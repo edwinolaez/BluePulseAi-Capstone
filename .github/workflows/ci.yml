@@ -1,0 +1,296 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Stage 1 — Lint
+  # ─────────────────────────────────────────────────────────────────────────
+  lint:
+    name: "Stage 1 — Lint"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: jasper-frontend/package-lock.json
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install frontend deps
+        working-directory: jasper-frontend
+        run: npm ci
+        continue-on-error: true  # skip if package.json not yet present
+
+      - name: ESLint (frontend)
+        working-directory: jasper-frontend
+        run: npm run lint
+        continue-on-error: true
+
+      - name: TypeScript type check (frontend)
+        working-directory: jasper-frontend
+        run: npx tsc --noEmit
+        continue-on-error: true
+
+      - name: Install Pylint
+        run: pip install pylint
+
+      - name: Pylint (backend)
+        working-directory: jasper-backend
+        run: |
+          if [ "$(find . -name '*.py' | head -1)" != "" ]; then
+            pylint $(find . -name '*.py' | head -20) --fail-under=7.0
+          else
+            echo "No Python files yet — skipping Pylint for jasper-backend"
+          fi
+
+      - name: Pylint (ML)
+        working-directory: jasper-ml
+        run: |
+          if [ "$(find . -name '*.py' | head -1)" != "" ]; then
+            pylint $(find . -name '*.py' | head -20) --fail-under=7.0
+          else
+            echo "No Python files yet — skipping Pylint for jasper-ml"
+          fi
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Stage 2 — Security
+  # ─────────────────────────────────────────────────────────────────────────
+  security:
+    name: "Stage 2 — Security"
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install security tools
+        run: pip install semgrep pip-audit
+
+      - name: Semgrep SAST — Python
+        run: semgrep --config=p/python --error .
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+
+      - name: Semgrep SAST — TypeScript/JavaScript
+        run: semgrep --config=p/typescript --config=p/javascript --error .
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+
+      - name: Semgrep — Secret detection
+        run: semgrep --config=p/secrets --error .
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+
+      - name: pip-audit (backend)
+        working-directory: jasper-backend
+        run: |
+          if [ -f requirements.txt ]; then
+            pip-audit -r requirements.txt
+          else
+            echo "No requirements.txt yet — skipping pip-audit for jasper-backend"
+          fi
+
+      - name: pip-audit (ML)
+        working-directory: jasper-ml
+        run: |
+          if [ -f requirements.txt ]; then
+            pip-audit -r requirements.txt
+          else
+            echo "No requirements.txt yet — skipping pip-audit for jasper-ml"
+          fi
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Stage 3 — Unit Tests
+  # ─────────────────────────────────────────────────────────────────────────
+  unit-tests:
+    name: "Stage 3 — Unit Tests"
+    runs-on: ubuntu-latest
+    needs: security
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: jasper-frontend/package-lock.json
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install frontend deps
+        working-directory: jasper-frontend
+        run: npm ci
+        continue-on-error: true
+
+      - name: Jest (frontend)
+        working-directory: jasper-frontend
+        run: npm test -- --ci --passWithNoTests
+        continue-on-error: true
+
+      - name: Install backend deps
+        working-directory: jasper-backend
+        run: |
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+
+      - name: pytest (backend)
+        working-directory: jasper-backend
+        run: |
+          pip install pytest pytest-cov
+          if [ "$(find . -name 'test_*.py' | head -1)" != "" ]; then
+            pytest --cov=. --cov-report=xml --cov-fail-under=80
+          else
+            echo "No tests yet — skipping pytest for jasper-backend"
+          fi
+
+      - name: pytest (ML)
+        working-directory: jasper-ml
+        run: |
+          pip install pytest pytest-cov
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ "$(find . -name 'test_*.py' | head -1)" != "" ]; then
+            pytest --cov=. --cov-report=xml --cov-fail-under=80
+          else
+            echo "No tests yet — skipping pytest for jasper-ml"
+          fi
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Stage 4 — Integration Tests
+  # ─────────────────────────────────────────────────────────────────────────
+  integration-tests:
+    name: "Stage 4 — Integration Tests"
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install integration test deps
+        working-directory: tests
+        run: |
+          pip install pytest httpx pytest-asyncio
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run integration tests
+        working-directory: tests
+        run: |
+          if [ "$(find . -name 'test_*.py' | head -1)" != "" ]; then
+            pytest --tb=short
+          else
+            echo "No integration tests yet — skipping"
+          fi
+        env:
+          RAILWAY_API_URL: ${{ secrets.RAILWAY_API_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Stage 5 — Build
+  # ─────────────────────────────────────────────────────────────────────────
+  build:
+    name: "Stage 5 — Build"
+    runs-on: ubuntu-latest
+    needs: integration-tests
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: jasper-frontend/package-lock.json
+
+      - name: Install frontend deps
+        working-directory: jasper-frontend
+        run: npm ci
+        continue-on-error: true
+
+      - name: Next.js production build
+        working-directory: jasper-frontend
+        run: npm run build
+        continue-on-error: true
+        env:
+          NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
+          NEXT_PUBLIC_API_KEY: ${{ secrets.NEXT_PUBLIC_API_KEY }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend Docker image
+        working-directory: jasper-backend
+        run: |
+          if [ -f Dockerfile ]; then
+            docker build -t jasper-backend:ci .
+          else
+            echo "No Dockerfile yet — skipping Docker build for jasper-backend"
+          fi
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Stage 6 — Performance Gate (activates Sprint 3)
+  # ─────────────────────────────────────────────────────────────────────────
+  performance:
+    name: "Stage 6 — Performance Gate"
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Install Lighthouse CI
+        run: npm install -g @lhci/cli
+
+      - name: Run Lighthouse CI
+        run: |
+          if [ -f jasper-frontend/.lighthouserc.js ] || [ -f .lighthouserc.json ]; then
+            lhci autorun
+          else
+            echo "Lighthouse config not yet present — skipping (activates Sprint 3)"
+          fi
+        env:
+          LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: API response time benchmark
+        working-directory: tests
+        run: |
+          pip install pytest pytest-benchmark httpx
+          if [ -f benchmark_api.py ]; then
+            pytest benchmark_api.py --benchmark-max-time=60 --benchmark-json=benchmark_results.json
+          else
+            echo "API benchmark not yet present — skipping (activates Sprint 3)"
+          fi

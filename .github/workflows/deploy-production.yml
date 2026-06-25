@@ -1,0 +1,58 @@
+name: Deploy — Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type DEPLOY to confirm production release"
+        required: true
+        default: ""
+
+jobs:
+  gate-check:
+    name: "Production Gate Check"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm intent
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "DEPLOY" ]; then
+            echo "Deployment aborted — type DEPLOY in the confirm field to proceed"
+            exit 1
+          fi
+          echo "Gate check passed — proceeding to production deploy"
+
+  deploy-production:
+    name: "Deploy to Vercel Production"
+    runs-on: ubuntu-latest
+    needs: gate-check
+    environment: production   # requires Edwin's manual approval in GitHub Environments
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel
+
+      - name: Deploy frontend to Vercel (production)
+        working-directory: jasper-frontend
+        run: vercel --prod --token=${{ secrets.VERCEL_TOKEN }} --yes
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Post-deploy smoke test
+        run: |
+          PROD_URL="${{ secrets.RAILWAY_PROD_URL }}"
+          if [ -n "$PROD_URL" ]; then
+            curl --fail --retry 5 --retry-delay 10 "$PROD_URL/health" \
+              && echo "Production health check PASSED" \
+              || (echo "CRITICAL: Production health check FAILED" && exit 1)
+          else
+            echo "RAILWAY_PROD_URL not set — skipping smoke test"
+          fi

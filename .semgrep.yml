@@ -1,0 +1,64 @@
+rules:
+  # ─── Python: secrets in code ───────────────────────────────────────────────
+  - id: jasper-no-hardcoded-secrets
+    patterns:
+      - pattern: $KEY = "..."
+    metavariable-regex:
+      metavariable: $KEY
+      regex: (?i)(password|secret|api_key|token|key|credential)
+    message: "Potential hardcoded secret in variable '$KEY'. Use environment variables instead."
+    languages: [python]
+    severity: ERROR
+
+  # ─── Python: raw SQL string concatenation (SQLi risk) ─────────────────────
+  - id: jasper-no-raw-sql-concat
+    patterns:
+      - pattern: |
+          $DB.execute("..." + ...)
+      - pattern: |
+          $DB.execute(f"...")
+    message: "Raw SQL string building detected. Use parameterized queries to prevent SQL injection."
+    languages: [python]
+    severity: ERROR
+
+  # ─── Python: DEBUG=True in production code ────────────────────────────────
+  - id: jasper-no-debug-true
+    pattern: DEBUG = True
+    message: "DEBUG=True detected. Must not be set in production code."
+    languages: [python]
+    severity: WARNING
+
+  # ─── Python: bare exception in FastAPI handlers (hides stack traces) ───────
+  - id: jasper-no-bare-exception-return
+    patterns:
+      - pattern: |
+          except Exception as $E:
+            return $RESP
+    message: "Bare exception caught and returned directly. Use structured error responses to avoid leaking stack traces."
+    languages: [python]
+    severity: WARNING
+
+  # ─── TypeScript/JS: dangerouslySetInnerHTML ────────────────────────────────
+  - id: jasper-no-dangerous-inner-html
+    pattern: dangerouslySetInnerHTML
+    message: "dangerouslySetInnerHTML detected. This is an XSS vector — sanitize all content before use."
+    languages: [typescript, javascript]
+    severity: ERROR
+
+  # ─── TypeScript/JS: eval() ────────────────────────────────────────────────
+  - id: jasper-no-eval
+    pattern: eval(...)
+    message: "eval() detected. Never use eval — this is a code injection vector."
+    languages: [typescript, javascript]
+    severity: ERROR
+
+  # ─── TypeScript/JS: hardcoded API keys in source ──────────────────────────
+  - id: jasper-no-hardcoded-api-key-ts
+    patterns:
+      - pattern: const $KEY = "..."
+    metavariable-regex:
+      metavariable: $KEY
+      regex: (?i)(api_key|apikey|secret|token|password)
+    message: "Potential hardcoded secret '$KEY'. Use environment variables (NEXT_PUBLIC_* for client-safe values)."
+    languages: [typescript, javascript]
+    severity: ERROR

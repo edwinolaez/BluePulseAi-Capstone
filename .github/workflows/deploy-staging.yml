@@ -1,0 +1,45 @@
+name: Deploy — Staging
+
+on:
+  push:
+    branches: [develop]
+
+jobs:
+  deploy-staging:
+    name: "Auto-deploy to Vercel Staging"
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel
+
+      - name: Deploy frontend to Vercel (staging)
+        working-directory: jasper-frontend
+        run: vercel --token=${{ secrets.VERCEL_TOKEN }} --yes
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Deploy backend to Railway (staging)
+        run: |
+          echo "Railway deployment triggered via push to develop"
+          echo "Railway auto-deploys from this branch via webhook — no CLI step needed here"
+          echo "Staging backend URL: ${{ secrets.RAILWAY_STAGING_URL }}"
+
+      - name: Smoke test staging
+        run: |
+          STAGING_URL="${{ secrets.RAILWAY_STAGING_URL }}"
+          if [ -n "$STAGING_URL" ]; then
+            curl --fail --retry 3 --retry-delay 5 "$STAGING_URL/health" \
+              && echo "Staging backend health check passed" \
+              || echo "WARNING: Staging health check failed — investigate before M4 sign-off"
+          else
+            echo "RAILWAY_STAGING_URL not set yet — skipping smoke test"
+          fi
