@@ -5,6 +5,7 @@ Loads trained model and runs predictions on new satellite imagery.
 
 Usage:
     python predict.py --model models/change_detection/model_v1.pkl --sector ATH-001-A
+    python predict.py --model model_v1.pkl --sector ATH-001-A --output prediction.json
 """
 
 import argparse
@@ -13,51 +14,135 @@ import numpy as np
 from pathlib import Path
 from datetime import datetime, timezone
 import json
+import sys
+import os
+
+# Add parent directory to path for data_loader import
+sys.path.insert(0, str(Path(__file__).parent))
+from data_loader import load_sector_imagery, compute_spectral_features, create_image_pairs
 
 
 def load_model(model_path: str):
-    """Load trained model from disk."""
+    """
+    Load trained RandomForest model from disk.
+    
+    Args:
+        model_path: Path to pickled model file
+    
+    Returns:
+        Trained RandomForestClassifier
+    """
+    model_path = Path(model_path)
+    if not model_path.exists():
+        raise FileNotFoundError(f"Model file not found: {model_path}")
+    
     with open(model_path, 'rb') as f:
         model = pickle.load(f)
     print(f"✓ Model loaded from {model_path}")
     return model
 
 
-def load_sector_imagery(sector_id: str):
+def load_model_metrics(model_path: str) -> dict:
     """
-    Load pre/post-fire imagery for a specific sector.
+    Load metrics from training (if available).
     
-    TODO (Sprint 2):
-    - Query Feven's ingest pipeline for sector data
-    - Load GeoTIFF files with rasterio
-    - Parse geospatial metadata
+    Args:
+        model_path: Path to pickled model file
+    
+    Returns:
+        Metrics dict or empty dict if not found
     """
-    print(f"Loading imagery for sector {sector_id}...")
+    metrics_path = Path(model_path).with_stem(
+        Path(model_path).stem.replace("_metrics", "") + "_metrics"
+    ).with_suffix(".json")
     
-    # Placeholder: generate synthetic imagery features
-    n_features = 8
-    features = np.random.randn(1, n_features).astype(np.float32)
-    
-    print(f"✓ Loaded features for sector {sector_id}")
-    return features
+    if metrics_path.exists():
+        with open(metrics_path, 'r') as f:
+            return json.load(f)
+    return {}
 
 
-def predict(model, features):
-    """Run model inference."""
+def get_sector_features(sector_id: str, data_dir: str = "data/") -> np.ndarray:
+    """
+    Load satellite imagery for a sector and compute feature vector.
+    
+    Args:
+        sector_id: Sector identifier (e.g., "ATH-001-A")
+        data_dir: Directory containing sector imagery
+    
+    Returns:
+        Feature vector (n_features,) ready for model prediction
+    """
+    print(f"\nLoading imagery for sector {sector_id}...")
+    
+    # Load pre/post-fire imagery
+    pre_img, post_img = load_sector_imagery(sector_id, data_dir)
+    
+    print(f"  Pre-fire image: {pre_img.shape}")
+    print(f"  Post-fire image: {post_img.shape}")
+    
+    # Create patches and compute features
+    patches = create_image_pairs(pre_img, post_img, patch_size=32, stride=16)
+    
+    if len(patches) == 0:
+        print(f"  Warning: No patches created, using full images")
+        patches = [(pre_img, post_img)]
+    
+    # Compute mean features across all patches
+    all_features = []
+    for pre_patch, post_patch in patches:
+        features = compute_spectral_features(pre_patch, post_patch)
+        all_features.append(features)
+    
+    mean_features = np.mean(all_features, axis=0)
+    print(f"  Computed {len(all_features)} patches, aggregated to feature vector")
+    
+    return mean_features.reshape(1, -1)  # Reshape for sklearn prediction
+
+
+def predict(model, features: np.ndarray) -> tuple:
+    """
+    Run model inference on features.
+    
+    Args:
+        model: Trained RandomForestClassifier
+        features: Feature vector (1, n_features)
+    
+    Returns:
+        (prediction_class, max_probability, probabilities_per_class)
+    """
     prediction = model.predict(features)[0]
-    probability = model.predict_proba(features)[0].max()
-    return prediction, probability
-
-
-def format_output(sector_id: str, prediction: int, confidence: float) -> dict:
-    """Format prediction as standardized ML output."""
+    probabilities = model.predict_proba(features)[0]
+    max_probability = probabilities.max()
     
-    # Map class to label
+    return prediction, max_probability, probabilities
+
+
+def format_output(sector_id: str, 
+                 prediction: int, 
+                 confidence: float,
+                 probabilities: np.ndarray,
+                 model_metrics: dict = None) -> dict:
+    """
+    Format prediction as standardized ML output schema.
+    
+    Args:
+        sector_id: Sector ID that was predicted
+        prediction: Class prediction (0, 1, or 2)
+        confidence: Max probability from model
+        probabilities: Per-class probabilities
+        model_metrics: Optional metrics from training
+    
+    Returns:
+        Dict following ML_OUTPUT_SCHEMA.md
+    """
+    
+    # Map class to risk label
     label_map = {0: "Low", 1: "Medium", 2: "High"}
     risk_label = label_map.get(prediction, "Unknown")
     
-    # Normalize to risk_score [0, 1]
-    risk_score = float(prediction) / 2.0  # Normalize class to [0, 1]
+    # Risk score: use probability of predicted class
+    risk_score = float(confidence)
     
     output = {
         "sector_id": sector_id,
@@ -65,20 +150,66 @@ def format_output(sector_id: str, prediction: int, confidence: float) -> dict:
         "simulation_type": "change_detection",
         "risk_score": risk_score,
         "risk_label": risk_label,
-        "contaminant_vector": {"direction_deg": 0.0, "velocity": 0.0},
+        "contaminant_vector": {
+            "direction_deg": 0.0,
+            "velocity": 0.0
+        },
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "confidence": float(confidence)
+        "confidence": float(confidence),
+        "class_probabilities": {}
     }
+    
+    # Add per-class probabilities (handle variable number of classes)
+    class_names = ["no_change", "medium_change", "high_change"]
+    for i, class_name in enumerate(class_names):
+        if i < len(probabilities):
+            output["class_probabilities"][class_name] = float(probabilities[i])
+        else:
+            output["class_probabilities"][class_name] = 0.0
+    
+    # Add model metadata if available
+    if model_metrics:
+        output["model_metadata"] = {
+            "training_f1_score": model_metrics.get("f1_macro"),
+            "training_date": model_metrics.get("training_date"),
+            "training_samples": model_metrics.get("dataset", {}).get("n_samples")
+        }
     
     return output
 
 
+def save_output(output: dict, output_path: str):
+    """Save prediction output to JSON file."""
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    with open(output_path, 'w') as f:
+        json.dump(output, f, indent=2)
+    print(f"✓ Prediction saved to {output_path}")
+
+
 def main():
-    parser = argparse.ArgumentParser(description="Run change detection predictions")
-    parser.add_argument("--model", default="models/change_detection/model_v1.pkl",
-                       help="Path to trained model")
-    parser.add_argument("--sector", required=True, help="Sector ID to predict")
-    parser.add_argument("--output", help="Output file path (JSON)")
+    """Command-line interface for model inference."""
+    parser = argparse.ArgumentParser(
+        description="Run change detection model inference on satellite imagery"
+    )
+    parser.add_argument(
+        "--model", type=str, default="models/change_detection/model_v1.pkl",
+        help="Path to trained model file"
+    )
+    parser.add_argument(
+        "--sector", type=str, required=True,
+        help="Sector ID to predict (e.g., ATH-001-A)"
+    )
+    parser.add_argument(
+        "--data", type=str, default="data/",
+        help="Directory containing sector imagery"
+    )
+    parser.add_argument(
+        "--output", type=str,
+        help="Output file path (JSON). If not specified, prints to console"
+    )
+    
     args = parser.parse_args()
     
     print("=" * 70)
@@ -87,33 +218,52 @@ def main():
     
     # Load model
     model = load_model(args.model)
+    model_metrics = load_model_metrics(args.model)
     
-    # Load sector imagery
-    features = load_sector_imagery(args.sector)
+    if model_metrics:
+        print(f"\nModel training metrics:")
+        print(f"  F1 Score (macro): {model_metrics.get('f1_macro', 'N/A'):.4f}")
+        print(f"  Training date: {model_metrics.get('training_date', 'N/A')}")
+    
+    # Get sector features
+    features = get_sector_features(args.sector, args.data)
     
     # Run prediction
-    print(f"\nRunning inference on sector {args.sector}...")
-    prediction, confidence = predict(model, features)
+    print(f"\nRunning inference...")
+    prediction, confidence, probabilities = predict(model, features)
     
     # Format output
-    output = format_output(args.sector, prediction, confidence)
+    output = format_output(
+        args.sector, 
+        prediction, 
+        confidence, 
+        probabilities,
+        model_metrics
+    )
     
-    print(f"\n✓ Prediction complete:")
-    print(f"  Risk Score: {output['risk_score']:.3f}")
-    print(f"  Risk Label: {output['risk_label']}")
-    print(f"  Confidence: {output['confidence']:.3f}")
+    # Display results
+    print(f"\n{'='*70}")
+    print(f"Prediction Results for Sector: {args.sector}")
+    print(f"{'='*70}")
+    print(f"Risk Label:       {output['risk_label']}")
+    print(f"Risk Score:       {output['risk_score']:.4f}")
+    print(f"Confidence:       {output['confidence']:.4f}")
+    print(f"Timestamp:        {output['timestamp']}")
+    print(f"\nClass Probabilities:")
+    for class_name, prob in output['class_probabilities'].items():
+        print(f"  {class_name:15s}: {prob:.4f}")
+    print(f"{'='*70}\n")
     
-    # Display JSON
-    print(f"\nJSON Output:")
-    print(json.dumps(output, indent=2))
-    
-    # Optionally save to file
+    # Save or print output
     if args.output:
-        with open(args.output, 'w') as f:
-            json.dump(output, f, indent=2)
-        print(f"\n✓ Output saved to {args.output}")
-    
-    print("\n" + "=" * 70)
+        save_output(output, args.output)
+    else:
+        print("Prediction Output (JSON):")
+        print(json.dumps(output, indent=2))
+
+
+if __name__ == "__main__":
+    main()
 
 
 if __name__ == "__main__":

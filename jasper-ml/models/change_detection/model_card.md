@@ -178,6 +178,183 @@ Follows [ML_OUTPUT_SCHEMA.md](../ML_OUTPUT_SCHEMA.md):
 
 ### Model Updates
 
+**Sprint 2 (June 23–July 4):**
+- [ ] Retrain on real satellite imagery from Feven's ingest pipeline
+- [ ] Document final F1 score in this card
+- [ ] Update hyperparameters if needed
+- [ ] Validate on holdout test set
+- [ ] Tag Edwin for review before M2 milestone
+
+---
+
+## Sprint 2 Retraining Instructions
+
+**Purpose:** Train model v1 on real Landsat imagery for production use
+
+**Deadline:** July 4, 2026 (M2 milestone)
+
+### 1. Prepare Data
+
+```bash
+cd /Users/Richard/Downloads/Capstone/Project\ Jasper/BluePulseAi-Capstone/jasper-ml
+
+# Coordinate with Feven to download real pre/post-fire imagery:
+# Athabasca watershed sectors: ATH-001-A, ATH-001-B, ATH-002-A, ATH-002-B
+# Expected format: {sector_id}_pre.tif, {sector_id}_post.tif
+# Resolution: 30m/pixel (Landsat-standard)
+# Bands: RGB + NIR (4-band GeoTIFF)
+
+mkdir -p data/
+# Place downloaded imagery in data/ directory
+```
+
+### 2. Activate Environment and Install Dependencies
+
+```bash
+source ml-env/bin/activate
+pip install -r requirements.txt
+```
+
+### 3. Train Model
+
+```bash
+# Train with default hyperparameters
+python models/change_detection/train.py \
+  --data data/ \
+  --sectors ATH-001-A ATH-001-B ATH-002-A \
+  --output models/change_detection/model_v1.pkl
+
+# Or with custom hyperparameters
+python models/change_detection/train.py \
+  --data data/ \
+  --sectors ATH-001-A ATH-001-B ATH-002-A \
+  --n-estimators 100 \
+  --max-depth 15 \
+  --output models/change_detection/model_v1.pkl
+```
+
+### 4. Review Metrics
+
+Training script outputs:
+- F1 Score (macro): Should be ≥ 0.75 for M2 milestone
+- Precision & Recall per class
+- Confusion matrix
+- Feature importances
+- Metrics saved to `model_v1_metrics.json`
+
+### 5. Update This Card
+
+Copy metrics from training output and update:
+- "Training Dataset" section: actual sector names, data source
+- "Model Performance" section: final F1, precision, recall
+- "Training Details" section: actual training time, date
+- "Status" field: change to "Production v1.0"
+
+**Example:**
+
+```markdown
+### Final Metrics (Sprint 2, Real Imagery)
+
+| Metric                  | Value |
+| ----------------------- | ----- |
+| **F1 Score (macro)**    | 0.82  |
+| **F1 Score (weighted)** | 0.84  |
+| **Precision (macro)**   | 0.83  |
+| **Recall (macro)**      | 0.81  |
+| **Accuracy**            | 0.83  |
+
+Training Date: 2026-07-02  
+Training Time: 3.5 seconds  
+Data Source: Landsat 8/9, Athabasca region  
+```
+
+### 6. Run Tests
+
+```bash
+# Run accuracy threshold tests
+pytest tests/test_models.py::test_model_f1_score_baseline -v
+pytest tests/test_models.py::test_model_precision_and_recall -v
+pytest tests/test_models.py -v
+```
+
+### 7. Commit and Push
+
+```bash
+git add models/change_detection/model_v1.pkl
+git add models/change_detection/model_v1_metrics.json
+git add models/change_detection/model_card.md
+git add models/change_detection/train.py
+git commit -m "feat: train change-detection model v1, F1=0.82 on real Athabasca imagery"
+git push origin feature/richard-ml
+```
+
+### 8. Create Pull Request
+
+GitHub → New Pull Request  
+- Base: `develop`
+- Head: `feature/richard-ml`
+- Title: `feat: Change detection model v1 trained on real imagery (M2)`
+- Description:
+  ```
+  ## Sprint 2 M2 Milestone - Model Training Complete
+  
+  **Metrics:**
+  - F1 Score (macro): 0.82
+  - Precision: 0.83
+  - Recall: 0.81
+  - Training Data: Real Landsat imagery, Athabasca region
+  - Sectors: ATH-001-A, ATH-001-B, ATH-002-A
+  
+  **Testing:**
+  - [ ] pytest all tests passing
+  - [ ] CI pipeline green
+  - [ ] Model card updated
+  - [ ] Ready for Edwin review
+  ```
+
+---
+
+## Testing & CI
+
+**Before requesting review:**
+
+```bash
+# Run all tests
+pytest tests/test_models.py -v
+
+# Verify model file exists
+ls -lh models/change_detection/model_v1.pkl
+
+# Check metrics file
+cat models/change_detection/model_v1_metrics.json | jq .
+
+# Run linting
+pylint models/change_detection/train.py
+```
+
+---
+
+## Contact & Questions
+
+- **Data Questions** → Ask Feven (ingest pipeline)
+- **Model Questions** → Ask Richard
+- **Testing/QA** → Ask Edwin
+
+---
+
+## Version History
+
+| Version | Date       | Status      | F1 Score | Notes                              |
+| ------- | ---------- | ----------- | -------- | ---------------------------------- |
+| v0.1    | 2026-06-20 | Baseline    | 0.80     | Sprint 1 spike (synthetic data)    |
+| v1.0    | 2026-07-02 | Production  | TBD      | Sprint 2 (real imagery) - **TODO** |
+| v2.0    | 2026-08-01 | Optimized   | TBD      | Sprint 4 (final tuning) - TODO    |
+
+---
+
+*Last Updated: 2026-06-26*  
+*Next Milestone: M2 (July 4, 2026) — Real model training complete*
+
 - Retrained quarterly with new imagery
 - Hyperparameter tuning if F1 score drops below 0.75
 - Version incremented (v1.1, v1.2, v2.0) on significant changes
