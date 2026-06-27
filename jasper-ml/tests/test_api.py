@@ -34,6 +34,21 @@ def test_health_check():
     data = response.json()
     assert data["status"] == "ok"
     assert data["service"] == "Project Jasper ML API"
+    assert "components" in data
+    assert "model" in data["components"]
+    assert "erosion_model" in data["components"]
+    assert "contaminant_model" in data["components"]
+
+
+def test_metrics_endpoint():
+    """Test metrics endpoint for monitoring."""
+    response = client.get("/metrics")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "ok"
+    assert "info" in data
+    assert data["info"]["model_version"] == "v1.0"
+    assert data["info"]["endpoints"] == 3
 
 
 # ============================================================================

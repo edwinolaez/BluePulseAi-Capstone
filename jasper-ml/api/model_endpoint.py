@@ -11,7 +11,9 @@ Endpoints:
 Rate limit: 20 req/min (configured by Kong Gateway)
 """
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 import numpy as np
@@ -19,6 +21,8 @@ from datetime import datetime, timezone
 import os
 import pickle
 import sys
+import json
+import logging
 from pathlib import Path
 
 # Add parent directory to path for imports
@@ -28,11 +32,70 @@ from models.simulations.erosion_model import calculate_erosion_risk as calc_eros
 from models.simulations.contaminant_model import calculate_contaminant_vector as calc_contaminant
 
 
+# ============================================================================
+# Logging Configuration
+# ============================================================================
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+
 app = FastAPI(
     title="Project Jasper ML Model API",
     description="AI/ML endpoints for watershed environmental monitoring",
     version="1.0.0"
 )
+
+
+# ============================================================================
+# CORS Configuration (for Frontend Integration)
+# ============================================================================
+
+# Get allowed origins from environment, default to localhost for development
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173").split(",")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# ============================================================================
+# Request/Response Logging Middleware
+# ============================================================================
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    """Log all requests and responses."""
+    request_time = datetime.now(timezone.utc)
+    
+    # Log request
+    logger.info(f"📥 {request.method} {request.url.path}")
+    
+    try:
+        response = await call_next(request)
+        
+        # Log response
+        elapsed = (datetime.now(timezone.utc) - request_time).total_seconds()
+        logger.info(
+            f"📤 {request.method} {request.url.path} | "
+            f"Status: {response.status_code} | "
+            f"Time: {elapsed:.3f}s"
+        )
+        
+        # Add timing header
+        response.headers["X-Process-Time"] = str(elapsed)
+        return response
+        
+    except Exception as e:
+        logger.error(f"❌ {request.method} {request.url.path} | Error: {str(e)}")
+        raise
 
 
 # ============================================================================
@@ -255,8 +318,58 @@ def calculate_contaminant_vector(sector_id: str, flow_direction_deg: float,
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint."""
-    return {"status": "ok", "service": "Project Jasper ML API"}
+    """
+    Health check endpoint.
+    
+    Used by Kong Gateway and load balancers to verify service is running.
+    Returns status, version, and component health.
+    """
+    try:
+        # Check if model can be loaded (if available)
+        model = load_change_detection_model()
+        model_status = "ready" if model is not None else "pending"
+        
+        return {
+            "status": "ok",
+            "service": "Project Jasper ML API",
+            "version": "1.0.0",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "components": {
+                "model": model_status,
+                "erosion_model": "ready",
+                "contaminant_model": "ready"
+            }
+        }
+    except Exception as e:
+        logger.error(f"Health check failed: {str(e)}")
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "error",
+                "service": "Project Jasper ML API",
+                "message": "Service degraded",
+                "error": str(e)
+            }
+        )
+
+
+@app.get("/metrics")
+async def metrics():
+    """
+    Basic metrics endpoint for monitoring.
+    
+    In production, this would connect to Prometheus or similar.
+    """
+    return {
+        "status": "ok",
+        "service": "Project Jasper ML API",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "info": {
+            "model_version": "v1.0",
+            "endpoints": 3,
+            "simulation_types": ["change_detection", "erosion", "contaminant"]
+        }
+    }
 
 
 @app.post("/api/v1/predict/change-detection", response_model=ModelOutput)
@@ -275,6 +388,11 @@ async def predict_change_detection(request: ChangeDetectionRequest):
     - risk_label: High/Medium/Low
     - confidence: Model confidence in prediction
     
+    **Status Codes:**
+    - 200: Successful prediction
+    - 422: Invalid input (missing or malformed sector_id)
+    - 500: Prediction failed (model error)
+    
     **Rate Limit:** 20 requests/minute (Kong Gateway)
     
     **Example:**
@@ -285,9 +403,12 @@ async def predict_change_detection(request: ChangeDetectionRequest):
     ```
     """
     try:
+        logger.info(f"Processing change detection for sector: {request.sector_id}")
         result = calculate_change_detection_risk(request.sector_id)
+        logger.info(f"✓ Change detection complete for {request.sector_id}")
         return ModelOutput(**result)
     except Exception as e:
+        logger.error(f"Change detection prediction failed for {request.sector_id}: {str(e)}")
         # Never return stack trace (security)
         raise HTTPException(
             status_code=500,
@@ -315,15 +436,23 @@ async def simulate_erosion(
     - risk_score: Erosion risk [0, 1]
     - risk_label: High/Medium/Low
     
+    **Status Codes:**
+    - 200: Successful simulation
+    - 422: Invalid parameters (out of range)
+    - 500: Simulation failed
+    
     **Example:**
     ```
     curl "http://localhost:8000/api/v1/simulate/erosion?sector_id=ATH-001-B&slope_deg=45&rainfall_mm=100"
     ```
     """
     try:
+        logger.info(f"Processing erosion simulation for {sector_id}: slope={slope_deg}°, rainfall={rainfall_mm}mm")
         result = calculate_erosion_risk(sector_id, slope_deg, rainfall_mm)
+        logger.info(f"✓ Erosion simulation complete for {sector_id}")
         return ModelOutput(**result)
     except Exception as e:
+        logger.error(f"Erosion simulation failed for {sector_id}: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail="Erosion simulation failed"
@@ -352,20 +481,28 @@ async def simulate_contaminant(
     - contaminant_vector: Direction and velocity of plume movement
     - risk_score: Contamination risk level
     
+    **Status Codes:**
+    - 200: Successful simulation
+    - 422: Invalid parameters (out of range)
+    - 500: Simulation failed
+    
     **Example:**
     ```
     curl "http://localhost:8000/api/v1/simulate/contaminant?sector_id=ATH-001-C&flow_direction_deg=180&water_velocity_ms=2.5&contamination_level=0.7"
     ```
     """
     try:
+        logger.info(f"Processing contaminant simulation for {sector_id}: direction={flow_direction_deg}°, velocity={water_velocity_ms}m/s, level={contamination_level}")
         result = calculate_contaminant_vector(
             sector_id, 
             flow_direction_deg, 
             water_velocity_ms, 
             contamination_level
         )
+        logger.info(f"✓ Contaminant simulation complete for {sector_id}")
         return ModelOutput(**result)
     except Exception as e:
+        logger.error(f"Contaminant simulation failed for {sector_id}: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail="Contaminant simulation failed"
@@ -374,4 +511,24 @@ async def simulate_contaminant(
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001, log_level="info")
+    
+    # Get configuration from environment
+    host = os.getenv("API_HOST", "0.0.0.0")
+    port = int(os.getenv("API_PORT", "8001"))
+    env = os.getenv("API_ENV", "development")
+    
+    logger.info(f"🚀 Starting Project Jasper ML API")
+    logger.info(f"   Environment: {env}")
+    logger.info(f"   Host: {host}:{port}")
+    logger.info(f"   Allowed Origins: {ALLOWED_ORIGINS}")
+    
+    # Production mode uses more workers
+    workers = 4 if env == "production" else 1
+    
+    uvicorn.run(
+        app,
+        host=host,
+        port=port,
+        log_level="info" if env == "development" else "warning",
+        workers=workers
+    )
