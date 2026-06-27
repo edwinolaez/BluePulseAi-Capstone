@@ -282,33 +282,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-def main():
-    parser = argparse.ArgumentParser(description="Train change detection model")
-    parser.add_argument("--data", default="data/sample", help="Path to training data")
-    parser.add_argument("--epochs", type=int, default=100, help="Number of training epochs")
-    parser.add_argument("--output", default="models/change_detection/model_v1.pkl", 
-                       help="Path to save trained model")
-    args = parser.parse_args()
-    
-    print("=" * 70)
-    print("PROJECT JASPER — Change Detection Model Training")
-    print("=" * 70)
-    
-    # Load data
-    X, y = load_training_data(args.data)
-    
-    # Train model
-    model, X_test, y_test = train_model(X, y)
-    
-    # Save model
-    save_model(model, args.output)
-    
-    print("\n" + "=" * 70)
-    print("✅ Training complete!")
-    print("=" * 70)
-
-
-if __name__ == "__main__":
-    main()
