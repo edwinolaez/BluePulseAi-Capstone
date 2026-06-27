@@ -14,7 +14,7 @@ Rate limit: 20 req/min (configured by Kong Gateway)
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, Dict, Any
 import numpy as np
 from datetime import datetime, timezone
@@ -104,46 +104,70 @@ async def log_requests(request: Request, call_next):
 
 class ChangeDetectionRequest(BaseModel):
     """Validate change detection prediction request."""
-    sector_id: str = Field(..., description="Grid sector ID (e.g., ATH-001-A)")
-    
-    class Config:
-        example = {
-            "sector_id": "ATH-001-A"
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "sector_id": "ATH-001-A"
+            }
         }
+    )
+    
+    sector_id: str = Field(..., description="Grid sector ID (e.g., ATH-001-A)")
 
 
 class ErosionSimulationRequest(BaseModel):
     """Validate erosion risk simulation request."""
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "sector_id": "ATH-001-B",
+                "slope_deg": 45.0,
+                "rainfall_mm": 100.0
+            }
+        }
+    )
+    
     sector_id: str = Field(..., description="Grid sector ID")
     slope_deg: float = Field(..., ge=0, le=90, description="Terrain slope (0-90 degrees)")
     rainfall_mm: float = Field(..., ge=0, le=500, description="Rainfall intensity (0-500 mm)")
-    
-    class Config:
-        example = {
-            "sector_id": "ATH-001-B",
-            "slope_deg": 45.0,
-            "rainfall_mm": 100.0
-        }
 
 
 class ContaminantSimulationRequest(BaseModel):
     """Validate contaminant tracking simulation request."""
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "sector_id": "ATH-001-C",
+                "flow_direction_deg": 180.0,
+                "water_velocity_ms": 2.5,
+                "contamination_level": 0.7
+            }
+        }
+    )
+    
     sector_id: str = Field(..., description="Grid sector ID")
     flow_direction_deg: float = Field(..., ge=0, le=360, description="Water flow direction (0-360°)")
     water_velocity_ms: float = Field(..., ge=0, le=5, description="Water velocity (0-5 m/s)")
     contamination_level: float = Field(..., ge=0, le=1, description="Contamination level (0-1)")
-    
-    class Config:
-        example = {
-            "sector_id": "ATH-001-C",
-            "flow_direction_deg": 180.0,
-            "water_velocity_ms": 2.5,
-            "contamination_level": 0.7
-        }
 
 
 class ModelOutput(BaseModel):
     """Standardized ML output schema."""
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "sector_id": "ATH-001-A",
+                "model_version": "v1.0",
+                "simulation_type": "change_detection",
+                "risk_score": 0.85,
+                "risk_label": "High",
+                "contaminant_vector": {"direction_deg": 0.0, "velocity": 0.0},
+                "timestamp": "2026-06-26T14:30:00Z",
+                "confidence": 0.92
+            }
+        }
+    )
+    
     sector_id: str
     model_version: str
     simulation_type: str
@@ -152,18 +176,6 @@ class ModelOutput(BaseModel):
     contaminant_vector: Dict[str, float]
     timestamp: str
     confidence: float
-    
-    class Config:
-        example = {
-            "sector_id": "ATH-001-A",
-            "model_version": "v1.0",
-            "simulation_type": "change_detection",
-            "risk_score": 0.85,
-            "risk_label": "High",
-            "contaminant_vector": {"direction_deg": 0.0, "velocity": 0.0},
-            "timestamp": "2026-06-26T14:30:00Z",
-            "confidence": 0.92
-        }
 
 
 # ============================================================================
