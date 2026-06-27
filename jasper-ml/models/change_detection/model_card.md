@@ -179,6 +179,7 @@ Follows [ML_OUTPUT_SCHEMA.md](../ML_OUTPUT_SCHEMA.md):
 ### Model Updates
 
 **Sprint 2 (June 23–July 4):**
+
 - [ ] Retrain on real satellite imagery from Feven's ingest pipeline
 - [ ] Document final F1 score in this card
 - [ ] Update hyperparameters if needed
@@ -236,6 +237,7 @@ python models/change_detection/train.py \
 ### 4. Review Metrics
 
 Training script outputs:
+
 - F1 Score (macro): Should be ≥ 0.75 for M2 milestone
 - Precision & Recall per class
 - Confusion matrix
@@ -245,6 +247,7 @@ Training script outputs:
 ### 5. Update This Card
 
 Copy metrics from training output and update:
+
 - "Training Dataset" section: actual sector names, data source
 - "Model Performance" section: final F1, precision, recall
 - "Training Details" section: actual training time, date
@@ -265,7 +268,7 @@ Copy metrics from training output and update:
 
 Training Date: 2026-07-02  
 Training Time: 3.5 seconds  
-Data Source: Landsat 8/9, Athabasca region  
+Data Source: Landsat 8/9, Athabasca region
 ```
 
 ### 6. Run Tests
@@ -290,21 +293,23 @@ git push origin feature/richard-ml
 
 ### 8. Create Pull Request
 
-GitHub → New Pull Request  
+GitHub → New Pull Request
+
 - Base: `develop`
 - Head: `feature/richard-ml`
 - Title: `feat: Change detection model v1 trained on real imagery (M2)`
 - Description:
+
   ```
   ## Sprint 2 M2 Milestone - Model Training Complete
-  
+
   **Metrics:**
   - F1 Score (macro): 0.82
   - Precision: 0.83
   - Recall: 0.81
   - Training Data: Real Landsat imagery, Athabasca region
   - Sectors: ATH-001-A, ATH-001-B, ATH-002-A
-  
+
   **Testing:**
   - [ ] pytest all tests passing
   - [ ] CI pipeline green
@@ -344,16 +349,16 @@ pylint models/change_detection/train.py
 
 ## Version History
 
-| Version | Date       | Status      | F1 Score | Notes                              |
-| ------- | ---------- | ----------- | -------- | ---------------------------------- |
-| v0.1    | 2026-06-20 | Baseline    | 0.80     | Sprint 1 spike (synthetic data)    |
-| v1.0    | 2026-07-02 | Production  | TBD      | Sprint 2 (real imagery) - **TODO** |
-| v2.0    | 2026-08-01 | Optimized   | TBD      | Sprint 4 (final tuning) - TODO    |
+| Version | Date       | Status     | F1 Score | Notes                              |
+| ------- | ---------- | ---------- | -------- | ---------------------------------- |
+| v0.1    | 2026-06-20 | Baseline   | 0.80     | Sprint 1 spike (synthetic data)    |
+| v1.0    | 2026-07-02 | Production | TBD      | Sprint 2 (real imagery) - **TODO** |
+| v2.0    | 2026-08-01 | Optimized  | TBD      | Sprint 4 (final tuning) - TODO     |
 
 ---
 
-*Last Updated: 2026-06-26*  
-*Next Milestone: M2 (July 4, 2026) — Real model training complete*
+_Last Updated: 2026-06-26_  
+_Next Milestone: M2 (July 4, 2026) — Real model training complete_
 
 - Retrained quarterly with new imagery
 - Hyperparameter tuning if F1 score drops below 0.75
