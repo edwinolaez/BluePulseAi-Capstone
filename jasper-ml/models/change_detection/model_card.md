@@ -1,4 +1,5 @@
 # Model Card: Change Detection v1.0
+
 **Project:** Project Jasper — Post-Wildfire Environmental Monitoring  
 **Author:** Richard (AI/ML Specialist)  
 **Date:** June 26, 2026  
@@ -11,7 +12,7 @@
 **Name:** Post-Fire Burn Scar Detection (Random Forest)  
 **Task:** Binary/Multi-class change detection on pre/post-fire satellite imagery  
 **Framework:** scikit-learn RandomForestClassifier  
-**Deployment:** Athabasca watershed, real-time inference  
+**Deployment:** Athabasca watershed, real-time inference
 
 ---
 
@@ -29,21 +30,21 @@ Detect post-wildfire burn scars in satellite imagery by analyzing spectral chang
 
 ### Baseline Metrics (Sprint 1 Spike)
 
-| Metric | Value | Target |
-|--------|-------|--------|
-| **F1 Score (macro)** | 0.80 | ≥ 0.75 |
-| **F1 Score (weighted)** | 0.82 | ≥ 0.75 |
-| **Precision (macro)** | 0.81 | ≥ 0.75 |
-| **Recall (macro)** | 0.79 | ≥ 0.75 |
-| **Accuracy** | 0.81 | — |
+| Metric                  | Value | Target |
+| ----------------------- | ----- | ------ |
+| **F1 Score (macro)**    | 0.80  | ≥ 0.75 |
+| **F1 Score (weighted)** | 0.82  | ≥ 0.75 |
+| **Precision (macro)**   | 0.81  | ≥ 0.75 |
+| **Recall (macro)**      | 0.79  | ≥ 0.75 |
+| **Accuracy**            | 0.81  | —      |
 
 ### Per-Class Performance
 
-| Class | Precision | Recall | F1 | Support |
-|-------|-----------|--------|----|----|
-| No Change (0) | 0.85 | 0.88 | 0.86 | 1024 |
-| Medium Change (1) | 0.78 | 0.75 | 0.76 | 512 |
-| High Change (2) | 0.80 | 0.74 | 0.77 | 256 |
+| Class             | Precision | Recall | F1   | Support |
+| ----------------- | --------- | ------ | ---- | ------- |
+| No Change (0)     | 0.85      | 0.88   | 0.86 | 1024    |
+| Medium Change (1) | 0.78      | 0.75   | 0.76 | 512     |
+| High Change (2)   | 0.80      | 0.74   | 0.77 | 256     |
 
 ---
 
@@ -51,14 +52,14 @@ Detect post-wildfire burn scars in satellite imagery by analyzing spectral chang
 
 ### Training Dataset
 
-| Attribute | Value |
-|-----------|-------|
-| **Source** | Synthetic + Athabasca test imagery (Sprint 1) |
-| **Imagery Type** | 4-band satellite (RGB + NIR) |
-| **Resolution** | 30-50m/pixel (Landsat-equivalent) |
-| **Temporal Coverage** | Pre/post-fire pairs, 2024-2026 |
-| **Samples** | 256×256 patches, 1,792 training samples |
-| **Train/Test Split** | 80/20 (stratified) |
+| Attribute             | Value                                         |
+| --------------------- | --------------------------------------------- |
+| **Source**            | Synthetic + Athabasca test imagery (Sprint 1) |
+| **Imagery Type**      | 4-band satellite (RGB + NIR)                  |
+| **Resolution**        | 30-50m/pixel (Landsat-equivalent)             |
+| **Temporal Coverage** | Pre/post-fire pairs, 2024-2026                |
+| **Samples**           | 256×256 patches, 1,792 training samples       |
+| **Train/Test Split**  | 80/20 (stratified)                            |
 
 ### Data Preprocessing
 
@@ -74,9 +75,11 @@ Detect post-wildfire burn scars in satellite imagery by analyzing spectral chang
 ## Model Architecture
 
 ### Model Type
+
 Random Forest Classifier (ensemble of 100 decision trees)
 
 ### Hyperparameters
+
 ```python
 RandomForestClassifier(
     n_estimators=100,
@@ -88,6 +91,7 @@ RandomForestClassifier(
 ```
 
 ### Training Details
+
 - **Optimization**: Gini impurity
 - **Training Time**: ~2.5 seconds (on CPU)
 - **Feature Importance**: NDVI difference > spectral angle > mean change
@@ -97,12 +101,14 @@ RandomForestClassifier(
 ## Intended Use
 
 **Appropriate Uses:**
+
 - Real-time burn scar detection for emergency response
 - Post-fire environmental assessment
 - Erosion risk prediction (downstream)
 - CERCUTS/SAIT Faculty demonstration (demo day)
 
 **Limitations:**
+
 - Performance on cloud-obscured imagery: Unknown
 - Performance on non-Landsat imagery: Not tested
 - Seasonal variations: Not quantified
@@ -113,11 +119,14 @@ RandomForestClassifier(
 ## Model Inputs and Outputs
 
 ### Inputs
+
 - **Pre-fire Image**: 4-band GeoTIFF, 256×256 pixels
 - **Post-fire Image**: 4-band GeoTIFF, 256×256 pixels, same extent
 
 ### Outputs
+
 Follows [ML_OUTPUT_SCHEMA.md](../ML_OUTPUT_SCHEMA.md):
+
 ```json
 {
   "sector_id": "ATH-001-A",
@@ -125,7 +134,7 @@ Follows [ML_OUTPUT_SCHEMA.md](../ML_OUTPUT_SCHEMA.md):
   "simulation_type": "change_detection",
   "risk_score": 0.85,
   "risk_label": "High",
-  "contaminant_vector": {"direction_deg": 0.0, "velocity": 0.0},
+  "contaminant_vector": { "direction_deg": 0.0, "velocity": 0.0 },
   "timestamp": "2026-06-26T14:30:00Z",
   "confidence": 0.92
 }
@@ -136,11 +145,13 @@ Follows [ML_OUTPUT_SCHEMA.md](../ML_OUTPUT_SCHEMA.md):
 ## Bias and Fairness
 
 **Potential Biases:**
+
 - Training data limited to Athabasca region (may not generalize to other watersheds)
 - Seasonal imagery bias (mostly summer data)
 - Sensor bias (Landsat 8/9 spectral characteristics)
 
 **Mitigation:**
+
 - Multi-region data planned for Sprint 3+
 - Stratified validation across seasons
 - Cross-sensor evaluation (Sentinel-2, etc.)
@@ -160,16 +171,19 @@ Follows [ML_OUTPUT_SCHEMA.md](../ML_OUTPUT_SCHEMA.md):
 ## Maintenance and Monitoring
 
 ### Performance Monitoring
+
 - F1 score tracked weekly against baseline (0.80 threshold)
 - Confusion matrix reviewed monthly
 - Outlier predictions logged for inspection
 
 ### Model Updates
+
 - Retrained quarterly with new imagery
 - Hyperparameter tuning if F1 score drops below 0.75
 - Version incremented (v1.1, v1.2, v2.0) on significant changes
 
 ### Versioning
+
 - **v1.0** (Sprint 1): Baseline spike notebook
 - **v1.1** (Sprint 2): Trained on production pipeline
 - **v2.0** (Sprint 3+): Planned improvements
@@ -179,17 +193,20 @@ Follows [ML_OUTPUT_SCHEMA.md](../ML_OUTPUT_SCHEMA.md):
 ## Testing
 
 ### Unit Tests
+
 - Output schema validation
 - Risk score range checks [0, 1]
 - Risk label classification rules
 - Timestamp ISO 8601 format
 
 ### Integration Tests
+
 - End-to-end prediction with real imagery
 - PostGIS storage round-trip
 - Frontend map display validation
 
 ### Regression Tests
+
 - F1 score maintained above baseline
 - No NaN/Inf values in outputs
 - Latency < 2 seconds per prediction
@@ -209,9 +226,9 @@ Follows [ML_OUTPUT_SCHEMA.md](../ML_OUTPUT_SCHEMA.md):
 
 **Model Owner:** Richard (AI/ML Specialist)  
 **Questions:** Ask in team channel  
-**Report Issues:** Create GitHub issue on `feature/richard-ml` branch  
+**Report Issues:** Create GitHub issue on `feature/richard-ml` branch
 
 ---
 
-*Last Updated: 2026-06-26*  
-*Next Review: 2026-07-04 (M2 Milestone)*
+_Last Updated: 2026-06-26_  
+_Next Review: 2026-07-04 (M2 Milestone)_

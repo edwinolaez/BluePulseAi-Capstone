@@ -1,4 +1,5 @@
 # Project Jasper — ML Module
+
 ## AI/ML & Simulation for Post-Wildfire Environmental Monitoring
 
 **Project Lead:** Richard (AI/ML Specialist)  
@@ -38,6 +39,7 @@ jupyter notebook notebooks/change_detection_spike.ipynb
 ```
 
 This notebook demonstrates:
+
 - ✅ Loading and preprocessing satellite imagery
 - ✅ Training baseline Random Forest model
 - ✅ Evaluating F1 score, precision, recall (baseline: F1=0.80)
@@ -90,13 +92,13 @@ jasper-ml/
 
 ## Sprint Timeline & Status
 
-| Sprint | Dates | Status | Deliverables |
-|--------|-------|--------|--------------|
-| **1 — Foundation** | Jun 10-20 | ✅ DONE | Spike notebook, ML schema, model card template |
-| **2 — Pipeline** | Jun 23-Jul 4 | ⏳ TODO | Train v1 model, accuracy tests, PostGIS schema |
-| **3 — AI Live** | Jul 7-18 | ⏳ TODO | Erosion + contaminant sims, API endpoints |
-| **4 — Hardening** | Jul 21-Aug 1 | ⏳ TODO | Final validation, CERCUTS report |
-| **5 — Demo** | Aug 3 | 🎯 TARGET | Demonstration to SAIT Faculty & CERCUTS |
+| Sprint             | Dates        | Status    | Deliverables                                   |
+| ------------------ | ------------ | --------- | ---------------------------------------------- |
+| **1 — Foundation** | Jun 10-20    | ✅ DONE   | Spike notebook, ML schema, model card template |
+| **2 — Pipeline**   | Jun 23-Jul 4 | ⏳ TODO   | Train v1 model, accuracy tests, PostGIS schema |
+| **3 — AI Live**    | Jul 7-18     | ⏳ TODO   | Erosion + contaminant sims, API endpoints      |
+| **4 — Hardening**  | Jul 21-Aug 1 | ⏳ TODO   | Final validation, CERCUTS report               |
+| **5 — Demo**       | Aug 3        | 🎯 TARGET | Demonstration to SAIT Faculty & CERCUTS        |
 
 ---
 
@@ -127,6 +129,7 @@ All model outputs follow this standardized structure (delivered to Edwin):
 ## API Endpoints (Sprint 3+)
 
 ### Change Detection
+
 ```bash
 curl -X POST http://localhost:8001/api/v1/predict/change-detection \
   -H "Content-Type: application/json" \
@@ -134,11 +137,13 @@ curl -X POST http://localhost:8001/api/v1/predict/change-detection \
 ```
 
 ### Erosion Risk
+
 ```bash
 curl "http://localhost:8001/api/v1/simulate/erosion?sector_id=ATH-001-B&slope_deg=45&rainfall_mm=100"
 ```
 
 ### Contaminant Tracking
+
 ```bash
 curl "http://localhost:8001/api/v1/simulate/contaminant?sector_id=ATH-001-C&flow_direction_deg=180&water_velocity_ms=2.5&contamination_level=0.7"
 ```
@@ -159,6 +164,7 @@ pytest tests/test_models.py --cov=models --cov=api
 ```
 
 **Key test categories:**
+
 - ✅ Schema validation (outputs match ML_OUTPUT_SCHEMA.md)
 - ✅ Range constraints (risk_score ∈ [0,1], direction ∈ [0,360))
 - ✅ Edge cases (NaN handling, boundary values)
@@ -194,15 +200,15 @@ git push origin feature/richard-ml
 
 ## Key Files
 
-| File | Purpose | Status |
-|------|---------|--------|
-| [ML_OUTPUT_SCHEMA.md](ML_OUTPUT_SCHEMA.md) | Standardized JSON schema | ✅ Done |
-| [models/change_detection/model_card.md](models/change_detection/model_card.md) | Model documentation | ✅ Template |
-| [notebooks/change_detection_spike.ipynb](notebooks/change_detection_spike.ipynb) | Spike analysis | ✅ Complete |
-| [tests/test_models.py](tests/test_models.py) | Test suite | ✅ Ready |
-| [api/model_endpoint.py](api/model_endpoint.py) | FastAPI server | ✅ Skeleton |
-| [models/simulations/erosion_model.py](models/simulations/erosion_model.py) | Erosion sim | ✅ Ready |
-| [models/simulations/contaminant_model.py](models/simulations/contaminant_model.py) | Contaminant sim | ✅ Ready |
+| File                                                                               | Purpose                  | Status      |
+| ---------------------------------------------------------------------------------- | ------------------------ | ----------- |
+| [ML_OUTPUT_SCHEMA.md](ML_OUTPUT_SCHEMA.md)                                         | Standardized JSON schema | ✅ Done     |
+| [models/change_detection/model_card.md](models/change_detection/model_card.md)     | Model documentation      | ✅ Template |
+| [notebooks/change_detection_spike.ipynb](notebooks/change_detection_spike.ipynb)   | Spike analysis           | ✅ Complete |
+| [tests/test_models.py](tests/test_models.py)                                       | Test suite               | ✅ Ready    |
+| [api/model_endpoint.py](api/model_endpoint.py)                                     | FastAPI server           | ✅ Skeleton |
+| [models/simulations/erosion_model.py](models/simulations/erosion_model.py)         | Erosion sim              | ✅ Ready    |
+| [models/simulations/contaminant_model.py](models/simulations/contaminant_model.py) | Contaminant sim          | ✅ Ready    |
 
 ---
 
@@ -239,7 +245,7 @@ All packages already installed during initial setup.
 **Feven (Data Pipeline):** Provides pre/post-fire imagery  
 **Rahil (Database):** Stores outputs in PostGIS  
 **Reyta (Frontend):** Displays on map overlay  
-**Edwin (QA):** Validates in CI pipeline  
+**Edwin (QA):** Validates in CI pipeline
 
 ---
 
@@ -262,5 +268,5 @@ All packages already installed during initial setup.
 
 ---
 
-*Last Updated: 2026-06-26*  
-*Next Review: 2026-07-04 (M2 Milestone)*
+_Last Updated: 2026-06-26_  
+_Next Review: 2026-07-04 (M2 Milestone)_
