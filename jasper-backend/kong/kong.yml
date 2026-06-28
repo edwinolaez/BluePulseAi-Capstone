@@ -1,0 +1,31 @@
+_format_version: "2.1"
+
+services:
+  - name: jasper-backend
+    url: http://localhost:8000
+    routes:
+      - name: health-route
+        paths:
+          - /health
+        methods:
+          - GET
+      - name: ingest-route
+        paths:
+          - /api/v1/ingest
+        methods:
+          - POST
+      - name: layers-route
+        paths:
+          - /api/v1/layers
+        methods:
+          - GET
+
+plugins:
+  - name: rate-limiting
+    config:
+      minute: 20
+      policy: local
+  - name: cors
+    config:
+      origins:
+        - http://localhost:3000
