@@ -4,6 +4,8 @@
 **Last Updated:** 2026-06-26
 
 ---
+**Production URL:** https://bluepulseai-capstone-production.up.railway.app
+
 
 ## 1. Health Check
 
