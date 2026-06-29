@@ -1,11 +1,11 @@
 import os
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form
-from datetime import datetime
+from datetime import datetime, timezone
 from schemas.ingest_schema import GeoTiffIngest, DEMIngest, TelemetryIngest
 
 router = APIRouter()
 
-MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB in bytes
+MAX_FILE_SIZE = 50 * 1024 * 1024
 
 @router.post("/api/v1/ingest/geotiff")
 async def ingest_geotiff(
@@ -14,20 +14,21 @@ async def ingest_geotiff(
     data_source: str = Form(...),
     user_id: str = Form(...),
 ):
-    # Check file size
     contents = await file.read()
     if len(contents) > MAX_FILE_SIZE:
         raise HTTPException(status_code=413, detail="File too large. Max size is 50MB.")
 
-    # Check file format
     if not file.filename.endswith(".tif") and not file.filename.endswith(".tiff"):
         raise HTTPException(status_code=422, detail="Invalid file format. Only GeoTIFF files accepted.")
 
+    timestamp = datetime.now(timezone.utc).isoformat()
     return {
         "status": "accepted",
         "layer_type": "geotiff",
-        "layer_id": f"geotiff-{sector_id}-{datetime.utcnow().timestamp()}",
+        "layer_id": f"geotiff-{sector_id}-{timestamp}",
         "sector_id": sector_id,
+        "user_id": user_id,
+        "timestamp": timestamp,
         "filename": file.filename,
         "size_bytes": len(contents)
     }
@@ -47,11 +48,14 @@ async def ingest_dem(
     if not file.filename.endswith(".tif") and not file.filename.endswith(".tiff"):
         raise HTTPException(status_code=422, detail="Invalid file format. Only DEM GeoTIFF files accepted.")
 
+    timestamp = datetime.now(timezone.utc).isoformat()
     return {
         "status": "accepted",
         "layer_type": "dem",
-        "layer_id": f"dem-{sector_id}-{datetime.utcnow().timestamp()}",
+        "layer_id": f"dem-{sector_id}-{timestamp}",
         "sector_id": sector_id,
+        "user_id": user_id,
+        "timestamp": timestamp,
         "filename": file.filename,
         "size_bytes": len(contents)
     }
@@ -65,11 +69,14 @@ async def ingest_telemetry(
     turbidity: float = Form(...),
     flow_rate: float = Form(...),
 ):
+    timestamp = datetime.now(timezone.utc).isoformat()
     return {
         "status": "accepted",
         "layer_type": "telemetry",
-        "record_id": f"telemetry-{sector_id}-{datetime.utcnow().timestamp()}",
+        "record_id": f"telemetry-{sector_id}-{timestamp}",
         "sector_id": sector_id,
+        "user_id": user_id,
+        "timestamp": timestamp,
         "turbidity": turbidity,
         "flow_rate": flow_rate
     }
