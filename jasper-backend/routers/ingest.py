@@ -60,6 +60,8 @@ async def ingest_dem(
         "filename": file.filename,
         "size_bytes": len(contents)
     }
+
+
 @router.post("/api/v1/ingest/telemetry")
 async def ingest_telemetry(
     sector_id: str = Form(...),
@@ -76,10 +78,11 @@ async def ingest_telemetry(
             "sector_id": sector_id,
             "turbidity": turbidity,
             "recorded_at": timestamp,
+            "payload": {"flow_rate": flow_rate, "data_source": data_source}
         }
         supabase.table("water_quality_readings").insert(record).execute()
     except Exception:
-        pass  # If DB is unavailable, still return accepted
+        pass
 
     return {
         "status": "accepted",
