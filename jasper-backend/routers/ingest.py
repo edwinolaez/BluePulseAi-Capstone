@@ -2,6 +2,7 @@ import os
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form
 from datetime import datetime, timezone
 from schemas.ingest_schema import GeoTiffIngest, DEMIngest, TelemetryIngest
+from database import get_supabase
 
 router = APIRouter()
 
@@ -59,8 +60,6 @@ async def ingest_dem(
         "filename": file.filename,
         "size_bytes": len(contents)
     }
-
-
 @router.post("/api/v1/ingest/telemetry")
 async def ingest_telemetry(
     sector_id: str = Form(...),
@@ -70,6 +69,18 @@ async def ingest_telemetry(
     flow_rate: float = Form(...),
 ):
     timestamp = datetime.now(timezone.utc).isoformat()
+
+    try:
+        supabase = get_supabase()
+        record = {
+            "sector_id": sector_id,
+            "turbidity": turbidity,
+            "recorded_at": timestamp,
+        }
+        supabase.table("water_quality_readings").insert(record).execute()
+    except Exception:
+        pass  # If DB is unavailable, still return accepted
+
     return {
         "status": "accepted",
         "layer_type": "telemetry",
