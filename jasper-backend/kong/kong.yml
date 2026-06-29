@@ -2,21 +2,24 @@ _format_version: "2.1"
 
 services:
   - name: jasper-backend
-    url: http://localhost:8000
+    url: http://192.168.1.75:8000
     routes:
       - name: health-route
         paths:
           - /health
+        strip_path: false
         methods:
           - GET
       - name: ingest-route
         paths:
           - /api/v1/ingest
+        strip_path: false
         methods:
           - POST
       - name: layers-route
         paths:
           - /api/v1/layers
+        strip_path: false
         methods:
           - GET
 
@@ -25,7 +28,12 @@ plugins:
     config:
       minute: 20
       policy: local
-  - name: cors
+  - name: key-auth
     config:
-      origins:
-        - http://localhost:3000
+      key_names:
+        - X-API-Key
+
+consumers:
+  - username: jasper-frontend
+    keyauth_credentials:
+      - key: jasper-dev-api-key-2026
