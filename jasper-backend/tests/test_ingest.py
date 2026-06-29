@@ -78,3 +78,25 @@ def test_telemetry_ingest_missing_field():
         }
     )
     assert response.status_code == 422
+
+    # Fusion endpoint tests
+def test_get_layers_valid():
+    response = client.get("/api/v1/layers/S1")
+    assert response.status_code == 200
+    assert response.json()["sector_id"] == "S1"
+    assert "layers" in response.json()
+
+def test_get_layers_with_filters():
+    response = client.get(
+        "/api/v1/layers/S1?date_from=2026-01-01&date_to=2026-06-01&layer_type=geotiff"
+    )
+    assert response.status_code == 200
+    assert response.json()["sector_id"] == "S1"
+
+def test_get_layers_invalid_layer_type():
+    response = client.get("/api/v1/layers/S1?layer_type=invalid")
+    assert response.status_code == 422
+
+def test_get_layers_invalid_date():
+    response = client.get("/api/v1/layers/S1?date_from=not-a-date")
+    assert response.status_code == 422
