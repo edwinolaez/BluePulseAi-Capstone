@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #f1f5f9;
+  --foreground: #0f172a;
+  --surface: #ffffff;
+  --surface-container: #ffffff;
+  --surface-alt: #e2e8f0;
+}
+
+.dark {
+  --background: #121416;
+  --foreground: #e2e2e5;
+  --surface: #1e2022;
+  --surface-container: #1e2022;
+  --surface-alt: #2a2d30;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-display), Arial, Helvetica, sans-serif;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* Scientific grayscale filter in light mode, premium satellite-style filter in dark mode */
+.leaflet-tile-pane {
+  filter: grayscale(1) brightness(1.08) contrast(0.95) saturate(0.12) opacity(0.85);
+  transition: filter 0.25s ease;
+}
+.dark .leaflet-tile-pane {
+  filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7);
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Borderless, floating labels for map hazard circles */
+.jasper-zone-label {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Station telemetry popup card */
+.jasper-popup .leaflet-popup-content-wrapper {
+  border-radius: 10px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25);
+}
+.jasper-popup .leaflet-popup-content {
+  margin: 12px 14px;
+}
