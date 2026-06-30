@@ -32,6 +32,21 @@ plugins:
     config:
       key_names:
         - X-API-Key
+  - name: cors
+    config:
+      origins:
+        - http://localhost:3000
+        - https://*.vercel.app
+      methods:
+        - GET
+        - POST
+        - OPTIONS
+      headers:
+        - X-API-Key
+        - Content-Type
+      exposed_headers:
+        - X-Kong-Upstream-Latency
+      max_age: 3600
 
 consumers:
   - username: jasper-frontend
