@@ -11,7 +11,7 @@ export function BurnScarLayer() {
   const [mlData, setMlData] = useState<ModelOutput | null>(null);
 
   useEffect(() => {
-    fetchChangeDetection(SECTOR_ID).then(setMlData).catch(() => null);
+    fetchChangeDetection(SECTOR_ID).then(setMlData).catch((err) => console.error("BurnScarLayer: change detection failed", err));
   }, []);
 
   const confidence = mlData

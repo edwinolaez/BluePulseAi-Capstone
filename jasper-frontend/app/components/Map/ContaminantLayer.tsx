@@ -29,7 +29,7 @@ export function ContaminantLayer() {
     // 180° = southward Athabasca flow; 2.1 m/s = observed discharge; 0.7 = high contamination
     fetchContaminantSimulation(SECTOR_ID, 180, 2.1, 0.7)
       .then(setMlData)
-      .catch(() => null);
+      .catch((err) => console.error("ContaminantLayer: contaminant simulation failed", err));
   }, []);
 
   const directionDeg = mlData

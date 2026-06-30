@@ -1,12 +1,11 @@
-import os
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form
 from datetime import datetime, timezone
-from schemas.ingest_schema import GeoTiffIngest, DEMIngest, TelemetryIngest
 from database import get_supabase
 
 router = APIRouter()
 
 MAX_FILE_SIZE = 50 * 1024 * 1024
+
 
 @router.post("/api/v1/ingest/geotiff")
 async def ingest_geotiff(
@@ -15,6 +14,10 @@ async def ingest_geotiff(
     data_source: str = Form(...),
     user_id: str = Form(...),
 ):
+    # Reject oversized files before buffering into memory
+    if file.size and file.size > MAX_FILE_SIZE:
+        raise HTTPException(status_code=413, detail="File too large. Max size is 50MB.")
+
     contents = await file.read()
     if len(contents) > MAX_FILE_SIZE:
         raise HTTPException(status_code=413, detail="File too large. Max size is 50MB.")
@@ -31,7 +34,7 @@ async def ingest_geotiff(
         "user_id": user_id,
         "timestamp": timestamp,
         "filename": file.filename,
-        "size_bytes": len(contents)
+        "size_bytes": len(contents),
     }
 
 
@@ -42,6 +45,10 @@ async def ingest_dem(
     data_source: str = Form(...),
     user_id: str = Form(...),
 ):
+    # Reject oversized files before buffering into memory
+    if file.size and file.size > MAX_FILE_SIZE:
+        raise HTTPException(status_code=413, detail="File too large. Max size is 50MB.")
+
     contents = await file.read()
     if len(contents) > MAX_FILE_SIZE:
         raise HTTPException(status_code=413, detail="File too large. Max size is 50MB.")
@@ -58,7 +65,7 @@ async def ingest_dem(
         "user_id": user_id,
         "timestamp": timestamp,
         "filename": file.filename,
-        "size_bytes": len(contents)
+        "size_bytes": len(contents),
     }
 
 
@@ -78,13 +85,12 @@ async def ingest_telemetry(
             "sector_id": sector_id,
             "turbidity": turbidity,
             "recorded_at": timestamp,
-            "payload": {"flow_rate": flow_rate, "data_source": data_source}
+            "payload": {"flow_rate": flow_rate, "data_source": data_source},
         }
         supabase.table("water_quality_readings").insert(record).execute()
     except Exception as e:
-        print(f"Supabase error: {e}")
-        pass
-    
+        raise HTTPException(status_code=503, detail=f"Database unavailable: {e}")
+
     return {
         "status": "accepted",
         "layer_type": "telemetry",
@@ -93,5 +99,5 @@ async def ingest_telemetry(
         "user_id": user_id,
         "timestamp": timestamp,
         "turbidity": turbidity,
-        "flow_rate": flow_rate
+        "flow_rate": flow_rate,
     }

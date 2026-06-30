@@ -15,13 +15,12 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 import numpy as np
 from datetime import datetime, timezone
 import os
 import pickle
 import sys
-import json
 import logging
 from pathlib import Path
 

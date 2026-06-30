@@ -12,7 +12,7 @@ export function ErosionLayer() {
 
   useEffect(() => {
     // 38.5° matches observed SEC-E1 slope; 60 mm is typical post-fire rainfall
-    fetchErosionSimulation(SECTOR_ID, 38.5, 60).then(setMlData).catch(() => null);
+    fetchErosionSimulation(SECTOR_ID, 38.5, 60).then(setMlData).catch((err) => console.error("ErosionLayer: erosion simulation failed", err));
   }, []);
 
   const riskScore = mlData ? `${mlData.risk_score.toFixed(2)} / 1.00` : "0.78 / 1.00";
