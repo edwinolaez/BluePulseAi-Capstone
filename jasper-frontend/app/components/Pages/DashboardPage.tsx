@@ -57,10 +57,10 @@ const STATION_DATA: Record<Station, StationStats> = {
 };
 
 const METRICS: Record<MetricKey, { label: string; unit: string; dangerValue: number; dangerLabel: string }> = {
-  turbidity: { label: "Turbidity",         unit: "NTU", dangerValue: 50, dangerLabel: "Danger Barrier (5.0 NTU)" },
-  ph:        { label: "pH Level",          unit: "pH",  dangerValue: 40, dangerLabel: "Danger Barrier (6.0 pH)" },
-  ash:       { label: "Ash Concentration", unit: "ppm", dangerValue: 60, dangerLabel: "Danger Barrier (20 ppm)" },
-  soil:      { label: "Soil Stability",    unit: "%",   dangerValue: 70, dangerLabel: "Stability Floor (80%)" },
+  turbidity: { label: "Water Cloudiness",  unit: "NTU", dangerValue: 50, dangerLabel: "Warning Level (5.0 NTU)" },
+  ph:        { label: "Acidity (pH)",      unit: "pH",  dangerValue: 40, dangerLabel: "Warning Level (6.0 pH)" },
+  ash:       { label: "Ash Levels",        unit: "ppm", dangerValue: 60, dangerLabel: "Warning Level (20 ppm)" },
+  soil:      { label: "Ground Stability",  unit: "%",   dangerValue: 70, dangerLabel: "Stability Floor (80%)" },
 };
 
 const HOUR_LABELS = ["06:00", "07:00", "08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "Now"];
@@ -71,22 +71,22 @@ const ALERTS = [
     icon: FlameIcon,
     accentBorder: "border-red-500",
     accentText: "text-red-500",
-    title: "Active Runoff Risk Warning",
-    description: "High erosion potential detected in Burn Scar Segment 4A due to low soil hydration coefficients.",
+    title: "Soil Runoff Risk Detected",
+    description: "Soil in Burn Area 4A is dry and at high risk of washing away. Close monitoring is active.",
   },
   {
     icon: DropletIcon,
     accentBorder: "border-amber-500",
     accentText: "text-amber-500",
-    title: "Turbidity Surge Detected",
-    description: "IoT Jasper-A1 is indicating 4.2 NTU, rising 8.5% over the past three polling intervals.",
+    title: "River Getting Cloudier",
+    description: "Water sensor IoT Jasper-A1 shows water cloudiness rising — up 8.5% in the past 3 readings.",
   },
   {
     icon: PulseIcon,
     accentBorder: "border-green-500",
     accentText: "text-green-500",
-    title: "Sentinel-2 Ingest Stable",
-    description: "Latest high-resolution optical passes (98% confidence interval) processed at 16:15 local time.",
+    title: "Satellite Data Up to Date",
+    description: "Latest satellite images downloaded successfully (98% quality) at 4:15 PM today.",
   },
 ];
 
@@ -139,7 +139,7 @@ function StatCard({
           <Icon className={`w-4 h-4 ${selected ? "text-blue-500" : "text-gray-500 dark:text-gray-300"}`} />
         </div>
       </div>
-      <p className="text-2xl font-mono font-bold text-gray-900 dark:text-gray-100 mb-2">
+      <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
         {value} <span className="text-sm font-sans font-normal text-gray-400">{unit}</span>
       </p>
       <div className="flex items-center gap-2 text-xs flex-wrap">
@@ -168,10 +168,10 @@ export function DashboardPage() {
       <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1">
-            Athabasca Watershed Health Dashboard
+            Jasper Valley Health Monitor
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Real-time analytic insights and environmental risk assessment metrics for the Jasper Region.
+            Live environmental readings and risk indicators for the Jasper area.
           </p>
         </div>
         <div className="flex items-center gap-1 p-1 rounded-lg bg-surface-alt">
@@ -192,20 +192,20 @@ export function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard icon={DropletIcon} label="Turbidity" value={s.turbidity.toFixed(1)} unit="NTU" status={s.turbidityStatus} badge={s.turbidityBadge} delta={s.turbidityDelta} selected={metric === "turbidity"} onClick={() => setMetric("turbidity")} />
-        <StatCard icon={TargetIcon} label="pH Level" value={s.ph.toFixed(2)} unit="pH" status={s.phStatus} badge={s.phBadge} delta={s.phDelta} selected={metric === "ph"} onClick={() => setMetric("ph")} />
-        <StatCard icon={FlameIcon} label="Ash Concentration" value={s.ash.toFixed(1)} unit="ppm" status={s.ashStatus} badge={s.ashBadge} delta={s.ashDelta} selected={metric === "ash"} onClick={() => setMetric("ash")} />
-        <StatCard icon={PulseIcon} label="Soil Stability" value={s.soil.toFixed(1)} unit="%" status={s.soilStatus} badge={s.soilBadge} delta={s.soilDelta} selected={metric === "soil"} onClick={() => setMetric("soil")} />
+        <StatCard icon={DropletIcon} label="Water Cloudiness" value={s.turbidity.toFixed(1)} unit="NTU" status={s.turbidityStatus} badge={s.turbidityBadge} delta={s.turbidityDelta} selected={metric === "turbidity"} onClick={() => setMetric("turbidity")} />
+        <StatCard icon={TargetIcon} label="Acidity (pH)" value={s.ph.toFixed(2)} unit="pH" status={s.phStatus} badge={s.phBadge} delta={s.phDelta} selected={metric === "ph"} onClick={() => setMetric("ph")} />
+        <StatCard icon={FlameIcon} label="Ash Levels" value={s.ash.toFixed(1)} unit="ppm" status={s.ashStatus} badge={s.ashBadge} delta={s.ashDelta} selected={metric === "ash"} onClick={() => setMetric("ash")} />
+        <StatCard icon={PulseIcon} label="Ground Stability" value={s.soil.toFixed(1)} unit="%" status={s.soilStatus} badge={s.soilBadge} delta={s.soilDelta} selected={metric === "soil"} onClick={() => setMetric("soil")} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
         <div className="rounded-xl border border-gray-200/60 dark:border-gray-700/40 bg-surface p-5">
           <div className="flex items-center gap-2 mb-1">
             <ChartLineIcon className="w-4 h-4 text-blue-500" />
-            <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">Temporal Monitoring: {metricConfig.label} Trends</h2>
+            <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">{metricConfig.label} Over Time</h2>
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-            Showing compiled hourly fluctuations over the last 12-hour sensor cycle.
+            Hourly readings from the past 12-hour sensor cycle.
           </p>
           <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400 mb-2">
             <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-400" /> Active Stream</span>
@@ -217,10 +217,10 @@ export function DashboardPage() {
         <div className="rounded-xl border border-gray-200/60 dark:border-gray-700/40 bg-surface p-5">
           <div className="flex items-center gap-2 mb-1">
             <LayersIcon className="w-4 h-4 text-gray-500" />
-            <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">Watershed Status Summary</h2>
+            <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">Area Health Summary</h2>
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-            Current alert status from regional telemetry ingest protocols.
+            Live alerts based on current sensor readings across Jasper Valley.
           </p>
           <div className="flex flex-col gap-3">
             {ALERTS.map(({ icon: Icon, accentBorder, accentText, title, description }) => (

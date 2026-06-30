@@ -3,30 +3,41 @@
 import { useState } from "react";
 import { ClockIcon } from "../Layout/icons";
 
-const PRE_EVENT = new Date("2024-06-01").getTime();
-const RECOVERY = new Date("2024-09-30").getTime();
-const FIRE_EVENT = new Date("2024-07-04").getTime();
-const WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
+const PRE_EVENT   = new Date("2024-06-01").getTime();
+const RECOVERY    = new Date("2024-09-30").getTime();
+const FIRE_EVENT  = new Date("2024-07-04").getTime();
+const WINDOW_MS   = 14 * 24 * 60 * 60 * 1000;
 const DEFAULT_VALUE = 44;
 
-function toISODate(ms: number) {
-  return new Date(ms).toISOString().split("T")[0];
+const FIRE_PCT       = ((FIRE_EVENT  - PRE_EVENT) / (RECOVERY - PRE_EVENT)) * 100;
+const MONITORING_PCT = ((new Date("2024-08-01").getTime() - PRE_EVENT) / (RECOVERY - PRE_EVENT)) * 100;
+
+function toFriendlyDate(ms: number) {
+  return new Date(ms).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
 }
 
 function sliderToCenter(value: number) {
   return PRE_EVENT + (value / 100) * (RECOVERY - PRE_EVENT);
 }
 
-const FIRE_PCT = ((FIRE_EVENT - PRE_EVENT) / (RECOVERY - PRE_EVENT)) * 100;
+function getPhaseLabel(value: number) {
+  if (value < FIRE_PCT)       return "Before the Fire";
+  if (value < MONITORING_PCT) return "Immediately After";
+  return "Current Recovery";
+}
 
 interface Props {
   onDateRangeChange: (dateFrom: string, dateTo: string) => void;
 }
 
+function toISODate(ms: number) {
+  return new Date(ms).toISOString().split("T")[0];
+}
+
 export function TemporalSlider({ onDateRangeChange }: Props) {
   const [value, setValue] = useState(DEFAULT_VALUE);
   const center = sliderToCenter(value);
-  const isPostFire = value >= FIRE_PCT;
+  const phase  = getPhaseLabel(value);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const v = Number(e.target.value);
@@ -39,14 +50,14 @@ export function TemporalSlider({ onDateRangeChange }: Props) {
   }
 
   return (
-    <div className="bg-white/95 dark:bg-surface-container/95 backdrop-blur-md rounded-2xl border border-gray-200/60 dark:border-gray-700/40 shadow-xl px-6 py-3.5">
-      <div className="flex items-center justify-between mb-2.5">
+    <div className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-md rounded-2xl shadow-2xl border border-gray-200/60 dark:border-gray-700/40 px-6 py-4">
+      <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <ClockIcon className="w-4 h-4 text-gray-700 dark:text-gray-200" />
-          <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">Temporal Analysis</h2>
+          <ClockIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+          <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">Time History</h2>
         </div>
-        <span className="text-xs font-mono font-medium px-2.5 py-1 rounded-md bg-gray-900 dark:bg-gray-700 text-white">
-          {toISODate(center)} ({isPostFire ? "Post-Fire" : "Pre-Fire"})
+        <span className="text-xs font-semibold px-3 py-1 rounded-full bg-blue-600 text-white">
+          {phase} — {toFriendlyDate(center)}
         </span>
       </div>
 
@@ -56,12 +67,12 @@ export function TemporalSlider({ onDateRangeChange }: Props) {
         max={100}
         value={value}
         onChange={handleChange}
-        className="w-full accent-blue-500"
+        className="w-full accent-blue-500 cursor-pointer"
       />
 
-      <div className="flex justify-between text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mt-1.5">
-        <span>Pre-Event (Jun 2024)</span>
-        <span>Monitoring Recovery</span>
+      <div className="flex justify-between text-[10px] font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-500 mt-2">
+        <span>Before the Fire (Jun 2024)</span>
+        <span>Current Recovery</span>
       </div>
     </div>
   );

@@ -1,32 +1,70 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { fetchErosionSimulation, ModelOutput } from "../../../lib/api";
 import { HazardZone } from "./HazardZone";
 
-const CENTER: [number, number] = [52.858, -118.092];
+// Three erosion zones at different terrain positions in the watershed
+const ZONES = [
+  { sectorId: "ATH-001-H", center: [52.858, -118.092] as [number, number], radius: 1400, slopeDeg: 42, rainfallMm: 95 },
+  { sectorId: "ATH-001-M", center: [52.870, -118.070] as [number, number], radius: 1100, slopeDeg: 28, rainfallMm: 68 },
+  { sectorId: "ATH-001-L", center: [52.884, -118.045] as [number, number], radius: 900,  slopeDeg: 16, rainfallMm: 40 },
+];
+
+const STYLE_BY_LABEL = {
+  High:   { borderColor: "#a855f7", fillColor: "#c084fc", label: "Landslide & Soil Risk", sublabel: "High erosion zone" },
+  Medium: { borderColor: "#8b5cf6", fillColor: "#a78bfa", label: "Landslide & Soil Risk", sublabel: "Moderate erosion zone" },
+  Low:    { borderColor: "#6d28d9", fillColor: "#7c3aed", label: "Soil Erosion Risk", sublabel: "Low erosion zone" },
+} as const;
+
+const DEFAULT_RISK = ["High", "Medium", "Low"] as const;
 
 export function ErosionLayer() {
+  const [results, setResults] = useState<(ModelOutput | null)[]>([null, null, null]);
+
+  useEffect(() => {
+    Promise.allSettled(
+      ZONES.map((z) => fetchErosionSimulation(z.sectorId, z.slopeDeg, z.rainfallMm))
+    ).then((settled) => {
+      setResults(
+        settled.map((r) => (r.status === "fulfilled" ? r.value : null))
+      );
+    });
+  }, []);
+
   return (
-    <HazardZone
-      center={CENTER}
-      radius={1400}
-      borderColor="#a855f7"
-      fillColor="#c084fc"
-      fillOpacity={0.15}
-      label="Erosion Hazard"
-      sublabel="High Stream Slurry"
-      badgeIcon="mountain"
-      dotColor="#ef4444"
-      popupIcon="⛰️"
-      popupTitle="Slope Erosion Analytics"
-      status="WARNING"
-      name="Slope Sector SEC-E1"
-      fields={[
-        { label: "Slope Sector ID", value: "SEC-E1" },
-        { label: "Slope Angle", value: "38.5° (Steep)", valueColor: "text-purple-600" },
-        { label: "LiDAR Terrain Drift", value: "-12.4 cm (Slipped)", valueColor: "text-red-600" },
-        { label: "Erosion Index", value: "0.78 / 1.00", valueColor: "text-purple-600" },
-        { label: "Soil Moisture", value: "72.1% (Saturated)" },
-      ]}
-    />
+    <>
+      {ZONES.map((zone, i) => {
+        const risk = results[i]?.risk_label ?? DEFAULT_RISK[i];
+        const style = STYLE_BY_LABEL[risk as keyof typeof STYLE_BY_LABEL] ?? STYLE_BY_LABEL.Medium;
+        const score = results[i]?.risk_score;
+
+        return (
+          <HazardZone
+            key={zone.sectorId}
+            center={zone.center}
+            radius={zone.radius}
+            borderColor={style.borderColor}
+            fillColor={style.fillColor}
+            fillOpacity={0.15}
+            label={style.label}
+            sublabel={style.sublabel}
+            badgeIcon="mountain"
+            dotColor="#ef4444"
+            popupIcon="⛰️"
+            popupTitle="Soil Erosion Analysis"
+            status={risk === "High" ? "CRITICAL" : risk === "Medium" ? "WARNING" : "OPERATIONAL"}
+            name={`Slope Area ${zone.sectorId}`}
+            fields={[
+              { label: "Area ID", value: zone.sectorId },
+              { label: "Risk Level", value: risk, valueColor: risk === "High" ? "text-red-600" : risk === "Medium" ? "text-amber-600" : "text-green-600" },
+              { label: "Risk Score", value: score != null ? score.toFixed(3) : "—" },
+              { label: "Slope Angle", value: `${zone.slopeDeg}°`, valueColor: "text-purple-600" },
+              { label: "Rainfall Input", value: `${zone.rainfallMm} mm` },
+            ]}
+          />
+        );
+      })}
+    </>
   );
 }

@@ -57,3 +57,9 @@ body {
 .jasper-popup .leaflet-popup-content {
   margin: 12px 14px;
 }
+
+/* Contaminant plume arrow pulse animation */
+@keyframes jasper-arrow-pulse {
+  0%, 100% { opacity: 0.6; transform: scale(0.9) rotate(var(--arrow-rotation, 0deg)); }
+  50%       { opacity: 1;   transform: scale(1.1) rotate(var(--arrow-rotation, 0deg)); }
+}

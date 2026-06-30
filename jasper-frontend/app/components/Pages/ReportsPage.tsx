@@ -49,7 +49,7 @@ export function ReportsPage() {
       <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1">
-            Hydrological & GIS Reports
+            Environmental Reports
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">
             Access and generate standardized environmental diagnostic reports, satellite surveys, and soil stability runs.

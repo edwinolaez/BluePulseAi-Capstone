@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { TemporalSlider } from "../Controls/TemporalSlider";
+import { SectorPanel } from "../Controls/SectorPanel";
 import { ToggleSwitch } from "../Controls/ToggleSwitch";
 import { ChartLineIcon } from "../Layout/icons";
 import { WaterQualityWidget } from "../Widgets/WaterQualityWidget";
@@ -20,6 +21,7 @@ interface Props {
 }
 
 export function MapViewPage({ flyTo }: Props) {
+  const [sectorId, setSectorId]               = useState<string | null>(null);
   const [dateFrom, setDateFrom]               = useState("2024-06-01");
   const [dateTo, setDateTo]                   = useState("2024-07-24");
   const [showBurnScar, setShowBurnScar]       = useState(true);
@@ -40,6 +42,8 @@ export function MapViewPage({ flyTo }: Props) {
       <div className="relative flex-1 overflow-hidden">
         <div className="absolute inset-0">
           <JasperMap
+            onSectorClick={setSectorId}
+            activeSectorId={sectorId}
             dateFrom={dateFrom}
             dateTo={dateTo}
             showBurnScar={showBurnScar}
@@ -50,18 +54,18 @@ export function MapViewPage({ flyTo }: Props) {
           />
         </div>
 
-        {/* Top-right: Control dock */}
+        {/* Top-right: Layer toggles */}
         <div className="absolute top-4 right-4 z-[1001]">
           <div className="bg-white/95 dark:bg-surface-container/95 backdrop-blur-md rounded-xl border border-gray-200/60 dark:border-gray-700/40 p-4 min-w-[230px] shadow-xl">
             <div className="space-y-3">
-              <ToggleSwitch label="Erosion Outlines" dotColor="#a855f7" checked={showErosion} onChange={setShowErosion} />
-              <ToggleSwitch label="Water Chemistry" dotColor="#0ea5e9" checked={showContaminant} onChange={setShowContaminant} />
-              <ToggleSwitch label="Vegetation Index" dotColor="#2563eb" checked={showBurnScar} onChange={setShowBurnScar} />
+              <ToggleSwitch label="Soil Erosion Risk"      dotColor="#a855f7" checked={showErosion}     onChange={setShowErosion} />
+              <ToggleSwitch label="River Water Quality"    dotColor="#0ea5e9" checked={showContaminant} onChange={setShowContaminant} />
+              <ToggleSwitch label="Forest Regrowth Status" dotColor="#2563eb" checked={showBurnScar}    onChange={setShowBurnScar} />
             </div>
           </div>
         </div>
 
-        {/* Bottom: Temporal Analysis card + zoom buttons, laid out as a flex row so they never overlap */}
+        {/* Bottom: Time History slider + zoom buttons */}
         <div className="absolute bottom-4 left-4 right-4 z-[1001] flex items-end gap-3">
           <div className="flex-1 min-w-0">
             <TemporalSlider
@@ -88,12 +92,15 @@ export function MapViewPage({ flyTo }: Props) {
         </div>
       </div>
 
-      {/* ── Right: Live Telemetry column (fixed-width sibling, full height) ── */}
+      {/* ── Right: Live Readings column ── */}
       <aside className="w-72 shrink-0 flex flex-col gap-3 p-4 overflow-y-auto bg-surface border-l border-gray-200/60 dark:border-gray-700/40">
-        <div className="flex items-center gap-2 px-0.5">
+        {/* Sector Panel — shows data for whichever area the user clicked */}
+        <SectorPanel sectorId={sectorId} dateFrom={dateFrom} dateTo={dateTo} />
+
+        <div className="flex items-center gap-2 px-0.5 mt-1">
           <ChartLineIcon className="w-4 h-4 text-cyan-500" />
           <h2 className="text-xs font-bold uppercase tracking-widest text-gray-700 dark:text-gray-200">
-            Live Telemetry
+            Live Readings
           </h2>
         </div>
         <WaterQualityWidget />
