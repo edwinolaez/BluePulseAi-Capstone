@@ -81,9 +81,10 @@ async def ingest_telemetry(
             "payload": {"flow_rate": flow_rate, "data_source": data_source}
         }
         supabase.table("water_quality_readings").insert(record).execute()
-    except Exception:
+    except Exception as e:
+        print(f"Supabase error: {e}")
         pass
-
+    
     return {
         "status": "accepted",
         "layer_type": "telemetry",

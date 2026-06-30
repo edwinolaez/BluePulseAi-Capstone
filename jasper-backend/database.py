@@ -1,8 +1,17 @@
 import os
 from supabase import create_client, Client
 from dotenv import load_dotenv
+from pathlib import Path
 
-load_dotenv(".env.local")
+# Try multiple locations for .env.local
+for path in [
+    Path(__file__).parent / ".env.local",
+    Path(__file__).parent.parent / ".env.local",
+    Path(".env.local")
+]:
+    if path.exists():
+        load_dotenv(dotenv_path=path)
+        break
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
