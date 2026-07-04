@@ -2,7 +2,7 @@ _format_version: "2.1"
 
 services:
   - name: jasper-backend
-    url: http://192.168.1.75:8000
+    url: http://jasper-backend:8000
     routes:
       - name: health-route
         paths:
@@ -19,6 +19,22 @@ services:
       - name: layers-route
         paths:
           - /api/v1/layers
+        strip_path: false
+        methods:
+          - GET
+
+  - name: jasper-ml
+    url: http://jasper-ml:8001
+    routes:
+      - name: predict-route
+        paths:
+          - /api/v1/predict
+        strip_path: false
+        methods:
+          - POST
+      - name: simulate-route
+        paths:
+          - /api/v1/simulate
         strip_path: false
         methods:
           - GET
