@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Query, HTTPException
 from datetime import datetime
 from typing import Optional
+from database import get_supabase
 
 router = APIRouter()
 
@@ -32,10 +33,37 @@ async def get_layers(
         except ValueError:
             raise HTTPException(status_code=422, detail="Invalid date_to format. Use ISO 8601.")
 
+    layers = []
+
+    try:
+        supabase = get_supabase()
+
+        # Query water_quality_readings filtered by sector_id
+        query = supabase.table("water_quality_readings").select("*").eq("sector_id", sector_id)
+
+        # Apply date filters if provided
+        if date_from:
+            query = query.gte("recorded_at", date_from)
+        if date_to:
+            query = query.lte("recorded_at", date_to)
+
+        result = query.execute()
+
+        # Format each row as a layer object
+        for row in result.data:
+            layers.append({
+                "layer_type": "water_quality",
+                "sector_id": sector_id,
+                "data": row
+            })
+
+    except Exception as e:
+        print(f"Supabase query error: {e}")
+
     return {
         "sector_id": sector_id,
         "date_from": date_from,
         "date_to": date_to,
         "layer_type": layer_type,
-        "layers": []
+        "layers": layers
     }
