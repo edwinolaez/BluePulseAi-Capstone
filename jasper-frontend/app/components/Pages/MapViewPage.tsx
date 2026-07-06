@@ -1,0 +1,107 @@
+"use client";
+
+import { useState, useCallback } from "react";
+import dynamic from "next/dynamic";
+import { TemporalSlider } from "../Controls/TemporalSlider";
+import { ToggleSwitch } from "../Controls/ToggleSwitch";
+import { ChartLineIcon } from "../Layout/icons";
+import { WaterQualityWidget } from "../Widgets/WaterQualityWidget";
+import { PipelineStatusWidget } from "../Widgets/PipelineStatusWidget";
+import { ModelPerformanceWidget } from "../Widgets/ModelPerformanceWidget";
+import { FieldPhotosWidget } from "../Widgets/FieldPhotosWidget";
+import type { FlyToTarget } from "../Map/JasperMap";
+
+const JasperMap = dynamic(() => import("../Map/JasperMap"), {
+  ssr: false,
+});
+
+interface Props {
+  flyTo?: FlyToTarget | null;
+}
+
+export function MapViewPage({ flyTo }: Props) {
+  const [dateFrom, setDateFrom]               = useState("2024-06-01");
+  const [dateTo, setDateTo]                   = useState("2024-07-24");
+  const [showBurnScar, setShowBurnScar]       = useState(true);
+  const [showErosion, setShowErosion]         = useState(true);
+  const [showContaminant, setShowContaminant] = useState(true);
+  const [zoomIn, setZoomIn]   = useState<(() => void) | null>(null);
+  const [zoomOut, setZoomOut] = useState<(() => void) | null>(null);
+
+  const handleMapInit = useCallback((zi: () => void, zo: () => void) => {
+    setZoomIn(() => zi);
+    setZoomOut(() => zo);
+  }, []);
+
+  return (
+    <div className="flex-1 flex min-h-0">
+
+      {/* ── Map column ── */}
+      <div className="relative flex-1 overflow-hidden">
+        <div className="absolute inset-0">
+          <JasperMap
+            dateFrom={dateFrom}
+            dateTo={dateTo}
+            showBurnScar={showBurnScar}
+            showErosion={showErosion}
+            showContaminant={showContaminant}
+            onMapInit={handleMapInit}
+            flyTo={flyTo}
+          />
+        </div>
+
+        {/* Top-right: Control dock */}
+        <div className="absolute top-4 right-4 z-[1001]">
+          <div className="bg-white/95 dark:bg-surface-container/95 backdrop-blur-md rounded-xl border border-gray-200/60 dark:border-gray-700/40 p-4 min-w-[230px] shadow-xl">
+            <div className="space-y-3">
+              <ToggleSwitch label="Erosion Outlines" dotColor="#a855f7" checked={showErosion} onChange={setShowErosion} />
+              <ToggleSwitch label="Water Chemistry" dotColor="#0ea5e9" checked={showContaminant} onChange={setShowContaminant} />
+              <ToggleSwitch label="Vegetation Index" dotColor="#2563eb" checked={showBurnScar} onChange={setShowBurnScar} />
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom: Temporal Analysis card + zoom buttons, laid out as a flex row so they never overlap */}
+        <div className="absolute bottom-4 left-4 right-4 z-[1001] flex items-end gap-3">
+          <div className="flex-1 min-w-0">
+            <TemporalSlider
+              onDateRangeChange={(from, to) => {
+                setDateFrom(from);
+                setDateTo(to);
+              }}
+            />
+          </div>
+          <div className="flex flex-col gap-2 shrink-0">
+            <button
+              onClick={() => zoomIn?.()}
+              className="w-9 h-9 flex items-center justify-center rounded-full bg-white/95 dark:bg-surface-container/95 text-gray-800 dark:text-white text-lg shadow-lg hover:scale-105 transition-transform"
+            >
+              +
+            </button>
+            <button
+              onClick={() => zoomOut?.()}
+              className="w-9 h-9 flex items-center justify-center rounded-full bg-white/95 dark:bg-surface-container/95 text-gray-800 dark:text-white text-lg shadow-lg hover:scale-105 transition-transform"
+            >
+              −
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Right: Live Telemetry column (fixed-width sibling, full height) ── */}
+      <aside className="w-72 shrink-0 flex flex-col gap-3 p-4 overflow-y-auto bg-surface border-l border-gray-200/60 dark:border-gray-700/40">
+        <div className="flex items-center gap-2 px-0.5">
+          <ChartLineIcon className="w-4 h-4 text-cyan-500" />
+          <h2 className="text-xs font-bold uppercase tracking-widest text-gray-700 dark:text-gray-200">
+            Live Telemetry
+          </h2>
+        </div>
+        <WaterQualityWidget />
+        <PipelineStatusWidget />
+        <ModelPerformanceWidget />
+        <FieldPhotosWidget />
+      </aside>
+
+    </div>
+  );
+}
