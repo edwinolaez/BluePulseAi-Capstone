@@ -222,14 +222,22 @@ class TestConvexQueries:
         )
 
         body = response.json()
-        result = body.get("value") or body  # Convex wraps results in {"value": ...}
+        value = body.get("value")  # Convex wraps results in {"value": ...}
 
-        if result:
-            # Reyta needs these fields to render the status panel
+        # getPipelineStatus returns a list of records; check the first one if present
+        if isinstance(value, list) and value:
+            record = value[0]
             for field in ["status", "timestamp"]:
-                assert field in result, (
+                assert field in record, (
                     f"getPipelineStatus response is missing '{field}'. "
-                    f"Full response: {result}. "
+                    f"Full record: {record}. "
+                    "Reyta's dashboard will show 'undefined' for this field."
+                )
+        elif isinstance(value, dict) and value:
+            for field in ["status", "timestamp"]:
+                assert field in value, (
+                    f"getPipelineStatus response is missing '{field}'. "
+                    f"Full response: {value}. "
                     "Reyta's dashboard will show 'undefined' for this field."
                 )
 
@@ -245,7 +253,7 @@ class TestConvexQueries:
             "/api/query",
             json={
                 "path": "waterQuality:getLiveWaterQuality",
-                "args": {}
+                "args": {"sectorId": "ATH-001"}
             },
             headers=convex_query_headers()
         )
@@ -361,12 +369,20 @@ class TestConvexMutationQueryRoundTrip:
         )
 
         body = read_response.json()
-        result = body.get("value") or body
+        value = body.get("value")
 
-        if result and isinstance(result, dict):
-            assert result.get("status") == test_status, (
+        # getPipelineStatus returns a list; find the record we just wrote
+        if isinstance(value, list) and value:
+            statuses = [r.get("status") for r in value if isinstance(r, dict)]
+            assert test_status in statuses, (
                 f"Wrote status '{test_status}' to Convex, "
-                f"but getPipelineStatus returned '{result.get('status')}'. "
+                f"but getPipelineStatus returned statuses: {statuses}. "
+                "Convex real-time consistency is not working as expected."
+            )
+        elif isinstance(value, dict) and value:
+            assert value.get("status") == test_status, (
+                f"Wrote status '{test_status}' to Convex, "
+                f"but getPipelineStatus returned '{value.get('status')}'. "
                 "Convex real-time consistency is not working as expected."
             )
 
