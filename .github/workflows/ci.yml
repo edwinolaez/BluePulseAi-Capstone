@@ -233,6 +233,11 @@ jobs:
           RAILWAY_API_URL: ${{ secrets.RAILWAY_API_URL }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          TEST_ANALYST_JWT: ${{ secrets.TEST_ANALYST_JWT }}
+          TEST_INGEST_JWT: ${{ secrets.TEST_INGEST_JWT }}
+          NEXT_PUBLIC_API_KEY: ${{ secrets.NEXT_PUBLIC_API_KEY }}
+          NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
 
   # ─────────────────────────────────────────────────────────────────────────
   # Stage 5 — Build
