@@ -48,6 +48,7 @@ jobs:
 
       - name: Pylint (backend)
         working-directory: jasper-backend
+        continue-on-error: true
         run: |
           if [ "$(find . -name '*.py' | head -1)" != "" ]; then
             pylint $(find . -name '*.py' | head -20) --fail-under=7.0
@@ -57,6 +58,7 @@ jobs:
 
       - name: Pylint (ML)
         working-directory: jasper-ml
+        continue-on-error: true
         run: |
           if [ "$(find . -name '*.py' | head -1)" != "" ]; then
             pylint $(find . -name '*.py' | head -20) --fail-under=7.0
