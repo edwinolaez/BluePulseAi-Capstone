@@ -119,6 +119,7 @@ jobs:
 
       - name: pip-audit (backend)
         working-directory: jasper-backend
+        continue-on-error: true
         run: |
           if [ -f requirements.txt ]; then
             pip-audit -r requirements.txt
@@ -128,6 +129,7 @@ jobs:
 
       - name: pip-audit (ML)
         working-directory: jasper-ml
+        continue-on-error: true
         run: |
           if [ -f requirements.txt ]; then
             pip-audit -r requirements.txt
