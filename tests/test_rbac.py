@@ -71,7 +71,7 @@ def skip_if_no_supabase():
 
 # ─── Viewer Role Tests ────────────────────────────────────────────────────────
 
-@pytest.mark.skipif(not SUPABASE_URL, reason="Supabase not configured yet")
+@pytest.mark.skipif(not SUPABASE_URL or not VIEWER_TOKEN, reason="Supabase not configured or viewer token missing")
 class TestViewerRole:
     """
     Viewers (SAIT Faculty) are read-only.
@@ -145,7 +145,7 @@ class TestViewerRole:
 
 # ─── Analyst Role Tests ───────────────────────────────────────────────────────
 
-@pytest.mark.skipif(not SUPABASE_URL, reason="Supabase not configured yet")
+@pytest.mark.skipif(not SUPABASE_URL or not ANALYST_TOKEN, reason="Supabase not configured or analyst token missing")
 class TestAnalystRole:
     """
     Analysts (CERCUTS users) can read everything and write water quality readings.
@@ -214,7 +214,7 @@ class TestAnalystRole:
 
 # ─── Ingest Service Account Tests ─────────────────────────────────────────────
 
-@pytest.mark.skipif(not SUPABASE_URL, reason="Supabase not configured yet")
+@pytest.mark.skipif(not SUPABASE_URL or not INGEST_TOKEN, reason="Supabase not configured or ingest token missing")
 class TestIngestRole:
     """
     The ingest role is a machine account used by Feven's pipeline service.
