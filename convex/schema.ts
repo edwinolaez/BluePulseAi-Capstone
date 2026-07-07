@@ -22,6 +22,7 @@ export default defineSchema({
     modelName: v.string(),
     modelVersion: v.string(),
     f1Score: v.number(),
+    runId: v.optional(v.string()),
     trainingDate: v.number(),
     lastPrediction: v.number(),
   }),
