@@ -1,7 +1,8 @@
 """Ingest routers for GeoTIFF, DEM, and telemetry data ingestion."""
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Security, UploadFile
+from fastapi.security.api_key import APIKeyHeader
 
 from database import get_supabase
 
@@ -9,8 +10,22 @@ router = APIRouter()
 
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB in bytes
 
+# This is the expected API key value — stored here for FastAPI-level auth
+# Kong also enforces this at the gateway level
+API_KEY = "jasper-dev-api-key-2026"
 
-@router.post("/api/v1/ingest")
+# This tells FastAPI to look for a header called "X-API-Key" on incoming requests
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+
+async def require_api_key(api_key: str = Security(api_key_header)):
+    """Validate the X-API-Key header — returns 401 if missing or wrong."""
+    # If no key provided or wrong key, reject the request immediately
+    if api_key != API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
+
+
+@router.post("/api/v1/ingest", dependencies=[Depends(require_api_key)])
 async def ingest_base(
     sector_id: str = Form(...),
     data_source: str = Form(...),
@@ -27,7 +42,7 @@ async def ingest_base(
     }
 
 
-@router.post("/api/v1/ingest/geotiff")
+@router.post("/api/v1/ingest/geotiff", dependencies=[Depends(require_api_key)])
 async def ingest_geotiff(
     file: UploadFile = File(...),
     sector_id: str = Form(...),
@@ -60,7 +75,7 @@ async def ingest_geotiff(
     }
 
 
-@router.post("/api/v1/ingest/dem")
+@router.post("/api/v1/ingest/dem", dependencies=[Depends(require_api_key)])
 async def ingest_dem(
     file: UploadFile = File(...),
     sector_id: str = Form(...),
@@ -93,7 +108,7 @@ async def ingest_dem(
     }
 
 
-@router.post("/api/v1/ingest/telemetry")
+@router.post("/api/v1/ingest/telemetry", dependencies=[Depends(require_api_key)])
 async def ingest_telemetry(
     sector_id: str = Form(...),
     data_source: str = Form(...),

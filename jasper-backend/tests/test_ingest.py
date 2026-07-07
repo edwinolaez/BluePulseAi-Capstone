@@ -1,3 +1,4 @@
+"""Unit tests for Project Jasper ingest and data endpoints."""
 from fastapi.testclient import TestClient
 import sys
 import os
@@ -7,17 +8,23 @@ import io
 
 client = TestClient(app)
 
-# Health check test
+# Every protected request needs this header
+API_HEADERS = {"X-API-Key": "jasper-dev-api-key-2026"}
+
+# Health check test — no API key needed
 def test_health():
+    """Health endpoint should be publicly accessible."""
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
 
 # GeoTIFF tests
 def test_geotiff_ingest_valid_file():
+    """Valid GeoTIFF file should be accepted."""
     fake_file = io.BytesIO(b"fake geotiff content")
     response = client.post(
         "/api/v1/ingest/geotiff",
+        headers=API_HEADERS,
         data={"sector_id": "S1", "data_source": "sentinel", "user_id": "user1"},
         files={"file": ("test.tif", fake_file, "image/tiff")}
     )
@@ -25,9 +32,11 @@ def test_geotiff_ingest_valid_file():
     assert response.json()["status"] == "accepted"
 
 def test_geotiff_ingest_wrong_format():
+    """Non-GeoTIFF file should be rejected with 422."""
     fake_file = io.BytesIO(b"not a geotiff")
     response = client.post(
         "/api/v1/ingest/geotiff",
+        headers=API_HEADERS,
         data={"sector_id": "S1", "data_source": "sentinel", "user_id": "user1"},
         files={"file": ("test.txt", fake_file, "text/plain")}
     )
@@ -35,9 +44,11 @@ def test_geotiff_ingest_wrong_format():
 
 # DEM tests
 def test_dem_ingest_valid_file():
+    """Valid DEM GeoTIFF file should be accepted."""
     fake_file = io.BytesIO(b"fake dem content")
     response = client.post(
         "/api/v1/ingest/dem",
+        headers=API_HEADERS,
         data={"sector_id": "S1", "data_source": "altalis", "user_id": "user1"},
         files={"file": ("dem.tif", fake_file, "image/tiff")}
     )
@@ -45,9 +56,11 @@ def test_dem_ingest_valid_file():
     assert response.json()["status"] == "accepted"
 
 def test_dem_ingest_wrong_format():
+    """Non-GeoTIFF DEM file should be rejected with 422."""
     fake_file = io.BytesIO(b"not a dem")
     response = client.post(
         "/api/v1/ingest/dem",
+        headers=API_HEADERS,
         data={"sector_id": "S1", "data_source": "altalis", "user_id": "user1"},
         files={"file": ("dem.csv", fake_file, "text/csv")}
     )
@@ -55,8 +68,10 @@ def test_dem_ingest_wrong_format():
 
 # Telemetry tests
 def test_telemetry_ingest_valid():
+    """Valid telemetry data should be accepted."""
     response = client.post(
         "/api/v1/ingest/telemetry",
+        headers=API_HEADERS,
         data={
             "sector_id": "S1",
             "data_source": "wateroffice",
@@ -69,8 +84,10 @@ def test_telemetry_ingest_valid():
     assert response.json()["status"] == "accepted"
 
 def test_telemetry_ingest_missing_field():
+    """Telemetry request missing required fields should return 422."""
     response = client.post(
         "/api/v1/ingest/telemetry",
+        headers=API_HEADERS,
         data={
             "sector_id": "S1",
             "data_source": "wateroffice",
@@ -79,23 +96,37 @@ def test_telemetry_ingest_missing_field():
     )
     assert response.status_code == 422
 
-    # Fusion endpoint tests
+# Auth tests
+def test_protected_route_requires_api_key():
+    """Protected endpoint without API key should return 401."""
+    fake_file = io.BytesIO(b"fake geotiff content")
+    response = client.post(
+        "/api/v1/ingest/geotiff",
+        data={"sector_id": "S1", "data_source": "sentinel", "user_id": "user1"},
+        files={"file": ("test.tif", fake_file, "image/tiff")}
+    )
+    assert response.status_code == 401
+
+# Fusion endpoint tests
 def test_get_layers_valid():
-    response = client.get("/api/v1/layers/S1")
-    # Either returns data (200) or no data found (404) — both are valid
+    """Layers endpoint should return data or 404 for sector S1."""
+    response = client.get("/api/v1/layers/S1", headers=API_HEADERS)
     assert response.status_code in [200, 404]
 
 def test_get_layers_with_filters():
+    """Layers endpoint with date filters should return 200 or 404."""
     response = client.get(
-        "/api/v1/layers/S1?date_from=2026-01-01&date_to=2027-01-01"
+        "/api/v1/layers/S1?date_from=2026-01-01&date_to=2027-01-01",
+        headers=API_HEADERS
     )
-    # Either returns data (200) or no data found (404) — both are valid
     assert response.status_code in [200, 404]
 
 def test_get_layers_invalid_layer_type():
-    response = client.get("/api/v1/layers/S1?layer_type=invalid")
+    """Invalid layer_type should return 422."""
+    response = client.get("/api/v1/layers/S1?layer_type=invalid", headers=API_HEADERS)
     assert response.status_code == 422
 
 def test_get_layers_invalid_date():
-    response = client.get("/api/v1/layers/S1?date_from=not-a-date")
+    """Invalid date format should return 422."""
+    response = client.get("/api/v1/layers/S1?date_from=not-a-date", headers=API_HEADERS)
     assert response.status_code == 422
