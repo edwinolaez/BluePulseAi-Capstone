@@ -1,8 +1,33 @@
 # CI Feedback — Richard (jasper-ml)
 
 **From:** Edwin (QA)
-**Date:** July 6, 2026 (updated after branch review)
-**Branch reviewed:** `feature/richard-ml`
+**Last updated:** July 7, 2026 — post Sprint 2 merge CI run on `main`
+**Branch reviewed:** `feature/richard-ml` → merged into `main`
+
+---
+
+## July 7 CI Run — Stage 4 Results
+
+Two failure patterns from the live CI run:
+
+**1. 502 Bad Gateway — ML integration tests**
+All direct calls to `ML_API_URL` are returning `502 Application failed to respond`:
+- `POST /predict/change-detection` → 502
+- `POST /simulate/erosion` → 502
+- `POST /simulate/contaminant` → 502
+
+502 means Railway is up but the app inside the container is crashing. Check your Railway deployment logs — look for a startup error (missing env var, import error, model file not found, port mismatch).
+
+**2. 404 — Contract tests**
+The contract tests hitting the same endpoints through the base URL are getting 404. This may be a route path issue or the service isn't fully started.
+
+**Immediate action:**
+1. Go to railway.app → your ML service → **Deployments** tab
+2. Click the latest deployment → view logs
+3. Find the crash/error and fix it
+4. Once the `/health` endpoint returns 200, ping Edwin — he'll re-run CI
+
+---
 
 ---
 

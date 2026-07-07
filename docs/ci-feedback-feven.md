@@ -1,8 +1,27 @@
 # CI Feedback — Feven (jasper-backend)
 
 **From:** Edwin (QA)
-**Date:** July 6, 2026 (updated after branch review)
-**Branch reviewed:** `feature/feven-ingest`
+**Last updated:** July 7, 2026 — post Sprint 2 merge CI run on `main`
+**Branch reviewed:** `feature/feven-ingest` → merged into `main`
+
+---
+
+## July 7 CI Run — Stage 4 Results
+
+**Every backend call is returning `401 Invalid or missing API key`** — Kong is rejecting all requests including ones that send the correct `NEXT_PUBLIC_API_KEY` from GitHub Secrets.
+
+Affected tests: all of `test_api_contracts.py` (ingest + map query), `test_e2e_pipeline.py`, and `test_health.py::TestKongGateway`.
+
+**Root cause:** The API key registered in Kong's key-auth plugin does not match the value stored in the `NEXT_PUBLIC_API_KEY` GitHub Secret. CI sends that secret as the `X-API-Key` header — if Kong doesn't have that exact value registered, it returns 401.
+
+**Fix:**
+1. Log into your Railway deployment → open the Kong service config
+2. Find the key-auth plugin consumer key that's registered
+3. Either update the Kong key to match what's in the GitHub Secret, or send Edwin the correct key value so he can update the secret
+
+Once Kong accepts the key, the 401s will clear and the underlying ingest/map-query logic can be tested.
+
+---
 
 ---
 
