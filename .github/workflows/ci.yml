@@ -238,6 +238,7 @@ jobs:
           TEST_INGEST_JWT: ${{ secrets.TEST_INGEST_JWT }}
           NEXT_PUBLIC_API_KEY: ${{ secrets.NEXT_PUBLIC_API_KEY }}
           NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
+          ML_API_URL: ${{ secrets.ML_API_URL }}
 
   # ─────────────────────────────────────────────────────────────────────────
   # Stage 5 — Build
