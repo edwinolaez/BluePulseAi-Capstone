@@ -11,25 +11,29 @@ Endpoints:
 Rate limit: 20 req/min (configured by Kong Gateway)
 """
 
-from fastapi import FastAPI, HTTPException, Query, Request
+from pathlib import Path
+import sys
+import logging
+import os
+import pickle
+from datetime import datetime, timezone
+from typing import Dict, Any
+
+import numpy as np
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, Dict, Any
-import numpy as np
-from datetime import datetime, timezone
-import os
-import pickle
-import sys
-import json
-import logging
-from pathlib import Path
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from models.simulations.erosion_model import calculate_erosion_risk as calc_erosion
-from models.simulations.contaminant_model import calculate_contaminant_vector as calc_contaminant
+from models.simulations.erosion_model import (
+    calculate_erosion_risk as calc_erosion,
+)
+from models.simulations.contaminant_model import (
+    calculate_contaminant_vector as calc_contaminant,
+)
 
 
 # ============================================================================
@@ -74,27 +78,31 @@ app.add_middleware(
 async def log_requests(request: Request, call_next):
     """Log all requests and responses."""
     request_time = datetime.now(timezone.utc)
-    
+
     # Log request
-    logger.info(f"📥 {request.method} {request.url.path}")
-    
+    logger.info("📥 %s %s", request.method, request.url.path)
+
     try:
         response = await call_next(request)
-        
+
         # Log response
         elapsed = (datetime.now(timezone.utc) - request_time).total_seconds()
         logger.info(
-            f"📤 {request.method} {request.url.path} | "
-            f"Status: {response.status_code} | "
-            f"Time: {elapsed:.3f}s"
+            "📤 %s %s | Status: %s | Time: %.3fs",
+            request.method,
+            request.url.path,
+            response.status_code,
+            elapsed,
         )
-        
+
         # Add timing header
         response.headers["X-Process-Time"] = str(elapsed)
         return response
-        
+
     except Exception as e:
-        logger.error(f"❌ {request.method} {request.url.path} | Error: {str(e)}")
+        logger.error(
+            "❌ %s %s | Error: %s", request.method, request.url.path, str(e)
+        )
         raise
 
 
@@ -226,118 +234,6 @@ def load_change_detection_model():
 # Model Functions (Production-Ready)
 # ============================================================================
 
-def calculate_change_detection_risk(sector_id: str) -> Dict[str, Any]:
-    """
-    Calculate post-fire burn scar risk using trained ML model.
-    
-    If model is not yet available, returns synthetic data for development.
-    """
-    try:
-        # Try to load real model
-        model = load_change_detection_model()
-        
-        if model is None:
-            # Development mode: return synthetic data
-            # This allows API to work while waiting for real model training
-            risk_score = np.random.uniform(0.6, 0.95)
-            confidence = np.random.uniform(0.7, 1.0)
-        else:
-            # Production mode: use trained model
-            # In real deployment, would fetch imagery and run inference
-            # For now, return placeholder with indication model is loaded
-            risk_score = np.random.uniform(0.5, 1.0)
-            confidence = 0.92
-        
-        # Classify risk
-        if risk_score >= 0.7:
-            risk_label = "High"
-        elif risk_score >= 0.4:
-            risk_label = "Medium"
-        else:
-            risk_label = "Low"
-        
-        return {
-            "sector_id": sector_id,
-            "model_version": "v1.0",
-            "simulation_type": "change_detection",
-            "risk_score": float(risk_score),
-            "risk_label": risk_label,
-            "contaminant_vector": {"direction_deg": 0.0, "velocity": 0.0},
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "confidence": float(confidence)
-        }
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Change detection prediction failed: {str(e)}"
-        )
-
-
-def calculate_erosion_risk(sector_id: str, slope_deg: float, rainfall_mm: float, 
-                          burn_severity: float = 1.0) -> Dict[str, Any]:
-    """
-    Calculate erosion risk using real RUSLE-inspired model.
-    
-    Integrates with erosion_model.py for accurate watershed erosion assessment.
-    """
-    try:
-        # Call production erosion model
-        result = calc_erosion(slope_deg, rainfall_mm, burn_severity)
-        
-        return {
-            "sector_id": sector_id,
-            "model_version": "v1.0",
-            "simulation_type": "erosion",
-            "risk_score": result["risk_score"],
-            "risk_label": result["risk_label"],
-            "contaminant_vector": {"direction_deg": 0.0, "velocity": 0.0},
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "confidence": 0.85
-        }
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Erosion simulation failed: {str(e)}"
-        )
-
-
-def calculate_contaminant_vector(sector_id: str, flow_direction_deg: float, 
-                                water_velocity_ms: float, contamination_level: float) -> Dict[str, Any]:
-    """
-    Calculate contaminant plume movement vector using real model.
-    
-    Integrates with contaminant_model.py for accurate hydrocarbon plume tracking.
-    """
-    try:
-        # Call production contaminant model
-        result = calc_contaminant(flow_direction_deg, water_velocity_ms, contamination_level)
-        
-        # Determine risk label based on contamination level
-        if contamination_level >= 0.7:
-            risk_label = "High"
-        elif contamination_level >= 0.4:
-            risk_label = "Medium"
-        else:
-            risk_label = "Low"
-        
-        return {
-            "sector_id": sector_id,
-            "model_version": "v1.0",
-            "simulation_type": "contaminant",
-            "risk_score": contamination_level,
-            "risk_label": risk_label,
-            "contaminant_vector": {
-                "direction_deg": result["direction_deg"],
-                "velocity": result["velocity"]
-            },
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "confidence": result["confidence"]
-        }
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Contaminant simulation failed: {str(e)}"
-        )
 
 
 # ============================================================================
@@ -429,12 +325,12 @@ async def predict_change_detection(request: ChangeDetectionRequest):
     ```
     """
     try:
-        logger.info(f"Processing change detection for sector: {request.sector_id}")
-        
+        logger.info("Processing change detection for sector: %s", request.sector_id)
+
         # Calculate risk
         risk_score = np.random.uniform(0.6, 0.95)
         confidence = np.random.uniform(0.7, 1.0)
-        
+
         # Classify risk
         if risk_score >= 0.7:
             risk_label = "High"
@@ -442,23 +338,26 @@ async def predict_change_detection(request: ChangeDetectionRequest):
             risk_label = "Medium"
         else:
             risk_label = "Low"
-        
+
         result = ChangeDetectionResponse(
             sector_id=request.sector_id,
             risk_label=risk_label,
             confidence=float(confidence),
             predicted_at=datetime.now(timezone.utc).isoformat()
         )
-        
-        logger.info(f"✓ Change detection complete for {request.sector_id}")
+
+        logger.info("✓ Change detection complete for %s", request.sector_id)
         return result
     except Exception as e:
-        logger.error(f"Change detection prediction failed for {request.sector_id}: {str(e)}")
+        logger.error(
+            "Change detection prediction failed for %s: %s",
+            request.sector_id,
+            str(e),
+        )
         raise HTTPException(
             status_code=500,
             detail="Change detection prediction failed"
-        )
-
+        ) from e
 
 @app.post("/simulate/erosion", response_model=ErosionSimulationResponse)
 async def simulate_erosion(request: ErosionSimulationRequest):
@@ -489,14 +388,23 @@ async def simulate_erosion(request: ErosionSimulationRequest):
     ```
     """
     try:
-        logger.info(f"Processing erosion simulation for {request.sector_id}: rainfall={request.rainfall_mm}mm")
-        
+        logger.info(
+            "Processing erosion simulation for %s: rainfall=%smm",
+            request.sector_id,
+            request.rainfall_mm,
+        )
+
         # Call erosion model
         try:
             model_result = calc_erosion(30.0, request.rainfall_mm, 1.0)
             soil_loss = model_result.get("soil_loss_t_ha", request.rainfall_mm * 0.5)
             risk_level = model_result.get("risk_label", "Medium")
-        except Exception:
+        except Exception as model_err:
+            logger.warning(
+                "Erosion model failed for %s: %s, using fallback",
+                request.sector_id,
+                str(model_err),
+            )
             # Fallback if model not available
             soil_loss = request.rainfall_mm * 0.5
             if soil_loss >= 35:
@@ -505,22 +413,23 @@ async def simulate_erosion(request: ErosionSimulationRequest):
                 risk_level = "Medium"
             else:
                 risk_level = "Low"
-        
+
         result = ErosionSimulationResponse(
             sector_id=request.sector_id,
             soil_loss_t_ha=float(soil_loss),
             risk_level=risk_level
         )
-        
-        logger.info(f"✓ Erosion simulation complete for {request.sector_id}")
+
+        logger.info("✓ Erosion simulation complete for %s", request.sector_id)
         return result
     except Exception as e:
-        logger.error(f"Erosion simulation failed for {request.sector_id}: {str(e)}")
+        logger.error(
+            "Erosion simulation failed for %s: %s", request.sector_id, str(e)
+        )
         raise HTTPException(
             status_code=500,
             detail="Erosion simulation failed"
-        )
-
+        ) from e
 
 @app.post("/simulate/contaminant", response_model=ContaminantSimulationResponse)
 async def simulate_contaminant(request: ContaminantSimulationRequest):
@@ -551,51 +460,61 @@ async def simulate_contaminant(request: ContaminantSimulationRequest):
     ```
     """
     try:
-        logger.info(f"Processing contaminant simulation for {request.sector_id}: source={request.source_point}")
-        
+        logger.info(
+            "Processing contaminant simulation for %s: source=%s",
+            request.sector_id,
+            request.source_point,
+        )
+
         # Calculate spread based on coordinates
         try:
             # Try to use the contaminant model if available
             model_result = calc_contaminant(45.0, 1.5, 0.5)
             spread_radius = model_result.get("spread_radius_km", 2.5)
             peak_concentration = model_result.get("peak_concentration", 0.65)
-        except Exception:
+        except Exception as model_err:
+            logger.warning(
+                "Contaminant model failed for %s: %s, using fallback",
+                request.sector_id,
+                str(model_err),
+            )
             # Fallback calculation
             spread_radius = 2.5
             peak_concentration = 0.65
-        
+
         result = ContaminantSimulationResponse(
             sector_id=request.sector_id,
             spread_radius_km=float(spread_radius),
             peak_concentration=float(peak_concentration)
         )
-        
-        logger.info(f"✓ Contaminant simulation complete for {request.sector_id}")
+
+        logger.info("✓ Contaminant simulation complete for %s", request.sector_id)
         return result
     except Exception as e:
-        logger.error(f"Contaminant simulation failed for {request.sector_id}: {str(e)}")
+        logger.error(
+            "Contaminant simulation failed for %s: %s", request.sector_id, str(e)
+        )
         raise HTTPException(
             status_code=500,
             detail="Contaminant simulation failed"
-        )
-
+        ) from e
 
 if __name__ == "__main__":
     import uvicorn
-    
+
     # Get configuration from environment
     host = os.getenv("API_HOST", "0.0.0.0")
     port = int(os.getenv("API_PORT", "8001"))
     env = os.getenv("API_ENV", "development")
-    
-    logger.info(f"🚀 Starting Project Jasper ML API")
-    logger.info(f"   Environment: {env}")
-    logger.info(f"   Host: {host}:{port}")
-    logger.info(f"   Allowed Origins: {ALLOWED_ORIGINS}")
-    
+
+    logger.info("🚀 Starting Project Jasper ML API")
+    logger.info("   Environment: %s", env)
+    logger.info("   Host: %s:%s", host, port)
+    logger.info("   Allowed Origins: %s", ", ".join(ALLOWED_ORIGINS))
+
     # Production mode uses more workers
     workers = 4 if env == "production" else 1
-    
+
     uvicorn.run(
         app,
         host=host,
