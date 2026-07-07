@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { HazardZone } from "./HazardZone";
-import { fetchChangeDetection, ModelOutput } from "../../../lib/api";
+import { fetchChangeDetection, ChangeDetectionResult } from "../../../lib/api";
 
 const CENTER: [number, number] = [52.882, -118.065];
 const SECTOR_ID = "ATH-001-A";
 
 export function BurnScarLayer() {
-  const [mlData, setMlData] = useState<ModelOutput | null>(null);
+  const [mlData, setMlData] = useState<ChangeDetectionResult | null>(null);
 
   useEffect(() => {
     fetchChangeDetection(SECTOR_ID).then(setMlData).catch((err) => console.error("BurnScarLayer: change detection failed", err));
@@ -17,7 +17,7 @@ export function BurnScarLayer() {
   const confidence = mlData
     ? `${(mlData.confidence * 100).toFixed(1)}%`
     : "94.6%";
-  const riskScore = mlData ? mlData.risk_score.toFixed(2) : "–";
+  const riskLabel = mlData?.risk_label ?? "–";
   const status =
     mlData?.risk_label === "High"
       ? "CRITICAL"
@@ -47,8 +47,8 @@ export function BurnScarLayer() {
         { label: "Crown Scorch", value: "82.4% (Severe)", valueColor: "text-rose-600" },
         { label: "Dead Tree Hazards", value: "412 Standing", valueColor: "text-rose-600" },
         {
-          label: "ML Risk Score",
-          value: riskScore,
+          label: "ML Risk Label",
+          value: riskLabel,
           valueColor:
             mlData?.risk_label === "High"
               ? "text-rose-600"
