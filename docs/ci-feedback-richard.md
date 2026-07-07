@@ -1,159 +1,129 @@
 # CI Feedback — Richard (jasper-ml)
 
 **From:** Edwin (QA)
-**Date:** July 6, 2026
-**CI Run:** #65 / #66 on `develop`
+**Date:** July 6, 2026 (updated after branch review)
+**Branch reviewed:** `feature/richard-ml`
 
 ---
 
 ## Summary
 
-CI is now reaching Stage 4 (Integration Tests) for the first time. The Railway backend
-is reachable, but all three of your ML endpoints are returning 404. The tests can't
-find them at the expected paths. There are also code quality issues in Stage 1 and
-Stage 2 to clean up before M4.
+Your code is done — all three ML endpoints are correct and the response shapes
+match the test contract exactly. The only reason CI still can't reach your service
+is that your ML API runs on a **separate Railway deployment** from Feven's backend,
+and that URL hasn't been added to CI yet.
+
+This is a 10-minute fix that only needs one thing from you: your Railway service URL.
 
 ---
 
-## 1. ML Endpoints Not Found (Stage 4 — Integration Tests)
+## What's Already Done ✓
 
-All three ML endpoints return `{"detail": "Not Found"}` on Railway:
-
-| Endpoint | Expected | Got |
-|---|---|---|
-| `POST /predict/change-detection` | 200 + prediction JSON | 404 |
-| `POST /simulate/erosion` | 200 + simulation JSON | 404 |
-| `POST /simulate/contaminant` | 200 + simulation JSON | 404 |
-
-**What to check:**
-
-1. **Are the ML routes registered?** Confirm these exact paths exist in your FastAPI router:
-   - `/predict/change-detection`
-   - `/simulate/erosion`
-   - `/simulate/contaminant`
-
-2. **Is the ML service deployed to Railway?** The tests hit `RAILWAY_API_URL` which is Feven's backend. Are your routes mounted there, or is your ML service a separate deployment?
-   - If separate: tell Edwin the URL so he can add `ML_API_URL` as a secret.
-   - If same app: confirm the routes are registered and the Railway deploy is current.
-
-3. **Quick check:**
-   ```bash
-   curl -X POST https://bluepulseai-capstone-production.up.railway.app/predict/change-detection \
-     -H "Content-Type: application/json" \
-     -H "X-API-Key: jasper-dev-api-key-202" \
-     -d '{"sector_id": "ATH-001"}'
-   ```
-   If that returns 404, the route is either not deployed or at a different path.
+- `POST /predict/change-detection` — correct path, correct response shape ✓
+- `POST /simulate/erosion` — correct path, correct response shape ✓
+- `POST /simulate/contaminant` — correct path, correct response shape ✓
+- All Pydantic request/response models match the test contract ✓
+- Production hardening, CORS, logging, and Docker config in place ✓
 
 ---
 
-## 2. Expected Request/Response Format
+## The One Remaining Step — Share Your Railway URL
 
-Here's exactly what the tests send and expect — make sure your endpoints match:
+CI uses an environment variable called `ML_API_URL` to reach your service.
+Right now that variable is not set, so all ML tests are being skipped in CI.
 
-### `POST /predict/change-detection`
+Follow these steps to find your Railway URL and send it to Edwin.
+
+---
+
+### Step 1 — Log in to Railway
+
+Go to **railway.app** and log in with your account.
+
+---
+
+### Step 2 — Open Your ML Project
+
+On the Railway dashboard, look for your Project Jasper ML service.
+It will likely be named something like `jasper-ml` or `bluepulseai-ml`.
+
+Click on it to open the project.
+
+---
+
+### Step 3 — Find the Deployment URL
+
+Inside the project, click on your service (the box showing your deployment).
+Then look for one of these:
+
+- A **"Settings"** tab → scroll down to **"Domains"** — your public URL is listed there.
+- Or a **"Deploy"** tab → the URL is shown at the top of the latest deployment.
+
+The URL will look something like:
+
+```
+https://jasper-ml-production.up.railway.app
+```
+
+or
+
+```
+https://bluepulseai-ml-production.up.railway.app
+```
+
+---
+
+### Step 4 — Verify It's Live
+
+Before sending the URL, do a quick sanity check. Open a new browser tab and go to:
+
+```
+https://<your-url>/health
+```
+
+You should see a response like:
+
 ```json
-// Request body
-{
-  "sector_id": "ATH-001"
-}
-
-// Expected response (200)
-{
-  "sector_id": "ATH-001",
-  "risk_label": "High" | "Medium" | "Low",   // Title Case
-  "confidence": 0.0–1.0,
-  "predicted_at": "<ISO timestamp>"
-}
+{"status": "ok", "models": {...}}
 ```
 
-### `POST /simulate/erosion`
-```json
-// Request body
-{
-  "sector_id": "ATH-001",
-  "rainfall_mm": 45.0
-}
-
-// Expected response (200)
-{
-  "sector_id": "ATH-001",
-  "soil_loss_t_ha": <float>,
-  "risk_level": "High" | "Medium" | "Low"
-}
-```
-
-### `POST /simulate/contaminant`
-```json
-// Request body
-{
-  "sector_id": "ATH-001",
-  "source_point": [55.123, -114.456]
-}
-
-// Expected response (200)
-{
-  "sector_id": "ATH-001",
-  "spread_radius_km": <float>,
-  "peak_concentration": <float>
-}
-```
+If you get an error or the page doesn't load, your Railway deployment may not be
+running. In that case, go to the **"Deployments"** tab in Railway and check that
+the latest deploy shows a green "Success" status. If it's red, redeploy from the
+Railway dashboard.
 
 ---
 
-## 3. Code Quality — Pylint (Stage 1)
+### Step 5 — Send the URL to Edwin
 
-Your Python files in `jasper-ml` scored below 7.0/10 on Pylint.
+Send Edwin the full URL (including `https://`). He will add it to GitHub Secrets
+as `ML_API_URL` and wire it into the CI pipeline. Once that's done, the next CI
+run will be able to reach your endpoints and run all the ML tests.
 
-**How to check locally:**
-```bash
-cd jasper-ml
-pip install pylint
-pylint $(find . -name '*.py' | head -20) --fail-under=7.0
+---
+
+## What Edwin Will Do With It
+
+Edwin will add `ML_API_URL` to GitHub Secrets and add one line to `ci.yml`:
+
+```yaml
+ML_API_URL: ${{ secrets.ML_API_URL }}
 ```
 
-Common quick fixes: add docstrings, remove unused imports, fix line length (max 100 chars), rename single-letter variables.
-
-**Target:** Score ≥ 7.0 before M4 (July 25).
+That's all that's needed on the CI side. Your code doesn't need any changes.
 
 ---
 
-## 4. Dependency Vulnerabilities — pip-audit (Stage 2)
+## If You Haven't Deployed to Railway Yet
 
-`pip-audit` found vulnerable packages in `jasper-ml/requirements.txt`.
+If your ML service isn't deployed to Railway yet, here's the quick path:
 
-**How to check locally:**
-```bash
-cd jasper-ml
-pip install pip-audit
-pip-audit -r requirements.txt
-```
+1. Go to **railway.app** → New Project → Deploy from GitHub repo.
+2. Select the `BluePulseAi-Capstone` repo.
+3. Set the **Root Directory** to `jasper-ml`.
+4. Railway will detect your `Dockerfile` automatically and build it.
+5. Your service runs on **port 8001** — set that in Railway under
+   Settings → Networking → **Public Networking** → expose port `8001`.
+6. Railway will generate a public URL. That's the one to send Edwin.
 
-Update flagged packages to patched versions. For ML libraries (numpy, scipy, scikit-learn) check if a patched version exists before upgrading — some ML libs have breaking changes between minor versions.
-
-**Target:** Zero high-severity findings before M5 (Production Live, August 1).
-
----
-
-## 5. Security Findings — Semgrep (Stage 2)
-
-Semgrep found security issues in your Python code. Edwin will share the
-`semgrep-report.json` artifact from the CI run — look for entries where
-`path` starts with `jasper-ml/`.
-
-Common findings to look for:
-- Hardcoded file paths or model paths that should be env vars
-- Use of `pickle.load` without signature verification (common in ML code)
-- Unvalidated input passed to numpy/pandas operations
-
-**Target:** Zero `ERROR`-severity findings before M4.
-
----
-
-## Next Steps
-
-1. Confirm whether ML routes are in Feven's Railway app or a separate service
-2. If separate service: share the URL with Edwin → he'll add `ML_API_URL` as a CI secret
-3. Fix the route paths to match the expected endpoints above
-4. Redeploy and ping Edwin — he'll re-run CI to confirm
-5. Run Pylint and pip-audit locally when you get a chance (not urgent, but before M4)
+Your `Dockerfile` is already production-ready — no changes needed.

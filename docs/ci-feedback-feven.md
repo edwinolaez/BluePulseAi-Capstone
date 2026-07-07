@@ -1,125 +1,176 @@
 # CI Feedback — Feven (jasper-backend)
 
 **From:** Edwin (QA)
-**Date:** July 6, 2026
-**CI Run:** #65 / #66 on `develop`
+**Date:** July 6, 2026 (updated after branch review)
+**Branch reviewed:** `feature/feven-ingest`
 
 ---
 
 ## Summary
 
-CI is now reaching Stage 4 (Integration Tests) for the first time. Your backend is
-reachable on Railway — that's great. But the tests are finding 3 issues with endpoint
-behavior, plus code quality issues in Stage 1 and Stage 2.
+Good progress since the last CI run — the route now exists, empty-sector 404 is fixed,
+and Pylint is at 9.69. The remaining failures come down to one root issue: the ingest
+endpoint uses `Form(...)` fields but the tests (and the agreed contract) send JSON. Once
+that's fixed, the response shape needs a small adjustment too.
 
 ---
 
-## 1. Endpoint Issues (Stage 4 — Integration Tests)
+## What's Already Fixed
 
-### `POST /api/v1/ingest` is returning 404
-
-Every test that tries to post a new sensor record to Railway gets:
-```
-{"detail": "Not Found"}
-```
-
-**What to check:**
-- Is the route registered in your FastAPI app as `/api/v1/ingest`?
-- Is the Railway deployment up to date with your latest code?
-- Run: `curl -X POST https://bluepulseai-capstone-production.up.railway.app/api/v1/ingest` and confirm you get something other than 404.
-
-### Kong is not blocking unauthenticated requests
-
-The test `test_protected_route_requires_api_key` calls a protected endpoint with **no API key** and expects a `401`. It's getting `200` instead.
-
-**What to check:**
-- Is the Kong `key-auth` plugin enabled on the protected routes?
-- The route should reject any request that doesn't include `X-API-Key: jasper-dev-api-key-202`.
-
-### `GET /api/v1/layers/{sector_id}` returns 200 for unknown sectors
-
-When the test queries a sector ID that doesn't exist in the DB, it expects `404`. It's getting `200` with an empty or default response.
-
-**What to check:**
-- In your handler, after the DB query, check if the result is empty.
-- If no rows returned, explicitly `raise HTTPException(status_code=404, detail="Sector not found")`.
+- `POST /api/v1/ingest` route exists and is reachable ✓
+- `GET /api/v1/layers/{sector_id}` returns 404 when sector has no data ✓
+- Unauthenticated requests now get 401 (FastAPI-level auth added) ✓
+- Pylint score: **9.69/10** ✓
 
 ---
 
-## 2. Pydantic Validation Issues (Stage 4)
+## 1. Ingest Endpoint — JSON Body vs Form Data Mismatch
 
-Two tests expose missing validation in your ingest model:
+**This is the main blocker. It affects every ingest test.**
 
-| Test | Expected | Got | Fix |
-|---|---|---|---|
-| POST with no `sector_id` | 422 | 404 | Mark `sector_id` as required (no default) in your Pydantic model |
-| POST with `lat=999, lon=999` | 422 | 404 | Add coordinate range validator: lat must be -90 to 90, lon -180 to 180 |
+Your handler is currently defined like this:
 
-These are returning 404 instead of 422 because the route itself isn't found — fix the 404 first and these may resolve automatically once the route exists.
-
----
-
-## 3. Code Quality — Pylint (Stage 1)
-
-Your Python files in `jasper-backend` scored below 7.0/10 on Pylint.
-
-**How to check locally:**
-```bash
-cd jasper-backend
-pip install pylint
-pylint $(find . -name '*.py' | head -20) --fail-under=7.0
+```python
+@router.post("/api/v1/ingest")
+async def ingest_base(
+    sector_id: str = Form(...),
+    data_source: str = Form(...),
+    user_id: str = Form(...),
+):
 ```
 
-Common quick fixes: add docstrings, remove unused imports, fix line length (max 100 chars), rename single-letter variables.
+`Form(...)` tells FastAPI to expect `multipart/form-data` or
+`application/x-www-form-urlencoded`. But every test sends a JSON body:
 
-**Target:** Score ≥ 7.0 before M4 (July 25).
-
----
-
-## 4. Dependency Vulnerabilities — pip-audit (Stage 2)
-
-`pip-audit` found vulnerable packages in `jasper-backend/requirements.txt`.
-
-**How to check locally:**
-```bash
-cd jasper-backend
-pip install pip-audit
-pip-audit -r requirements.txt
+```python
+http_client.post("/api/v1/ingest", json=SAMPLE_INGEST_RECORD, headers=auth_headers)
 ```
 
-Update any flagged packages to their patched versions. If a package can't be updated, document why.
+When FastAPI gets a `Content-Type: application/json` request against a `Form(...)` endpoint,
+it returns **422** because the form fields are missing. The tests expect **201**.
 
-**Target:** Zero high-severity findings before M5 (Production Live, August 1).
+**Fix — replace `Form(...)` with a Pydantic model:**
+
+```python
+from pydantic import BaseModel, Field
+from typing import Optional, Dict, Any
+
+class Coordinates(BaseModel):
+    lat: float = Field(..., ge=-90, le=90)
+    lon: float = Field(..., ge=-180, le=180)
+
+class IngestRecord(BaseModel):
+    sector_id: str
+    layer_type: str
+    coordinates: Coordinates
+    timestamp: str
+    payload: Optional[Dict[str, Any]] = {}
+
+@router.post("/api/v1/ingest", status_code=201, dependencies=[Depends(require_api_key)])
+async def ingest_base(record: IngestRecord):
+    ...
+```
+
+This also gives you the coordinate range validation for free (the `ge`/`le` bounds on
+`lat` and `lon`) — which fixes Issue 2 below at the same time.
 
 ---
 
-## 5. Security Findings — Semgrep (Stage 2)
+## 2. Ingest Response — Missing `id` Field
 
-Semgrep found security issues in your Python code. Edwin will share the
-`semgrep-report.json` artifact from the CI run — look for entries where
-`path` starts with `jasper-backend/`.
+The tests check that a successful 201 response contains `id`, `sector_id`, and `timestamp`:
 
-Common findings to look for:
-- Hardcoded credentials or tokens
-- SQL injection risks (use parameterized queries)
-- Insecure use of `subprocess` or `eval`
-- Unvalidated user input passed to file paths
+```python
+assert_has_required_fields(body, required_fields=["id", "sector_id", "timestamp"])
+```
 
-**Target:** Zero `ERROR`-severity findings before M4.
+Your current response returns `status`, `message`, `user_id` — there's no `id` field.
+
+**Fix — return `id` in the response:**
+
+The `id` should be the UUID that Supabase generates when the row is inserted. After your
+DB write, read it back and include it:
+
+```python
+result = supabase.table("ingest_records").insert({...}).execute()
+record_id = result.data[0]["id"]  # Supabase returns the generated UUID
+
+return JSONResponse(status_code=201, content={
+    "id": record_id,
+    "sector_id": record.sector_id,
+    "timestamp": datetime.now(timezone.utc).isoformat(),
+})
+```
+
+If Supabase isn't wired up yet for this endpoint, you can generate a UUID locally as a
+temporary measure:
+
+```python
+import uuid
+return JSONResponse(status_code=201, content={
+    "id": str(uuid.uuid4()),
+    "sector_id": record.sector_id,
+    "timestamp": datetime.now(timezone.utc).isoformat(),
+})
+```
 
 ---
 
-## What Passes Already
+## 3. Coordinate Validation — Missing (Fixed by Issue 1 fix)
 
-- `GET /api/v1/layers/{sector_id}` with a **valid** sector returns data ✓ (Feven mentioned this was fixed)
-- Health endpoint is reachable ✓
+The test sends `lat=999, lon=999` and expects a 422. Right now those invalid coordinates
+are accepted silently because there's no validation.
+
+If you add the Pydantic model from Issue 1 with `ge`/`le` bounds on `lat` and `lon`,
+this test will pass automatically — no extra work needed.
+
+---
+
+## Full Expected Contract for Reference
+
+Here is exactly what the tests send and expect — use this as the spec:
+
+### `POST /api/v1/ingest`
+
+```json
+// Request body (Content-Type: application/json)
+{
+  "layer_type": "burn_scar",
+  "sector_id": "ATH-001",
+  "coordinates": {
+    "lat": 56.7267,
+    "lon": -111.3790
+  },
+  "timestamp": "2026-06-25T12:00:00Z",
+  "payload": {
+    "severity": "high",
+    "area_km2": 142.5
+  }
+}
+
+// Expected response (201 Created)
+{
+  "id": "<uuid>",
+  "sector_id": "ATH-001",
+  "timestamp": "<ISO timestamp>"
+}
+```
+
+### Validation rules the tests enforce
+| Scenario | Expected status |
+|---|---|
+| Valid record | 201 |
+| Missing `sector_id` | 422 |
+| `lat=999` or `lon=999` | 422 |
+| No `X-API-Key` header | 401 |
 
 ---
 
 ## Next Steps
 
-1. Fix the `/api/v1/ingest` 404 first — it unblocks 8+ failing tests
-2. Enable Kong key-auth plugin on protected routes
-3. Add empty-result 404 to the layers handler
-4. Run Pylint and pip-audit locally, fix what you can
-5. Ping Edwin when Railway is redeployed so he can re-run CI
+1. Replace `Form(...)` with a Pydantic JSON model (fixes Issues 1 + 3 together)
+2. Add `id` to the 201 response
+3. Redeploy to Railway and ping Edwin — he'll re-run CI to confirm
+
+The Pylint and pip-audit items from before are no longer urgent given the score is 9.69.
+Focus on the two items above first.
