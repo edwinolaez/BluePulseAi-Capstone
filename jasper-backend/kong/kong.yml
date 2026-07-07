@@ -1,0 +1,70 @@
+_format_version: "2.1"
+
+services:
+  - name: jasper-backend
+    url: http://jasper-backend:8000
+    routes:
+      - name: health-route
+        paths:
+          - /health
+        strip_path: false
+        methods:
+          - GET
+      - name: ingest-route
+        paths:
+          - /api/v1/ingest
+        strip_path: false
+        methods:
+          - POST
+      - name: layers-route
+        paths:
+          - /api/v1/layers
+        strip_path: false
+        methods:
+          - GET
+
+  - name: jasper-ml
+    url: http://jasper-ml:8001
+    routes:
+      - name: predict-route
+        paths:
+          - /api/v1/predict
+        strip_path: false
+        methods:
+          - POST
+      - name: simulate-route
+        paths:
+          - /api/v1/simulate
+        strip_path: false
+        methods:
+          - GET
+
+plugins:
+  - name: rate-limiting
+    config:
+      minute: 20
+      policy: local
+  - name: key-auth
+    config:
+      key_names:
+        - X-API-Key
+  - name: cors
+    config:
+      origins:
+        - http://localhost:3000
+        - https://*.vercel.app
+      methods:
+        - GET
+        - POST
+        - OPTIONS
+      headers:
+        - X-API-Key
+        - Content-Type
+      exposed_headers:
+        - X-Kong-Upstream-Latency
+      max_age: 3600
+
+consumers:
+  - username: jasper-frontend
+    keyauth_credentials:
+      - key: jasper-dev-api-key-2026
