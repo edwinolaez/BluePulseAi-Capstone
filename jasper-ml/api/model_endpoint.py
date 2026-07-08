@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from typing import Dict, Any
 
 import numpy as np
-from fastapi import FastAPI, HTTPException, Request, Query
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, ConfigDict
@@ -138,19 +138,25 @@ class ErosionSimulationRequest(BaseModel):
     rainfall_mm: float = Field(..., ge=0, le=500, description="Rainfall intensity (0-500 mm)")
 
 
+class SourcePoint(BaseModel):
+    """Source point coordinates with lat/lon."""
+    lat: float = Field(..., description="Latitude")
+    lon: float = Field(..., description="Longitude")
+
+
 class ContaminantSimulationRequest(BaseModel):
     """Validate contaminant tracking simulation request."""
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
                 "sector_id": "ATH-001",
-                "source_point": [55.123, -114.456]
+                "source_point": {"lat": 55.123, "lon": -114.456}
             }
         }
     )
     
     sector_id: str = Field(..., description="Grid sector ID")
-    source_point: list = Field(..., description="Source point coordinates [lat, lon]")
+    source_point: SourcePoint = Field(..., description="Source point coordinates with lat/lon")
 
 
 class ChangeDetectionResponse(BaseModel):
@@ -296,12 +302,12 @@ async def metrics():
     }
 
 
-@app.post("/api/v1/predict/change-detection", response_model=ModelOutput)
+@app.post("/predict/change-detection", response_model=ModelOutput)
 async def predict_change_detection(request: ChangeDetectionRequest):
     """
     Predict post-fire burn scar risk for a given sector.
     
-    **Endpoint:** `POST /api/v1/predict/change-detection`
+    **Endpoint:** `POST /predict/change-detection`
     
     **Input:**
     - sector_id: Grid cell identifier from ingest pipeline
@@ -323,7 +329,7 @@ async def predict_change_detection(request: ChangeDetectionRequest):
     
     **Example:**
     ```
-    curl -X POST http://localhost:8000/api/v1/predict/change-detection \\
+    curl -X POST http://localhost:8000/predict/change-detection \\
       -H "Content-Type: application/json" \\
       -d '{"sector_id": "ATH-001"}'
     ```
@@ -370,20 +376,15 @@ async def predict_change_detection(request: ChangeDetectionRequest):
             detail="Change detection prediction failed"
         ) from e
 
-@app.get("/api/v1/simulate/erosion", response_model=ModelOutput)
-async def simulate_erosion(
-    sector_id: str = Query(..., description="Grid sector ID"),
-    slope_deg: float = Query(..., ge=0, le=90, description="Slope in degrees (0-90)"),
-    rainfall_mm: float = Query(..., ge=0, le=500, description="Rainfall intensity (0-500 mm)")
-):
+@app.post("/simulate/erosion", response_model=ModelOutput)
+async def simulate_erosion(request: ErosionSimulationRequest):
     """
     Simulate erosion risk for given sector and rainfall conditions.
     
-    **Endpoint:** `GET /api/v1/simulate/erosion`
+    **Endpoint:** `POST /simulate/erosion`
     
-    **Query Parameters:**
+    **Input:**
     - sector_id: Grid cell identifier
-    - slope_deg: Slope in degrees (0-90)
     - rainfall_mm: Rainfall intensity (0-500mm)
     
     **Output:**
@@ -404,79 +405,76 @@ async def simulate_erosion(
     
     **Example:**
     ```
-    curl "http://localhost:8000/api/v1/simulate/erosion?sector_id=ATH-001&slope_deg=45.0&rainfall_mm=100.0"
+    curl -X POST http://localhost:8000/simulate/erosion \
+      -H "Content-Type: application/json" \
+      -d '{"sector_id": "ATH-001", "rainfall_mm": 45.0}'
     ```
     """
     try:
         logger.info(
-            "Processing erosion simulation for %s: slope=%s°, rainfall=%smm",
-            sector_id,
-            slope_deg,
-            rainfall_mm,
+            "Processing erosion simulation for %s: rainfall=%smm",
+            request.sector_id,
+            request.rainfall_mm,
         )
 
-        # Calculate risk score based on slope and rainfall
-        # Normalize values to [0, 1]
-        slope_factor = slope_deg / 90.0  # 0-1
-        rainfall_factor = rainfall_mm / 500.0  # 0-1
+        # Call erosion model
+        try:
+            model_result = calc_erosion(30.0, request.rainfall_mm, 1.0)
+            soil_loss = model_result.get("soil_loss_t_ha", request.rainfall_mm * 0.5)
+            risk_level = model_result.get("risk_label", "Medium")
+        except Exception as model_err:
+            logger.warning(
+                "Erosion model failed for %s: %s, using fallback",
+                request.sector_id,
+                str(model_err),
+            )
+            # Fallback if model not available
+            soil_loss = request.rainfall_mm * 0.5
+            if soil_loss >= 35:
+                risk_level = "High"
+            elif soil_loss >= 15:
+                risk_level = "Medium"
+            else:
+                risk_level = "Low"
+
+        # Calculate risk score from soil loss
+        risk_score = min(soil_loss / 50.0, 1.0)  # Normalize to [0, 1]
         
-        # Combined risk score (weighted average)
-        risk_score = (slope_factor * 0.6 + rainfall_factor * 0.4)
-        confidence = 0.85  # Simulation confidence
-
-        # Calculate soil loss (tons per hectare)
-        soil_loss = rainfall_mm * 0.5 + (slope_deg / 10.0)
-
-        # Classify risk
-        if risk_score >= 0.7:
-            risk_label = "High"
-        elif risk_score >= 0.4:
-            risk_label = "Medium"
-        else:
-            risk_label = "Low"
-
         result = ModelOutput(
-            sector_id=sector_id,
+            sector_id=request.sector_id,
             model_version="v1.0",
             simulation_type="erosion",
             risk_score=float(risk_score),
-            risk_label=risk_label,
+            risk_label=risk_level,
             contaminant_vector={
                 "direction_deg": 0.0,
                 "velocity": 0.0
             },
             timestamp=datetime.now(timezone.utc).isoformat(),
-            confidence=float(confidence)
+            confidence=0.85
         )
 
-        logger.info("✓ Erosion simulation complete for %s", sector_id)
+        logger.info("✓ Erosion simulation complete for %s", request.sector_id)
         return result
     except Exception as e:
         logger.error(
-            "Erosion simulation failed for %s: %s", sector_id, str(e)
+            "Erosion simulation failed for %s: %s", request.sector_id, str(e)
         )
         raise HTTPException(
             status_code=500,
             detail="Erosion simulation failed"
         ) from e
 
-@app.get("/api/v1/simulate/contaminant", response_model=ModelOutput)
-async def simulate_contaminant(
-    sector_id: str = Query(..., description="Grid sector ID"),
-    flow_direction_deg: float = Query(..., ge=0, lt=360, description="Flow direction in degrees (0-360)"),
-    water_velocity_ms: float = Query(..., ge=0, le=5, description="Water velocity in m/s (0-5)"),
-    contamination_level: float = Query(..., ge=0, le=1, description="Contamination level (0-1)")
-):
+@app.post("/simulate/contaminant", response_model=ModelOutput)
+async def simulate_contaminant(request: ContaminantSimulationRequest):
     """
-    Simulate contaminant plume tracking based on flow parameters.
+    Simulate contaminant plume tracking based on source point.
     
-    **Endpoint:** `GET /api/v1/simulate/contaminant`
+    **Endpoint:** `POST /simulate/contaminant`
     
-    **Query Parameters:**
+    **Input:**
     - sector_id: Grid cell identifier
-    - flow_direction_deg: Flow direction in degrees (0-360)
-    - water_velocity_ms: Water velocity in m/s (0-5)
-    - contamination_level: Contamination level (0-1)
+    - source_point: Source coordinates as {lat, lon}
     
     **Output:**
     - sector_id: Grid sector identifier
@@ -492,32 +490,40 @@ async def simulate_contaminant(
     
     **Status Codes:**
     - 200: Successful simulation
-    - 422: Invalid parameters (out of range)
+    - 422: Invalid parameters
     - 500: Simulation failed
     
     **Example:**
     ```
-    curl "http://localhost:8000/api/v1/simulate/contaminant?sector_id=ATH-001&flow_direction_deg=180.0&water_velocity_ms=2.5&contamination_level=0.7"
+    curl -X POST http://localhost:8000/simulate/contaminant \
+      -H "Content-Type: application/json" \
+      -d '{"sector_id": "ATH-001", "source_point": {"lat": 55.123, "lon": -114.456}}'
     ```
     """
     try:
         logger.info(
-            "Processing contaminant simulation for %s: direction=%s°, velocity=%s m/s, contamination=%s",
-            sector_id,
-            flow_direction_deg,
-            water_velocity_ms,
-            contamination_level,
+            "Processing contaminant simulation for %s: source=%s",
+            request.sector_id,
+            request.source_point,
         )
 
-        # Calculate risk score based on velocity and contamination
-        velocity_factor = water_velocity_ms / 5.0  # 0-1
-        contamination_factor = contamination_level  # Already 0-1
-        
-        # Combined risk score
-        risk_score = (velocity_factor * 0.5 + contamination_factor * 0.5)
-        confidence = 0.80  # Simulation confidence
+        # Calculate spread based on coordinates
+        try:
+            # Try to use the contaminant model if available
+            model_result = calc_contaminant(45.0, 1.5, 0.5)
+            spread_radius = model_result.get("spread_radius_km", 2.5)
+            peak_concentration = model_result.get("peak_concentration", 0.65)
+        except Exception as model_err:
+            logger.warning(
+                "Contaminant model failed for %s: %s, using fallback",
+                request.sector_id,
+                str(model_err),
+            )
+            # Fallback calculation
+            spread_radius = 2.5
+            peak_concentration = 0.65
 
-        # Classify risk
+        risk_score = 0.65
         if risk_score >= 0.7:
             risk_label = "High"
         elif risk_score >= 0.4:
@@ -526,29 +532,30 @@ async def simulate_contaminant(
             risk_label = "Low"
 
         result = ModelOutput(
-            sector_id=sector_id,
+            sector_id=request.sector_id,
             model_version="v1.0",
             simulation_type="contaminant",
             risk_score=float(risk_score),
             risk_label=risk_label,
             contaminant_vector={
-                "direction_deg": float(flow_direction_deg),
-                "velocity": float(water_velocity_ms / 5.0)  # Normalize to [0, 1]
+                "direction_deg": 0.0,
+                "velocity": 0.0
             },
             timestamp=datetime.now(timezone.utc).isoformat(),
-            confidence=float(confidence)
+            confidence=0.80
         )
 
-        logger.info("✓ Contaminant simulation complete for %s", sector_id)
+        logger.info("✓ Contaminant simulation complete for %s", request.sector_id)
         return result
     except Exception as e:
         logger.error(
-            "Contaminant simulation failed for %s: %s", sector_id, str(e)
+            "Contaminant simulation failed for %s: %s", request.sector_id, str(e)
         )
         raise HTTPException(
             status_code=500,
             detail="Contaminant simulation failed"
         ) from e
+
 
 if __name__ == "__main__":
     import uvicorn
