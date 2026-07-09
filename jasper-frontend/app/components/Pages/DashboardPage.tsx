@@ -164,22 +164,22 @@ export function DashboardPage() {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 bg-background">
-      <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
+    <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-background">
+      <div className="flex flex-col gap-3 mb-6 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1">
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1">
             Jasper Valley Health Monitor
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">
             Live environmental readings and risk indicators for the Jasper area.
           </p>
         </div>
-        <div className="flex items-center gap-1 p-1 rounded-lg bg-surface-alt">
+        <div className="flex flex-wrap items-center gap-1 p-1 rounded-lg bg-surface-alt self-start">
           {STATIONS.map((st) => (
             <button
               key={st}
               onClick={() => setStation(st)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+              className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
                 station === st
                   ? "bg-blue-600 text-white shadow"
                   : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"

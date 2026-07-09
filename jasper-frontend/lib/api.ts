@@ -1,15 +1,23 @@
-// ─── API Configuration ────────────────────────────────────────────────────────
-// Feven's backend (data pipeline + layer queries)
+// This file is the main connection point between the frontend and the backend APIs.
+// Feven's backend handles the map layer data, and Richard's ML backend handles
+// the three AI model predictions (burn scar, erosion, and contaminant).
+// All the API URLs are stored in environment variables so they're easy to swap out.
+
+// Feven's backend URL — handles data pipeline and environmental layer queries
 const FEVEN_API  = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
-// Richard's ML API (change detection, erosion, contaminant simulations)
+// Richard's ML model API — runs the three AI simulations
 const ML_API     = process.env.NEXT_PUBLIC_ML_API_BASE_URL ?? "";
+// API key sent in every request header to authenticate with the backend
 const API_KEY    = process.env.NEXT_PUBLIC_API_KEY ?? "";
 
+// Attaches the API key to every request so the server knows it's coming from us
 function apiHeaders(): HeadersInit {
   return { "X-API-Key": API_KEY };
 }
 
-// ─── Feven's Response Types ───────────────────────────────────────────────────
+// ─── Data types coming back from Feven's backend ─────────────────────────────
+
+// Describes what a layer response looks like (used by the map overlays)
 export interface LayerData {
   sector_id:  string;
   date_from:  string | null;
@@ -18,28 +26,32 @@ export interface LayerData {
   layers:     unknown[];
 }
 
-// ─── Richard's ML Output Schema (shared by all 3 simulations) ─────────────────
-// Source: jasper-ml/ML_OUTPUT_SCHEMA.md
+// ─── Data type shared by all three of Richard's ML models ────────────────────
+// Every model (burn scar, erosion, contaminant) returns the same shape of data.
+// This makes it easy to display all three in a consistent way on the AI Overview page.
 export interface ModelOutput {
   sector_id:          string;
   model_version:      string;
+  // which of the three simulations produced this result
   simulation_type:    "change_detection" | "erosion" | "contaminant";
-  risk_score:         number;             // [0.0, 1.0]
+  // a number from 0 to 1 — higher means more dangerous
+  risk_score:         number;
+  // human-readable label based on risk_score
   risk_label:         "High" | "Medium" | "Low";
+  // only used by contaminant — tells us which direction the plume is moving and how fast
   contaminant_vector: {
-    direction_deg: number;                // [0.0, 360.0) — plume heading
-    velocity:      number;                // [0.0, 1.0]  — normalized speed
+    direction_deg: number; // compass heading (0–360)
+    velocity:      number; // normalized speed (0–1)
   };
   timestamp:   string;
-  confidence:  number;                    // [0.0, 1.0]
+  // how confident the ML model is in its prediction (0–1)
+  confidence:  number;
 }
 
-// ─── Feven's Endpoints ────────────────────────────────────────────────────────
+// ─── Functions that call Feven's backend ─────────────────────────────────────
 
-/**
- * Fetch environmental layer data for a sector and date range.
- * GET /api/v1/layers/{sector_id}?date_from=&date_to=&layer_type=
- */
+// Fetches environmental layer data for a given sector and date range.
+// Used by the map layers to colour the zones based on real data.
 export async function fetchLayerData(
   sectorId:   string,
   dateFrom:   string,
@@ -52,13 +64,10 @@ export async function fetchLayerData(
   return res.json();
 }
 
-// ─── Richard's ML Endpoints ───────────────────────────────────────────────────
+// ─── Functions that call Richard's ML backend ─────────────────────────────────
 
-/**
- * Predict post-fire burn scar risk for a sector.
- * POST /api/v1/predict/change-detection
- * Body: { sector_id }
- */
+// Asks Richard's model to predict the burn scar / forest damage risk for a sector.
+// Sends the sector ID and gets back a risk score, label, and confidence.
 export async function fetchChangeDetection(
   sectorId: string
 ): Promise<ModelOutput> {
@@ -71,17 +80,15 @@ export async function fetchChangeDetection(
   return res.json();
 }
 
-/**
- * Simulate erosion risk for a sector given terrain + rainfall conditions.
- * GET /api/v1/simulate/erosion?sector_id=&slope_deg=&rainfall_mm=
- *
- * Default params reflect Jasper watershed typical values.
- */
+// Asks Richard's model to simulate erosion risk based on terrain and rainfall.
+// slope_deg and rainfall_mm are the terrain conditions — defaults reflect
+// typical Jasper Valley watershed measurements.
 export async function fetchErosionSimulation(
   sectorId:   string,
   slopeDeg:   number = 38.5,   // typical steep Jasper valley slope
   rainfallMm: number = 82.0    // historical avg post-fire rainfall (mm)
 ): Promise<ModelOutput> {
+  // URLSearchParams keeps the URL clean and handles any special characters
   const params = new URLSearchParams({
     sector_id:   sectorId,
     slope_deg:   String(slopeDeg),
@@ -94,12 +101,9 @@ export async function fetchErosionSimulation(
   return res.json();
 }
 
-/**
- * Simulate contaminant plume movement for a sector.
- * GET /api/v1/simulate/contaminant?sector_id=&flow_direction_deg=&water_velocity_ms=&contamination_level=
- *
- * Default params reflect Athabasca River typical summer flow.
- */
+// Asks Richard's model to simulate where the contaminant plume is heading.
+// The flow direction, water speed, and contamination level tell the model
+// how the pollutant is moving through the river system.
 export async function fetchContaminantSimulation(
   sectorId:           string,
   flowDirectionDeg:   number = 180,  // south-flowing river segment

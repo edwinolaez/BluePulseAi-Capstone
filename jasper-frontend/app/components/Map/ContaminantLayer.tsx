@@ -1,3 +1,11 @@
+// ContaminantLayer visualises water contamination flowing through the Athabasca River.
+// It draws two river path lines on the map (main channel + branch),
+// places animated directional arrows along the river to show which way the plume is moving,
+// and adds a hazard zone circle at the critical contamination point.
+//
+// The arrow direction and animation speed come directly from Richard's contaminant API —
+// so as the model updates, the arrows update too.
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -6,7 +14,7 @@ import { Marker, Polyline } from "react-leaflet";
 import { fetchContaminantSimulation, ModelOutput } from "../../../lib/api";
 import { HazardZone } from "./HazardZone";
 
-// River path points — arrows placed at intervals along this path
+// GPS coordinates that trace the main river channel through the monitored area
 const RIVER_MAIN: [number, number][] = [
   [52.820, -118.200],
   [52.840, -118.155],
@@ -17,13 +25,15 @@ const RIVER_MAIN: [number, number][] = [
   [52.935, -117.920],
 ];
 
+// The secondary river branch — offset slightly from the main channel
 const RIVER_BRANCH: [number, number][] = RIVER_MAIN.map(
   ([lat, lng]): [number, number] => [lat + 0.004, lng + 0.006]
 );
 
+// The GPS point where contamination risk is highest — centre of the hazard zone circle
 const CRITICAL_CENTER: [number, number] = [52.875, -118.060];
 
-// Arrow marker positions (evenly spaced along river)
+// Four evenly-spaced positions along the river where animated arrows are placed
 const ARROW_POSITIONS: [number, number][] = [
   [52.840, -118.155],
   [52.858, -118.105],
@@ -31,8 +41,11 @@ const ARROW_POSITIONS: [number, number][] = [
   [52.905, -117.988],
 ];
 
+// Creates a Leaflet custom icon that looks like a directional arrow.
+// The arrow rotates to match the plume's direction, and its pulse animation
+// speeds up when the water velocity is higher.
 function arrowIcon(directionDeg: number, velocity: number): L.DivIcon {
-  // CSS animation speed: faster arrows for higher velocity
+  // Lower duration = faster animation = faster moving water
   const duration = Math.max(0.6, 2.5 - velocity * 2).toFixed(1);
   return L.divIcon({
     className: "",
@@ -49,34 +62,42 @@ function arrowIcon(directionDeg: number, velocity: number): L.DivIcon {
 }
 
 export function ContaminantLayer() {
+  // Holds the live result from Richard's contaminant plume API
   const [result, setResult] = useState<ModelOutput | null>(null);
 
+  // Fetch the contaminant simulation when the layer first loads.
+  // Parameters: sector ID, river flow direction (south = 180°), water speed, contamination level.
   useEffect(() => {
     fetchContaminantSimulation("ATH-001-W", 180, 2.1, 0.72)
       .then(setResult)
+      // If the API is unavailable, fall back to default direction and velocity below
       .catch(() => setResult(null));
   }, []);
 
-  const directionDeg = result?.contaminant_vector.direction_deg ?? 180;
+  // Use live values if available, otherwise use sensible defaults
+  const directionDeg = result?.contaminant_vector.direction_deg ?? 180;  // south-flowing
   const velocity     = result?.contaminant_vector.velocity     ?? 0.65;
   const risk         = result?.risk_label ?? "Warning";
 
   return (
     <>
+      {/* Main river channel — thick cyan line */}
       <Polyline
         positions={RIVER_MAIN}
         pathOptions={{ color: "#0ea5e9", weight: 5, opacity: 0.8, lineCap: "round", lineJoin: "round" }}
       />
+      {/* Secondary river branch — thinner and lighter */}
       <Polyline
         positions={RIVER_BRANCH}
         pathOptions={{ color: "#38bdf8", weight: 3, opacity: 0.7, lineCap: "round", lineJoin: "round" }}
       />
 
-      {/* Animated direction arrows using contaminant_vector from Richard's API */}
+      {/* Animated flow arrows — direction and speed come from Richard's contaminant_vector */}
       {ARROW_POSITIONS.map((pos, i) => (
         <Marker key={i} position={pos} icon={arrowIcon(directionDeg, velocity)} />
       ))}
 
+      {/* Hazard zone circle at the most critical contamination point */}
       <HazardZone
         center={CRITICAL_CENTER}
         radius={1500}
@@ -93,12 +114,13 @@ export function ContaminantLayer() {
         status="WARNING"
         name="Athabasca River — SEC-W2"
         fields={[
-          { label: "Station ID", value: "SEC-W2" },
-          { label: "Risk Level", value: risk, valueColor: "text-red-600" },
-          { label: "Plume Direction", value: `${directionDeg.toFixed(0)}°`, valueColor: "text-amber-600" },
-          { label: "Flow Velocity", value: `${(velocity * 5).toFixed(1)} m/s` },
-          { label: "Water Cloudiness", value: "18.4 NTU (High)", valueColor: "text-red-600" },
-          { label: "Connection Status", value: "Active Sync", valueColor: "text-green-600" },
+          { label: "Station ID",        value: "SEC-W2" },
+          { label: "Risk Level",        value: risk,                              valueColor: "text-red-600" },
+          { label: "Plume Direction",   value: `${directionDeg.toFixed(0)}°`,    valueColor: "text-amber-600" },
+          // Velocity is normalized 0–1 from the model, multiply by 5 to get m/s estimate
+          { label: "Flow Velocity",     value: `${(velocity * 5).toFixed(1)} m/s` },
+          { label: "Water Cloudiness",  value: "18.4 NTU (High)",                valueColor: "text-red-600" },
+          { label: "Connection Status", value: "Active Sync",                    valueColor: "text-green-600" },
         ]}
       />
     </>
