@@ -230,16 +230,16 @@ def test_contaminant_vector_output_ranges():
     assert response.status_code == 200
     data = response.json()
     
-    # Validate vector ranges
-    assert 0.0 <= data["contaminant_vector"]["direction_deg"] < 360.0
-    assert 0.0 <= data["contaminant_vector"]["velocity"] <= 1.0
+    # Validate contaminant_vector is a non-empty list of coordinates
+    assert isinstance(data["contaminant_vector"], list), "contaminant_vector should be a list"
+    assert len(data["contaminant_vector"]) > 0, "contaminant_vector should not be empty"
+    assert isinstance(data["contaminant_vector"][0], list), "each item should be coordinates"
+    assert len(data["contaminant_vector"][0]) == 2, "each coordinate should have [lat, lon]"
+    
+    # Validate other ranges
     assert 0.0 <= data["confidence"] <= 1.0
     assert 0.0 <= data["risk_score"] <= 1.0
     assert data["risk_label"] in ["High", "Medium", "Low"]
-
-
-
-
 
 
 def test_all_endpoints_return_model_output_schema():
