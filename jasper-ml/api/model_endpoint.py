@@ -494,6 +494,23 @@ async def simulate_contaminant(request: ContaminantSimulationRequest):
       -d '{"sector_id": "ATH-001", "source_point": {"lat": 55.123, "lon": -114.456}}'
     ```
     """
+    # Validate coordinates are within Athabasca watershed bounds BEFORE try block
+    # Athabasca watershed: lat 52-60°N, lon -120 to -110°W
+    athabasca_lat_min, athabasca_lat_max = 52.0, 60.0
+    athabasca_lon_min, athabasca_lon_max = -120.0, -110.0
+    
+    if not (athabasca_lat_min <= request.source_point.lat <= athabasca_lat_max and
+            athabasca_lon_min <= request.source_point.lon <= athabasca_lon_max):
+        logger.warning(
+            "Source point (%s, %s) is outside Athabasca watershed bounds",
+            request.source_point.lat,
+            request.source_point.lon,
+        )
+        raise HTTPException(
+            status_code=422,
+            detail=f"Source point ({request.source_point.lat}, {request.source_point.lon}) is outside Athabasca watershed bounds. Valid range: lat {athabasca_lat_min}-{athabasca_lat_max}°N, lon {athabasca_lon_min}-{athabasca_lon_max}°W"
+        )
+    
     try:
         logger.info(
             "Processing contaminant simulation for %s: source=%s",
