@@ -219,6 +219,31 @@ def test_contaminant_endpoint_valid_request():
     assert "contaminant_vector" in data
 
 
+
+def test_contaminant_watershed_bounds_validation():
+    """Test that contaminant endpoint rejects coordinates outside Athabasca watershed."""
+    # Test coordinates outside watershed (Gulf of Guinea)
+    params = {
+        "sector_id": "OUTSIDE-001",
+        "source_point": {"lat": 0.0, "lon": 0.0}
+    }
+    response = client.post("/simulate/contaminant", json=params)
+    
+    assert response.status_code == 422, f"Expected 422 for out-of-bounds coordinates, got {response.status_code}"
+    data = response.json()
+    assert "outside Athabasca watershed bounds" in data["detail"]
+    
+    # Test valid coordinates within watershed (northern Alberta)
+    params = {
+        "sector_id": "ATH-001-C",
+        "source_point": {"lat": 56.0, "lon": -115.0}
+    }
+    response = client.post("/simulate/contaminant", json=params)
+    
+    assert response.status_code == 200, f"Expected 200 for in-bounds coordinates, got {response.status_code}"
+    data = response.json()
+    assert data["sector_id"] == "ATH-001-C"
+
 def test_contaminant_vector_output_ranges():
     """Test that contaminant vector output is within valid ranges."""
     params = {
