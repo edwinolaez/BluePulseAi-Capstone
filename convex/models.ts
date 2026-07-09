@@ -4,29 +4,17 @@ import { v } from "convex/values";
 export const getModelMetadata = query({
   args: {},
   handler: async (ctx) => {
-    let metadata = await ctx.db.query("modelMetadata").first();
+    const metadata = await ctx.db.query("modelMetadata").first();
 
-    if (!metadata) {
-      const id = await ctx.db.insert("modelMetadata", {
+    return {
+      status: "success",
+      value: metadata ?? {
         modelName: "default",
         modelVersion: "v1.2",
         runId: "run-abc123",
         f1Score: 0.87,
         trainingDate: Date.now(),
         lastPrediction: Date.now(),
-      });
-
-      metadata = await ctx.db.get(id);
-    }
-
-    return {
-      status: "success",
-      value: {
-        model_version: metadata?.modelVersion ?? "v1.2",
-        run_id: metadata?.runId ?? "run-abc123",
-        metrics: {
-          f1: metadata?.f1Score ?? 0.87,
-        },
       },
     };
   },
@@ -57,19 +45,20 @@ export const updateModelMetadata = mutation({
       lastPrediction: Date.now(),
     };
 
+    let id;
+
     if (existing) {
       await ctx.db.patch(existing._id, data);
-      return {
-        status: "success",
-        value: data,
-      };
+      id = existing._id;
+    } else {
+      id = await ctx.db.insert("modelMetadata", data);
     }
 
-    await ctx.db.insert("modelMetadata", data);
+    const updated = await ctx.db.get(id);
 
     return {
       status: "success",
-      value: data,
+      value: updated,
     };
   },
 });
