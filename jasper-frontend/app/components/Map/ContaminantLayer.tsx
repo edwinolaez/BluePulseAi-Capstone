@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Polyline } from "react-leaflet";
 import { HazardZone } from "./HazardZone";
-import { fetchContaminantSimulation, ModelOutput } from "../../../lib/api";
+import { fetchContaminantSimulation, ContaminantResult } from "../../../lib/api";
 
 const RIVER_MAIN: [number, number][] = [
   [52.820, -118.200],
@@ -20,29 +20,21 @@ const RIVER_BRANCH: [number, number][] = RIVER_MAIN.map(
 );
 
 const CRITICAL_CENTER: [number, number] = [52.875, -118.060];
+const SOURCE_POINT: [number, number] = [52.875, -118.060];
 const SECTOR_ID = "ATH-001-C";
 
 export function ContaminantLayer() {
-  const [mlData, setMlData] = useState<ModelOutput | null>(null);
+  const [mlData, setMlData] = useState<ContaminantResult | null>(null);
 
   useEffect(() => {
-    // 180° = southward Athabasca flow; 2.1 m/s = observed discharge; 0.7 = high contamination
-    fetchContaminantSimulation(SECTOR_ID, 180, 2.1, 0.7)
+    fetchContaminantSimulation(SECTOR_ID, SOURCE_POINT)
       .then(setMlData)
       .catch((err) => console.error("ContaminantLayer: contaminant simulation failed", err));
   }, []);
 
-  const directionDeg = mlData
-    ? `${mlData.contaminant_vector.direction_deg.toFixed(0)}°`
-    : "180°";
-  const velocity = mlData
-    ? `${mlData.contaminant_vector.velocity.toFixed(2)} m/s`
-    : "–";
-  const riskPct = mlData
-    ? `${(mlData.risk_score * 100).toFixed(0)}%`
-    : "–";
-  const status =
-    mlData?.risk_label === "High" ? "CRITICAL" : "WARNING";
+  const spreadRadius = mlData ? `${mlData.spread_radius_km.toFixed(2)} km` : "–";
+  const peakConc = mlData ? `${(mlData.peak_concentration * 100).toFixed(0)}%` : "–";
+  const status = mlData && mlData.peak_concentration > 0.5 ? "CRITICAL" : "WARNING";
 
   return (
     <>
@@ -74,9 +66,9 @@ export function ContaminantLayer() {
           { label: "Athabasca Run ID", value: "SEC-W2" },
           { label: "Turbidity Level", value: "18.4 NTU (Severe)", valueColor: "text-red-600" },
           { label: "Hydrocarbon Trace", value: "0.04 ppm", valueColor: "text-amber-600" },
-          { label: "Plume Direction", value: directionDeg },
-          { label: "ML Plume Velocity", value: velocity },
-          { label: "Contamination Risk", value: riskPct, valueColor: "text-red-600" },
+          { label: "Plume Direction", value: "180° (Southward)" },
+          { label: "ML Spread Radius", value: spreadRadius },
+          { label: "Peak Contamination", value: peakConc, valueColor: "text-red-600" },
         ]}
       />
     </>

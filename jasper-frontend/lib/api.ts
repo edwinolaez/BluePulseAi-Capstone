@@ -1,4 +1,6 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+// ML service may be on a separate deployment — falls back to API_BASE if not set
+const ML_BASE = process.env.NEXT_PUBLIC_ML_API_BASE_URL ?? API_BASE;
 const API_KEY = process.env.NEXT_PUBLIC_API_KEY ?? "";
 const FETCH_TIMEOUT_MS = 10_000;
 
@@ -36,19 +38,26 @@ export interface LayerData {
   date_to: string;
 }
 
-// Unified ML output — matches ModelOutput in jasper-ml/ML_OUTPUT_SCHEMA.md
-export interface ModelOutput {
+// Matches ChangeDetectionResponse in jasper-ml/api/model_endpoint.py
+export interface ChangeDetectionResult {
   sector_id: string;
-  model_version: string;
-  simulation_type: string;
-  risk_score: number;
   risk_label: "High" | "Medium" | "Low";
-  contaminant_vector: {
-    direction_deg: number;
-    velocity: number;
-  };
-  timestamp: string;
   confidence: number;
+  predicted_at: string;
+}
+
+// Matches ErosionSimulationResponse in jasper-ml/api/model_endpoint.py
+export interface ErosionResult {
+  sector_id: string;
+  soil_loss_t_ha: number;
+  risk_level: "High" | "Medium" | "Low";
+}
+
+// Matches ContaminantSimulationResponse in jasper-ml/api/model_endpoint.py
+export interface ContaminantResult {
+  sector_id: string;
+  spread_radius_km: number;
+  peak_concentration: number;
 }
 
 export async function fetchLayerData(
@@ -65,8 +74,8 @@ export async function fetchLayerData(
 
 export async function fetchChangeDetection(
   sectorId: string
-): Promise<ModelOutput> {
-  const res = await fetchWithTimeout(`${API_BASE}/api/v1/predict/change-detection`, {
+): Promise<ChangeDetectionResult> {
+  const res = await fetchWithTimeout(`${ML_BASE}/predict/change-detection`, {
     method: "POST",
     headers: { ...apiHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify({ sector_id: sectorId }),
@@ -75,31 +84,28 @@ export async function fetchChangeDetection(
   return res.json();
 }
 
-// slopeDeg and rainfallMm default to typical Jasper watershed terrain values
 export async function fetchErosionSimulation(
   sectorId: string,
-  slopeDeg: number = 30,
   rainfallMm: number = 50
-): Promise<ModelOutput> {
-  const res = await fetchWithTimeout(
-    `${API_BASE}/api/v1/simulate/erosion?sector_id=${sectorId}&slope_deg=${slopeDeg}&rainfall_mm=${rainfallMm}`,
-    { headers: apiHeaders() }
-  );
+): Promise<ErosionResult> {
+  const res = await fetchWithTimeout(`${ML_BASE}/simulate/erosion`, {
+    method: "POST",
+    headers: { ...apiHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ sector_id: sectorId, rainfall_mm: rainfallMm }),
+  });
   if (!res.ok) throw new Error(`Erosion simulation failed: ${res.status}`);
   return res.json();
 }
 
-// Flow parameters default to observed Athabasca river conditions
 export async function fetchContaminantSimulation(
   sectorId: string,
-  flowDirectionDeg: number = 180,
-  waterVelocityMs: number = 2.1,
-  contaminationLevel: number = 0.5
-): Promise<ModelOutput> {
-  const res = await fetchWithTimeout(
-    `${API_BASE}/api/v1/simulate/contaminant?sector_id=${sectorId}&flow_direction_deg=${flowDirectionDeg}&water_velocity_ms=${waterVelocityMs}&contamination_level=${contaminationLevel}`,
-    { headers: apiHeaders() }
-  );
+  sourcePoint: [number, number] = [52.875, -118.060]
+): Promise<ContaminantResult> {
+  const res = await fetchWithTimeout(`${ML_BASE}/simulate/contaminant`, {
+    method: "POST",
+    headers: { ...apiHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ sector_id: sectorId, source_point: sourcePoint }),
+  });
   if (!res.ok) throw new Error(`Contaminant simulation failed: ${res.status}`);
   return res.json();
 }
