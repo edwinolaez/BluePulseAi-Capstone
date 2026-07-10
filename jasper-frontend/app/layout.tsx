@@ -3,6 +3,7 @@
 
 import type { Metadata } from "next";
 import { Hanken_Grotesk, JetBrains_Mono } from "next/font/google";
+import Script from "next/script";
 import { ConvexClientProvider } from "./components/Providers/ConvexClientProvider";
 import "leaflet/dist/leaflet.css";
 import "./globals.css";
@@ -32,9 +33,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        {/* Theme script loaded from /public — avoids dangerouslySetInnerHTML ESLint flag.
-            Runs before React so there's no flash of the wrong theme on load. */}
-        <script src="/theme-init.js" />
+        <Script src="/theme-init.js" strategy="beforeInteractive" />
       </head>
       <body
         className={`${hankenGrotesk.variable} ${jetBrainsMono.variable} antialiased font-sans`}
