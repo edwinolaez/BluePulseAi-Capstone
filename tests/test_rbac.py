@@ -172,18 +172,18 @@ class TestAnalystRole:
         """
         Analysts are authorized to submit new water quality readings.
         This is their main job — recording contamination measurements in the field.
+        Table: water_quality_archive (migration 007). Analyst INSERT policy: migration 009.
         """
         water_reading = {
             "sector_id": "ATH-001",
             "ph": 7.2,
-            "turbidity_ntu": 3.5,
-            "hydrocarbon_ppb": 0.8,
-            "timestamp": "2026-06-25T12:00:00Z"
+            "turbidity": 3.5,
+            "hydrocarbon_level": 0.8,
         }
 
         with httpx.Client(base_url=SUPABASE_URL) as client:
             response = client.post(
-                "/rest/v1/water_quality",
+                "/rest/v1/water_quality_archive",
                 json=water_reading,
                 headers=supabase_headers(ANALYST_TOKEN)
             )
@@ -191,7 +191,8 @@ class TestAnalystRole:
         assert response.status_code in (200, 201), (
             f"Analyst was blocked from writing water quality data. "
             f"Status: {response.status_code}. "
-            "Supabase RLS must allow INSERT on water_quality for the analyst role."
+            "Supabase RLS must allow INSERT on water_quality_archive for the analyst role. "
+            "Rahil: confirm migration 009 has been applied."
         )
 
     def test_analyst_cannot_delete_records(self):
@@ -201,7 +202,7 @@ class TestAnalystRole:
         """
         with httpx.Client(base_url=SUPABASE_URL) as client:
             response = client.delete(
-                "/rest/v1/water_quality",
+                "/rest/v1/water_quality_archive",
                 headers=supabase_headers(ANALYST_TOKEN),
                 params={"sector_id": "eq.ATH-001"}
             )

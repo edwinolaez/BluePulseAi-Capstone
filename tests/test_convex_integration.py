@@ -219,16 +219,17 @@ class TestConvexQueries:
         value = body.get("value")  # Convex wraps results in {"value": ...}
 
         # getPipelineStatus returns a list of records; check the first one if present
+        # Rahil's pipeline.ts stores time as "lastIngestTime" (epoch ms), not "timestamp"
         if isinstance(value, list) and value:
             record = value[0]
-            for field in ["status", "timestamp"]:
+            for field in ["status", "lastIngestTime"]:
                 assert field in record, (
                     f"getPipelineStatus response is missing '{field}'. "
                     f"Full record: {record}. "
                     "Reyta's dashboard will show 'undefined' for this field."
                 )
         elif isinstance(value, dict) and value:
-            for field in ["status", "timestamp"]:
+            for field in ["status", "lastIngestTime"]:
                 assert field in value, (
                     f"getPipelineStatus response is missing '{field}'. "
                     f"Full response: {value}. "
