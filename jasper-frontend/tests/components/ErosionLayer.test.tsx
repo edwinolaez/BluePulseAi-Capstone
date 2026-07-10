@@ -11,6 +11,7 @@ jest.mock("react-leaflet", () => ({
   Tooltip: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
   Marker:  forwardRef<unknown, { children?: React.ReactNode }>(({ children }, _ref) => <div>{children}</div>),
   Popup:   ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  useMap:  () => ({ getZoom: () => 12, on: () => {}, off: () => {} }),
 }));
 
 jest.mock("leaflet", () => ({

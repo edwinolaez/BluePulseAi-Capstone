@@ -10,7 +10,7 @@
 
 import { useEffect, useState } from "react";
 import L from "leaflet";
-import { Marker, Polyline } from "react-leaflet";
+import { Marker, Polyline, useMap } from "react-leaflet";
 import { fetchContaminantSimulation, ModelOutput } from "../../../lib/api";
 import { HazardZone } from "./HazardZone";
 
@@ -62,38 +62,46 @@ function arrowIcon(directionDeg: number, velocity: number): L.DivIcon {
 }
 
 export function ContaminantLayer() {
-  // Holds the live result from Richard's contaminant plume API
   const [result, setResult] = useState<ModelOutput | null>(null);
+  const map = useMap();
+  const [zoom, setZoom] = useState(() => map.getZoom());
 
-  // Fetch the contaminant simulation when the layer first loads.
-  // Parameters: sector ID, river flow direction (south = 180°), water speed, contamination level.
+  useEffect(() => {
+    const onZoomEnd = () => setZoom(map.getZoom());
+    map.on("zoomend", onZoomEnd);
+    return () => { map.off("zoomend", onZoomEnd); };
+  }, [map]);
+
   useEffect(() => {
     fetchContaminantSimulation("ATH-001-W", 180, 2.1, 0.72)
       .then(setResult)
-      // If the API is unavailable, fall back to default direction and velocity below
       .catch(() => setResult(null));
   }, []);
 
-  // Use live values if available, otherwise use sensible defaults
-  const directionDeg = result?.contaminant_vector.direction_deg ?? 180;  // south-flowing
+  const directionDeg = result?.contaminant_vector.direction_deg ?? 180;
   const velocity     = result?.contaminant_vector.velocity     ?? 0.65;
   const risk         = result?.risk_label ?? "Warning";
 
+  // Scale arrow count and river line weight with zoom level
+  const arrowPositions = zoom >= 12 ? ARROW_POSITIONS
+    : zoom >= 10 ? ARROW_POSITIONS.slice(1, 3)
+    : [];
+  const lineWeight = zoom >= 11 ? 5 : zoom >= 9 ? 3 : 2;
+
   return (
     <>
-      {/* Main river channel — thick cyan line */}
       <Polyline
         positions={RIVER_MAIN}
-        pathOptions={{ color: "#0ea5e9", weight: 5, opacity: 0.8, lineCap: "round", lineJoin: "round" }}
+        interactive={false}
+        pathOptions={{ color: "#0ea5e9", weight: lineWeight, opacity: 0.8, lineCap: "round", lineJoin: "round" }}
       />
-      {/* Secondary river branch — thinner and lighter */}
       <Polyline
         positions={RIVER_BRANCH}
-        pathOptions={{ color: "#38bdf8", weight: 3, opacity: 0.7, lineCap: "round", lineJoin: "round" }}
+        interactive={false}
+        pathOptions={{ color: "#38bdf8", weight: Math.max(1, lineWeight - 2), opacity: 0.7, lineCap: "round", lineJoin: "round" }}
       />
 
-      {/* Animated flow arrows — direction and speed come from Richard's contaminant_vector */}
-      {ARROW_POSITIONS.map((pos, i) => (
+      {arrowPositions.map((pos, i) => (
         <Marker key={i} position={pos} icon={arrowIcon(directionDeg, velocity)} />
       ))}
 
@@ -103,9 +111,8 @@ export function ContaminantLayer() {
         radius={1500}
         borderColor="#ef4444"
         fillColor="#f87171"
-        fillOpacity={0.12}
+        fillOpacity={0.10}
         label="River Flow Warning"
-        sublabel="Discharge Detected"
         badgeIcon="map"
         badgeBorderColor="#0ea5e9"
         dotColor="#ef4444"

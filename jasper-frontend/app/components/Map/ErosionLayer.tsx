@@ -20,9 +20,9 @@ const ZONES = [
 
 // Colour and label for each risk level — purple tones to visually separate erosion from burn scar
 const STYLE_BY_LABEL = {
-  High:   { borderColor: "#a855f7", fillColor: "#c084fc", label: "Landslide & Soil Risk", sublabel: "High erosion zone" },
-  Medium: { borderColor: "#8b5cf6", fillColor: "#a78bfa", label: "Landslide & Soil Risk", sublabel: "Moderate erosion zone" },
-  Low:    { borderColor: "#6d28d9", fillColor: "#7c3aed", label: "Soil Erosion Risk",     sublabel: "Low erosion zone" },
+  High:   { borderColor: "#a855f7", fillColor: "#c084fc", label: "Landslide & Soil Risk" },
+  Medium: { borderColor: "#8b5cf6", fillColor: "#a78bfa", label: "Landslide & Soil Risk" },
+  Low:    { borderColor: "#6d28d9", fillColor: "#7c3aed", label: "Soil Erosion Risk"     },
 } as const;
 
 // Default risk order if the API hasn't responded yet — High for the steepest zone, Low for the flattest
@@ -61,9 +61,8 @@ export function ErosionLayer() {
             radius={zone.radius}
             borderColor={style.borderColor}
             fillColor={style.fillColor}
-            fillOpacity={0.15}
+            fillOpacity={0.12}
             label={style.label}
-            sublabel={style.sublabel}
             badgeIcon="mountain"
             dotColor="#ef4444"
             popupIcon="⛰️"

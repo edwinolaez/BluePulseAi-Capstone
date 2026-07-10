@@ -112,8 +112,11 @@ function TrendChart({ data, dangerValue, dangerLabel }: { data: number[]; danger
           <text x={8} y={dangerY - 6} fill="#f59e0b" fontSize="11" fontWeight={600}>{dangerLabel.toUpperCase()}</text>
           <polyline points={points} fill="none" stroke="#60a5fa" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
         </svg>
+        {/* On mobile hide every other label so they don't overlap in narrow space */}
         <div className="flex justify-between text-[10px] text-gray-400 dark:text-gray-500 mt-1">
-          {HOUR_LABELS.map((h) => <span key={h}>{h}</span>)}
+          {HOUR_LABELS.map((h, i) => (
+            <span key={h} className={[1, 3, 5, 7, 9].includes(i) ? "hidden sm:inline" : ""}>{h}</span>
+          ))}
         </div>
       </div>
     </div>

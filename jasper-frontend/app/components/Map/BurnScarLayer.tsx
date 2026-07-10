@@ -48,9 +48,8 @@ export function BurnScarLayer() {
       radius={2400}                        // circle size in metres
       borderColor={style.borderColor}
       fillColor={style.fillColor}
-      fillOpacity={0.1}
+      fillOpacity={0.08}
       label="Forest Regrowth Monitor"
-      sublabel={`Burn Area · ${risk} Risk`}
       badgeIcon="flame"
       badgeBg="#fff1f2"
       dotColor="#ef4444"

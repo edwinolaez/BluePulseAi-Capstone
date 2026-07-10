@@ -45,8 +45,10 @@ it("calls onTabChange when a tab is clicked", () => {
   expect(mock).toHaveBeenCalledWith("dashboard");
 });
 
-it("shows sign-out link", () => {
+it("shows sign-out link after opening the profile dropdown", () => {
   render(<TopNav {...BASE_PROPS} />);
+  // The avatar button (first name + role badge) opens the dropdown
+  fireEvent.click(screen.getByRole("button", { name: /Edwin/i }));
   expect(screen.getByText("Sign out")).toBeInTheDocument();
 });
 
@@ -64,6 +66,8 @@ it("does NOT show User Management tab for admin role", () => {
 it("calls onLogout when Sign out is clicked", () => {
   const mock = jest.fn();
   render(<TopNav {...BASE_PROPS} onLogout={mock} />);
+  // Open the dropdown first, then click Sign out
+  fireEvent.click(screen.getByRole("button", { name: /Edwin/i }));
   fireEvent.click(screen.getByText("Sign out"));
   expect(mock).toHaveBeenCalled();
 });

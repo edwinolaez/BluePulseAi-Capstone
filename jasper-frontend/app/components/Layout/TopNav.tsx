@@ -168,8 +168,8 @@ export function TopNav({
             Jasper Environmental Twin
           </h1>
 
-          {/* Tab navigation — hidden on very small screens (uses sidebar instead) */}
-          <nav className="hidden sm:flex items-center gap-4 md:gap-6 overflow-x-auto">
+          {/* Tab navigation — hidden on mobile (uses sidebar drawer instead) */}
+          <nav className="hidden md:flex items-center gap-4 md:gap-6 overflow-x-auto hide-scrollbar">
             {tabs.map((tab) => (
               <button
                 key={tab.id}

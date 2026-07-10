@@ -1,6 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+// WaterQualityWidget shows live turbidity and pH readings from the
+// Athabasca watershed sensors stored in Rahil's Convex database.
+// When Convex is not yet configured (URL not set), it falls back to
+// a realistic animated simulation so the dashboard still looks alive.
+
+import { useEffect, useState, useContext, useCallback } from "react";
+import { useQuery } from "convex/react";
+import { anyApi } from "convex/server";
+import { ConvexAvailableContext } from "../Providers/ConvexClientProvider";
 
 const SPARKLINE_BASE = [38, 52, 30, 70, 48, 55, 42];
 
@@ -12,12 +20,42 @@ function jitter(v: number, amount: number, min: number, max: number) {
   return clamp(v + (Math.random() - 0.5) * amount, min, max);
 }
 
+// Inner component that calls Convex's useQuery hook.
+// Only rendered when ConvexClientProvider has a real URL configured —
+// so useQuery is never called outside its required ConvexProvider context.
+function LiveWaterData({
+  onData,
+}: {
+  onData: (turbidity: number, ph: number) => void;
+}) {
+  // Subscribes to Rahil's getLiveWaterQuality function in real time.
+  // When the sensor data changes in the database, this component re-renders
+  // and pushes the new values up to the parent widget.
+  const data = useQuery(anyApi.waterQuality.getLiveWaterQuality, {
+    sectorId: "sector-1",
+  });
+
+  useEffect(() => {
+    if (data) {
+      onData(data.turbidity as number, data.ph as number);
+    }
+  }, [data, onData]);
+
+  return null;
+}
+
 export function WaterQualityWidget() {
+  // Check if Convex is ready — set by ConvexClientProvider based on .env.local
+  const isConvexReady = useContext(ConvexAvailableContext);
+
   const [turbidity, setTurbidity] = useState(3.6);
   const [ph, setPh]               = useState(7.21);
   const [sparkline, setSparkline] = useState(SPARKLINE_BASE);
 
+  // Animated mock data — only runs when Convex isn't configured yet.
+  // Simulates realistic sensor readings so the widget always looks live.
   useEffect(() => {
+    if (isConvexReady) return;
     const id = setInterval(() => {
       setTurbidity((t) => Math.round(jitter(t, 0.4, 1.8, 9.5) * 100) / 100);
       setPh((p)        => Math.round(jitter(p, 0.08, 6.2, 8.4) * 100) / 100);
@@ -27,12 +65,23 @@ export function WaterQualityWidget() {
       });
     }, 2500);
     return () => clearInterval(id);
+  }, [isConvexReady]);
+
+  // Stable callback — useCallback prevents a new reference on every render,
+  // which would cause LiveWaterData's useEffect to re-fire and loop infinitely.
+  const handleLiveData = useCallback((t: number, p: number) => {
+    setTurbidity(t);
+    setPh(p);
+    setSparkline((s) => [...s.slice(1), clamp((t / 10) * 95, 10, 95)]);
   }, []);
 
   const highlightIndex = sparkline.indexOf(Math.max(...sparkline));
 
   return (
     <div className="rounded-xl border border-gray-200/60 dark:border-gray-700/40 bg-surface p-3.5">
+      {/* When Convex URL is set, this sub-component fetches live sensor data */}
+      {isConvexReady && <LiveWaterData onData={handleLiveData} />}
+
       <div className="flex items-center justify-between mb-3">
         <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
           Water Cloudiness
@@ -60,6 +109,7 @@ export function WaterQualityWidget() {
         </div>
       </div>
 
+      {/* Mini sparkline chart — each bar is a recent turbidity reading */}
       <div className="flex items-end gap-1 h-10">
         {sparkline.map((h, i) => (
           <div

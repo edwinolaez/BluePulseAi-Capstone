@@ -86,9 +86,19 @@ export function MapViewPage({ flyTo }: Props) {
           </div>
         </div>
 
-        {/* Bottom bar: time range slider + custom zoom buttons.
-            The slider lets the user scrub through historical data. */}
+        {/* Bottom bar: [mobile: live data button] + slider + [desktop: zoom buttons] */}
         <div className="absolute bottom-4 left-4 right-4 z-[1001] flex items-end gap-3">
+
+          {/* Live Data button — mobile only, sits to the left of the slider.
+              On desktop the Live Readings sidebar is always visible so this is hidden. */}
+          <button
+            onClick={() => setPanelOpen(true)}
+            className="md:hidden flex items-center gap-1.5 px-3 py-2 rounded-full bg-cyan-500 text-white text-xs font-semibold shadow-lg active:scale-95 transition-transform shrink-0"
+          >
+            <ChartLineIcon className="w-3.5 h-3.5" />
+            Live
+          </button>
+
           <div className="flex-1 min-w-0">
             <TemporalSlider
               onDateRangeChange={(from, to) => {
@@ -98,9 +108,8 @@ export function MapViewPage({ flyTo }: Props) {
             />
           </div>
 
-          {/* Custom zoom buttons — use SVG icons instead of the default Leaflet ones
-              so they match the app's visual style */}
-          <div className="flex flex-col gap-2 shrink-0">
+          {/* Zoom buttons — desktop only. On mobile, use pinch-to-zoom instead. */}
+          <div className="hidden md:flex flex-col gap-2 shrink-0">
             <button
               onClick={() => zoomIn?.()}
               title="Zoom in"
@@ -122,16 +131,6 @@ export function MapViewPage({ flyTo }: Props) {
             </button>
           </div>
         </div>
-
-        {/* Floating "Live Data" button — only visible on mobile screens.
-            On desktop the Live Readings panel is always visible as a sidebar. */}
-        <button
-          onClick={() => setPanelOpen(true)}
-          className="md:hidden absolute bottom-20 right-4 z-[1001] flex items-center gap-2 px-4 py-2 rounded-full bg-cyan-500 text-white text-xs font-semibold shadow-lg active:scale-95 transition-transform"
-        >
-          <ChartLineIcon className="w-4 h-4" />
-          Live Data
-        </button>
       </div>
 
       {/* Dark backdrop behind the drawer — tapping it closes the panel on mobile */}

@@ -1,23 +1,62 @@
 "use client";
 
-import { useEffect, useState } from "react";
+// PipelineStatusWidget shows the health of the data pipeline that brings
+// satellite and IoT sensor readings into the Jasper dashboard.
+// It subscribes to Rahil's getPipelineStatus Convex function for live stats.
+// If Convex isn't configured yet, it falls back to animated mock data.
+
+import { useEffect, useState, useContext, useCallback } from "react";
+import { useQuery } from "convex/react";
+import { anyApi } from "convex/server";
 import { SyncIcon } from "../Layout/icons";
+import { ConvexAvailableContext } from "../Providers/ConvexClientProvider";
+
+// Inner component that calls useQuery — only mounted when ConvexProvider is active
+function LivePipelineData({
+  onData,
+}: {
+  onData: (ingestPct: number) => void;
+}) {
+  // Subscribes to Rahil's getPipelineStatus function.
+  // Returns the current satellite ingest percentage and IoT sync status.
+  const data = useQuery(anyApi.pipeline.getPipelineStatus, {});
+
+  useEffect(() => {
+    if (data) {
+      onData(data.ingestPct as number);
+    }
+  }, [data, onData]);
+
+  return null;
+}
 
 export function PipelineStatusWidget() {
+  const isConvexReady = useContext(ConvexAvailableContext);
+
   const [ingestPct, setIngestPct] = useState(98);
   const [syncing, setSyncing]     = useState(false);
 
+  // Mock animation — bounces the percentage between 94–100% when Convex isn't set up
   useEffect(() => {
+    if (isConvexReady) return;
     const id = setInterval(() => {
       setIngestPct((p) => Math.min(100, Math.max(94, p + (Math.random() > 0.5 ? 1 : -1))));
       setSyncing(true);
       setTimeout(() => setSyncing(false), 800);
     }, 4000);
     return () => clearInterval(id);
+  }, [isConvexReady]);
+
+  const handleLiveData = useCallback((pct: number) => {
+    setIngestPct(pct);
+    setSyncing(true);
+    setTimeout(() => setSyncing(false), 800);
   }, []);
 
   return (
     <div className="rounded-xl border border-gray-200/60 dark:border-gray-700/40 bg-surface p-3.5">
+      {isConvexReady && <LivePipelineData onData={handleLiveData} />}
+
       <div className="flex items-center justify-between mb-3.5">
         <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
           Data Connection
@@ -28,6 +67,7 @@ export function PipelineStatusWidget() {
         </span>
       </div>
 
+      {/* Progress bar showing how much of the satellite data has been ingested */}
       <div className="mb-3">
         <div className="flex justify-between text-xs mb-1">
           <span className="text-gray-700 dark:text-gray-200 font-medium">Satellite Updates</span>
@@ -41,6 +81,7 @@ export function PipelineStatusWidget() {
         </div>
       </div>
 
+      {/* IoT sync row — spins the icon briefly each time new data arrives */}
       <div className="flex items-center justify-between text-xs">
         <span className="text-gray-700 dark:text-gray-200 font-medium">IoT Jasper-A1</span>
         <span className={`flex items-center gap-1 font-medium transition-colors ${syncing ? "text-amber-400" : "text-cyan-500"}`}>

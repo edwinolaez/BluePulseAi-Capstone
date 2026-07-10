@@ -49,7 +49,7 @@ export function AdminPage() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 bg-background">
+    <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-background">
       <div className="max-w-4xl mx-auto">
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1">User Management</h1>
@@ -85,7 +85,7 @@ export function AdminPage() {
                 </div>
 
                 <div className="flex items-center gap-3 shrink-0">
-                  <span className="text-xs font-medium text-gray-400">Since {user.createdAt}</span>
+                  <span className="hidden sm:inline text-xs font-medium text-gray-400">Since {user.createdAt}</span>
                   <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded-full ${ROLE_BADGE[user.role]}`}>
                     {ROLE_LABELS[user.role]}
                   </span>

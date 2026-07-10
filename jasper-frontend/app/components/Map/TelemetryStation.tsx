@@ -33,8 +33,8 @@ export function TelemetryStation() {
 
   return (
     <Marker ref={markerRef} position={STATION_CENTER} icon={radarPinIcon}>
-      <Tooltip permanent direction="bottom" offset={[0, 14]} className="jasper-zone-label">
-        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-white text-gray-700 shadow">
+      <Tooltip permanent direction="bottom" offset={[0, 14]} className="jasper-zone-label" opacity={1}>
+        <span className="font-semibold text-[11px] leading-none text-cyan-600">
           Live Sensor — SEC-B4
         </span>
       </Tooltip>

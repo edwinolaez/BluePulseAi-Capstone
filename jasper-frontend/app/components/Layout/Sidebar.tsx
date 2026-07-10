@@ -5,6 +5,7 @@ import {
   ArrowUpRightIcon,
   ChartLineIcon,
   DownloadIcon,
+  FolderIcon,
   HelpCircleIcon,
   HistoryIcon,
   InfoCircleIcon,
@@ -12,6 +13,14 @@ import {
   MapPinIcon,
 } from "./icons";
 import { AppTab } from "./TopNav";
+
+const PAGE_NAV: { id: AppTab; icon: typeof MapPinIcon; label: string }[] = [
+  { id: "dashboard", icon: ChartLineIcon, label: "Dashboard" },
+  { id: "map",       icon: MapPinIcon,    label: "Map View" },
+  { id: "ai",        icon: LayersIcon,    label: "AI Overview" },
+  { id: "reports",   icon: DownloadIcon,  label: "Reports" },
+  { id: "archives",  icon: FolderIcon,    label: "Archives" },
+];
 
 const LEGEND_ITEMS = [
   { color: "#a855f7", label: "Erosion Outlines" },
@@ -41,21 +50,17 @@ interface Props {
 export function Sidebar({ activeTab, onNavigate, onFocusSector, onOpenLogs, onOpenSupport, mobileOpen, onCloseMobile }: Props) {
   const [expandedPanel, setExpandedPanel] = useState<ExpandedPanel>(null);
 
-  const navItems = [
-    {
-      icon: LayersIcon, label: "Layers & Map",
-      isActive: activeTab === "map" && expandedPanel !== "sectors",
-      onClick: () => { onNavigate("map"); setExpandedPanel(null); },
-    },
-    {
-      icon: ChartLineIcon, label: "Analytics",
-      isActive: activeTab === "dashboard",
-      onClick: () => { onNavigate("dashboard"); setExpandedPanel(null); },
-    },
+  // Tool buttons — these are map utilities, not page navigation.
+  // Page navigation is handled exclusively by the top nav tabs.
+  const toolItems = [
     {
       icon: MapPinIcon, label: "Live Sensors",
       isActive: expandedPanel === "sectors",
-      onClick: () => { onNavigate("map"); setExpandedPanel((p) => (p === "sectors" ? null : "sectors")); },
+      onClick: () => {
+        // Switches to the map tab and opens the sector selector panel
+        onNavigate("map");
+        setExpandedPanel((p) => (p === "sectors" ? null : "sectors"));
+      },
     },
     {
       icon: InfoCircleIcon, label: "Legend Panel",
@@ -66,7 +71,7 @@ export function Sidebar({ activeTab, onNavigate, onFocusSector, onOpenLogs, onOp
 
   return (
     <>
-      {/* Mobile backdrop */}
+      {/* Mobile backdrop — clicking outside closes the drawer */}
       {mobileOpen && (
         <div
           className="fixed inset-0 z-[1050] bg-black/50 md:hidden"
@@ -85,12 +90,34 @@ export function Sidebar({ activeTab, onNavigate, onFocusSector, onOpenLogs, onOp
         <MapPinIcon className="w-5 h-5 text-cyan-500" />
         <h2 className="text-base font-bold text-cyan-500">Jasper Watch</h2>
       </div>
-      <p className="px-2 mb-6 text-[10px] font-semibold tracking-widest text-gray-500 dark:text-gray-500 uppercase">
+      <p className="px-2 mb-4 text-[10px] font-semibold tracking-widest text-gray-500 dark:text-gray-500 uppercase">
         JASPER VALLEY AREA
       </p>
 
+      {/* Page navigation — only visible on mobile/small screens (md+ uses TopNav tabs) */}
+      <div className="md:hidden mb-4">
+        <p className="px-2 mb-1 text-[10px] font-bold uppercase tracking-widest text-gray-400">Pages</p>
+        <nav className="flex flex-col gap-1">
+          {PAGE_NAV.map(({ id, icon: Icon, label }) => (
+            <button
+              key={id}
+              onClick={() => onNavigate(id)}
+              className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-left transition-colors ${
+                activeTab === id
+                  ? "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-l-2 border-cyan-500"
+                  : "text-gray-600 dark:text-gray-300 hover:bg-surface-alt border-l-2 border-transparent"
+              }`}
+            >
+              <Icon className="w-4 h-4 shrink-0" />
+              {label}
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {/* Map tools — only two items, no duplicate page links */}
       <nav className="flex flex-col gap-1">
-        {navItems.map(({ icon: Icon, label, isActive, onClick }) => (
+        {toolItems.map(({ icon: Icon, label, isActive, onClick }) => (
           <button
             key={label}
             onClick={onClick}

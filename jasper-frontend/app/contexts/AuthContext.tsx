@@ -18,12 +18,12 @@ interface StoredUser extends AppUser {
 
 // ── Seed accounts (demo only — production would use Feven's backend auth) ──
 const SEED_USERS: StoredUser[] = [
-  { id: "u1", name: "Dr. Eleanor Vance",  email: "eleanor@jasper.ca", password: "Research@2024", role: "researcher", createdAt: "2024-06-01" },
-  { id: "u2", name: "Edwin Park",          email: "edwin@jasper.ca",   password: "Admin@2024",    role: "admin",       createdAt: "2024-06-01" },
-  { id: "u3", name: "System Administrator",email: "admin@jasper.ca",   password: "Super@2024",    role: "superadmin",  createdAt: "2024-06-01" },
+  { id: "u1", name: "Dr. Eleanor Vance",  email: "researcher@jasper.ca",  password: "Research@2024", role: "researcher", createdAt: "2024-06-01" },
+  { id: "u2", name: "Edwin Park",          email: "admin@jasper.ca",       password: "Admin@2024",    role: "admin",       createdAt: "2024-06-01" },
+  { id: "u3", name: "System Administrator",email: "superadmin@jasper.ca",  password: "Super@2024",    role: "superadmin",  createdAt: "2024-06-01" },
 ];
 
-const USERS_KEY   = "jasper_users";
+const USERS_KEY   = "jasper_users_v2";
 const SESSION_KEY = "jasper_session";
 
 function loadUsers(): StoredUser[] {

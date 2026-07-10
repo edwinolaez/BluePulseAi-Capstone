@@ -39,7 +39,7 @@ export function SupportRequestModal({ open, onClose }: Props) {
     <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
-      <div className="relative w-full max-w-lg rounded-2xl bg-white dark:bg-gray-900 shadow-2xl border border-gray-200 dark:border-gray-800 flex flex-col">
+      <div className="relative w-full max-w-lg rounded-2xl bg-white dark:bg-gray-900 shadow-2xl border border-gray-200 dark:border-gray-800 flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-gray-200 dark:border-gray-800">
           <div className="flex items-center gap-2.5">
@@ -50,6 +50,9 @@ export function SupportRequestModal({ open, onClose }: Props) {
             <XIcon className="w-5 h-5" />
           </button>
         </div>
+
+        {/* Scrollable body — allows modal to fit on short phone screens */}
+        <div className="overflow-y-auto flex-1">
 
         {/* Contact cards */}
         <div className="grid grid-cols-2 gap-3 px-6 py-4">
@@ -123,6 +126,8 @@ export function SupportRequestModal({ open, onClose }: Props) {
             {submitted ? "Submitted ✓" : "Submit Support Request"}
           </button>
         </div>
+
+        </div>{/* end scrollable body */}
 
         {/* Footer */}
         <div className="px-6 py-3 border-t border-gray-200 dark:border-gray-800 flex items-center justify-between">
