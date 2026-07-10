@@ -197,8 +197,9 @@ No user-supplied URL parameters in any HTTP call. ✅ CONFIRMED CLEAN
 - [x] All 10 OWASP rows reviewed with team (Edwin review complete 2026-07-10)
 - [x] Zero HIGH Semgrep findings on Sprint 3 CI run (Stage 2 passing on commit 714798c)
 - [x] Semgrep report artifact attached to Sprint 3 CI run (ci.yml uploads semgrep-report-{sha}.json each run)
-- [ ] Dependabot: zero unpatched HIGH CVEs (check GitHub → Security → Dependabot alerts)
+- [ ] Dependabot: zero unpatched HIGH CVEs — Edwin to check: GitHub → Security → Dependabot alerts (gh CLI not installed locally; must verify in browser)
 - [ ] A01: RBAC tests green — BLOCKED on Rahil regenerating TEST_ANALYST_JWT + TEST_INGEST_JWT
-- [ ] A09: 401 log entry verified in Kong/Railway logs (send deliberate bad-key request; check Railway logs)
+- [ ] A09: 401 log entry verified — run `scripts/test_a09.sh` with RAILWAY_API_URL from GitHub secrets, then check Railway Logs tab
 - [x] A10: Manual grep confirmed clean 2026-07-10 — all HTTP calls use hardcoded URLs (see A10 section)
 - [x] This document signed off and committed to docs/ (2026-07-10)
+- [x] develop → main merged 2026-07-10 (commit 6f29cfb) — M2 formal delivery complete

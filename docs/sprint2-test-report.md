@@ -160,6 +160,6 @@ Sprint 2 delivered late (M2 was July 4) due to teammate integration delays:
 - Richard's ML service stale deployment (Sprint 3 task)
 - Feven's Railway env vars pending
 
-All code is on develop branch. develop → main merge pending formal M2 sign-off.
+develop → main merge completed 2026-07-10 (commit 6f29cfb).
 Three teammate action items tracked in Blockers table above.
 ```
