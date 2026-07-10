@@ -33,22 +33,22 @@ export function TelemetryStation() {
 
   return (
     <Marker ref={markerRef} position={STATION_CENTER} icon={radarPinIcon}>
-      <Tooltip permanent direction="bottom" offset={[0, 14]} className="jasper-zone-label">
-        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-white text-gray-700 shadow">
-          SEC-B4 Station
+      <Tooltip permanent direction="bottom" offset={[0, 14]} className="jasper-zone-label" opacity={1}>
+        <span className="font-semibold text-[11px] leading-none text-cyan-600">
+          Live Sensor — SEC-B4
         </span>
       </Tooltip>
-      <Popup className="jasper-popup" closeButton={false} closeOnClick={false} autoClose={false} minWidth={260}>
+      <Popup className="jasper-popup" closeButton={false} minWidth={260}>
         <StationPopupCard
           icon="🎯"
-          title="Telemetry Station Focus"
+          title="Live Water Sensor Station"
           status="OPERATIONAL"
           name="Sector B-4 Upper Stream"
           fields={[
-            { label: "Node Standard ID", value: "SEC-B4" },
-            { label: "Synchronization Latency", value: "12 mins ago" },
-            { label: "Coordinates (Lat / Lng)", value: "54.6800° N, 113.5500° W" },
-            { label: "Local Stream Chem", value: "5.5 pH (Acid)", valueColor: "text-red-600" },
+            { label: "Station ID", value: "SEC-B4" },
+            { label: "Last Updated", value: "12 mins ago" },
+            { label: "Location (Lat / Lng)", value: "54.6800° N, 113.5500° W" },
+            { label: "Water Acidity", value: "5.5 pH (Acidic)", valueColor: "text-red-600" },
           ]}
         />
       </Popup>

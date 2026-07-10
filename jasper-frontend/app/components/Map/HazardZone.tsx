@@ -1,6 +1,7 @@
 "use client";
 
-import { Circle, Marker, Popup, Tooltip } from "react-leaflet";
+import { useEffect, useState } from "react";
+import { Circle, Marker, Popup, Tooltip, useMap } from "react-leaflet";
 import { createBadgeIcon, BadgeIconType } from "./badgeIcon";
 import { PopupField, StationPopupCard, StationStatus } from "./StationPopupCard";
 
@@ -11,7 +12,6 @@ interface Props {
   fillColor: string;
   fillOpacity: number;
   label: string;
-  sublabel?: string;
   badgeIcon: BadgeIconType;
   badgeBg?: string;
   badgeBorderColor?: string;
@@ -31,7 +31,6 @@ export function HazardZone({
   fillColor,
   fillOpacity,
   label,
-  sublabel,
   badgeIcon,
   badgeBg,
   badgeBorderColor,
@@ -43,49 +42,61 @@ export function HazardZone({
   name,
   fields,
 }: Props) {
+  const map = useMap();
+  const [zoom, setZoom] = useState(() => map.getZoom());
+
+  useEffect(() => {
+    const onZoomEnd = () => setZoom(map.getZoom());
+    map.on("zoomend", onZoomEnd);
+    return () => { map.off("zoomend", onZoomEnd); };
+  }, [map]);
+
+  // Below zoom 10 the zones visually merge — suppress markers to keep the map clean
+  const showDetail = zoom >= 10;
+
   return (
     <>
       <Circle
         center={center}
         radius={radius}
+        interactive={false}
         pathOptions={{
           color: borderColor,
           fillColor,
-          fillOpacity,
-          weight: 1.5,
+          fillOpacity: showDetail ? fillOpacity : fillOpacity * 0.4,
+          weight: showDetail ? 1.5 : 0.8,
           dashArray: "6 5",
         }}
-      >
-        <Tooltip permanent direction="center" className="jasper-zone-label" opacity={1}>
-          <div style={{ color: borderColor }} className="font-bold text-[11px] tracking-wide uppercase text-center leading-tight">
-            {label}
-            {sublabel && (
-              <div className="font-normal normal-case text-[10px] opacity-80">{sublabel}</div>
-            )}
-          </div>
-        </Tooltip>
-      </Circle>
+      />
 
-      <Marker
-        position={center}
-        icon={createBadgeIcon({
-          borderColor: badgeBorderColor ?? borderColor,
-          iconType: badgeIcon,
-          badgeBg,
-          dotColor,
-          dotPulse,
-        })}
-      >
-        <Popup className="jasper-popup" closeButton={false} minWidth={260}>
-          <StationPopupCard
-            icon={popupIcon}
-            title={popupTitle}
-            status={status}
-            name={name}
-            fields={fields}
-          />
-        </Popup>
-      </Marker>
+      {showDetail && (
+        <Marker
+          position={center}
+          icon={createBadgeIcon({
+            borderColor: badgeBorderColor ?? borderColor,
+            iconType: badgeIcon,
+            badgeBg,
+            dotColor,
+            dotPulse,
+          })}
+        >
+          {/* Permanent label below the badge — same pattern as TelemetryStation */}
+          <Tooltip permanent direction="bottom" offset={[0, 14]} className="jasper-zone-label" opacity={1}>
+            <span style={{ color: borderColor }} className="font-semibold text-[11px] leading-none">
+              {label}
+            </span>
+          </Tooltip>
+          <Popup className="jasper-popup" closeButton={false} minWidth={260}>
+            <StationPopupCard
+              icon={popupIcon}
+              title={popupTitle}
+              status={status}
+              name={name}
+              fields={fields}
+            />
+          </Popup>
+        </Marker>
+      )}
     </>
   );
 }
