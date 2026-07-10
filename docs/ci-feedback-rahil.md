@@ -1,8 +1,28 @@
 # CI Feedback — Rahil (jasper-db / Convex)
 
 **From:** Edwin (QA)
-**Date:** July 6, 2026
-**Branch reviewed:** `feature/rahil-db`
+**Last updated:** July 7, 2026 — post Sprint 2 merge CI run on `main`
+**Branch reviewed:** `feature/rahil-db` → merged into `main`
+
+---
+
+## July 7 CI Run — Stage 4 Results
+
+Two active failure areas from the live CI run:
+
+**1. Convex — queries returning `null`**
+Both `getLiveWaterQuality` and `getModelMetadata` return `{'status': 'success', 'value': None}`. The Convex functions exist and are reachable, but there is no data in the tables yet. This is a seeding issue — the tables are empty.
+
+`updateModelMetadata` write-then-read test also fails: writes `model_version: 1.0.0-test` but reads back `None`, which means either the mutation isn't persisting or the query isn't reading from the right table.
+
+**Action:** Seed at least one row of test data into `modelMetadata` and `waterQuality` in Convex, and verify the `updateModelMetadata` mutation is writing to the same table `getModelMetadata` reads from.
+
+**2. Supabase RBAC — `sectors` table still missing**
+RBAC tests hitting `/rest/v1/sectors` get 404 — the table doesn't exist in the live DB. Migrations 007 + 008 are committed but haven't been applied to Supabase yet.
+
+**Action:** Go to Supabase SQL Editor → run migrations `007_rls_policies.sql` and `008_sectors_ingest_records.sql` in order.
+
+---
 
 ---
 

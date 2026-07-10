@@ -25,6 +25,16 @@ body {
   transition: background-color 0.25s ease, color 0.25s ease;
 }
 
+/* Remove ALL browser focus outlines inside the map — these show as black boxes on click */
+.leaflet-container:focus,
+.leaflet-container:focus-visible,
+.leaflet-interactive:focus,
+.leaflet-interactive:focus-visible,
+.leaflet-container *:focus,
+.leaflet-container *:focus-visible {
+  outline: none !important;
+}
+
 /* Scientific grayscale filter in light mode, premium satellite-style filter in dark mode */
 .leaflet-tile-pane {
   filter: grayscale(1) brightness(1.08) contrast(0.95) saturate(0.12) opacity(0.85);
@@ -38,15 +48,34 @@ body {
   .text-balance {
     text-wrap: balance;
   }
+  .hide-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
 }
 
-/* Borderless, floating labels for map hazard circles */
+/* Floating label pill for map hazard zones — adapts to light and dark mode */
 .jasper-zone-label {
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  padding: 0 !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  border-radius: 6px !important;
+  padding: 3px 8px !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15) !important;
   pointer-events: none !important;
+  white-space: nowrap !important;
+}
+.jasper-zone-label::before,
+.jasper-zone-label::after {
+  display: none !important;   /* hide the default Leaflet tooltip tip arrow */
+}
+/* Dark mode — invert to a dark pill */
+.dark .jasper-zone-label {
+  background: rgba(22, 26, 32, 0.90) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.45) !important;
 }
 
 /* Station telemetry popup card */
@@ -56,4 +85,10 @@ body {
 }
 .jasper-popup .leaflet-popup-content {
   margin: 12px 14px;
+}
+
+/* Contaminant plume arrow pulse animation */
+@keyframes jasper-arrow-pulse {
+  0%, 100% { opacity: 0.6; transform: scale(0.9) rotate(var(--arrow-rotation, 0deg)); }
+  50%       { opacity: 1;   transform: scale(1.1) rotate(var(--arrow-rotation, 0deg)); }
 }

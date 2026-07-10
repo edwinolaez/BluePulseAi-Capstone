@@ -36,14 +36,10 @@ ENV PATH=/root/.local/bin:$PATH \
     PYTHONUNBUFFERED=1 \
     API_ENV=production \
     API_HOST=0.0.0.0 \
-    API_PORT=8001
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8001/health', timeout=5)" || exit 1
+    PORT=8080
 
 # Expose port
-EXPOSE 8001
+EXPOSE 8080
 
-# Run API
-CMD ["python", "-m", "uvicorn", "api.model_endpoint:app", "--host", "0.0.0.0", "--port", "8001", "--workers", "4"]
+# Run API - use PORT environment variable (Railway requirement)
+CMD python -m uvicorn api.model_endpoint:app --host 0.0.0.0 --port ${PORT:-8080} --workers 4

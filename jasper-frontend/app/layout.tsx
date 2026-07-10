@@ -1,7 +1,13 @@
+// Root layout — wraps every page in the app.
+// Sets up fonts, dark mode, Leaflet CSS, auth context, and Convex real-time provider.
+
 import type { Metadata } from "next";
 import { Hanken_Grotesk, JetBrains_Mono } from "next/font/google";
+import Script from "next/script";
+import { ConvexClientProvider } from "./components/Providers/ConvexClientProvider";
 import "leaflet/dist/leaflet.css";
 import "./globals.css";
+import { AuthProvider } from "./contexts/AuthContext";
 
 const hankenGrotesk = Hanken_Grotesk({
   subsets: ["latin"],
@@ -27,16 +33,16 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `try{var t=localStorage.getItem("jasper-theme");if(t?t==="dark":true){document.documentElement.classList.add("dark")}}catch(e){}`,
-          }}
-        />
+        <Script src="/theme-init.js" strategy="beforeInteractive" />
       </head>
       <body
         className={`${hankenGrotesk.variable} ${jetBrainsMono.variable} antialiased font-sans`}
       >
-        {children}
+        {/* ConvexClientProvider enables real-time data in the 3 live widgets.
+            It only activates when NEXT_PUBLIC_CONVEX_URL is set in .env.local. */}
+        <ConvexClientProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </ConvexClientProvider>
       </body>
     </html>
   );

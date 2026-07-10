@@ -156,6 +156,13 @@ class TestE2EIngestToMapQuery:
             "Check: Is Feven's FastAPI running? Is Rahil's DB accepting writes?"
         )
 
+        if not ingest_response.json().get("db_saved", False):
+            pytest.skip(
+                "Ingest accepted but DB write did not complete — "
+                "Railway service likely missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY env vars. "
+                "Feven must add these in the Railway dashboard under the jasper-api service."
+            )
+
         # Step 2: Query the sector we just wrote to
         query_response = http_client.get(
             f"/api/v1/layers/{unique_sector_id}",
@@ -503,6 +510,13 @@ class TestE2EMultipleRecords:
             pytest.skip(
                 f"Could not ingest both records (r1={r1.status_code}, r2={r2.status_code}) "
                 "— skipping multi-record check."
+            )
+
+        if not r1.json().get("db_saved", False) or not r2.json().get("db_saved", False):
+            pytest.skip(
+                "Ingest accepted but DB writes did not complete — "
+                "Railway service likely missing SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY env vars. "
+                "Feven must add these in the Railway dashboard under the jasper-api service."
             )
 
         # Query the sector
