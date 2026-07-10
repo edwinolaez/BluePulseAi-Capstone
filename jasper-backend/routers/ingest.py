@@ -64,6 +64,7 @@ async def ingest_base(record: IngestRecord):
     Returns 201 with the DB-generated id, sector_id, and timestamp.
     """
     record_id = str(uuid.uuid4())
+    db_saved = False
     try:
         supabase = get_supabase()
         row = {
@@ -79,6 +80,7 @@ async def ingest_base(record: IngestRecord):
         result = supabase.table("environmental_layers").insert(row).execute()
         if result.data:
             record_id = result.data[0]["id"]
+            db_saved = True
     except Exception:
         pass
 
@@ -86,6 +88,7 @@ async def ingest_base(record: IngestRecord):
         "id": record_id,
         "sector_id": record.sector_id,
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "db_saved": db_saved,
     })
 
 
