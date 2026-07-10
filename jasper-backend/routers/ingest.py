@@ -76,7 +76,7 @@ async def ingest_base(record: IngestRecord):
             },
             "timestamp": record.timestamp,
         }
-        result = supabase.table("ingest_records").insert(row).execute()
+        result = supabase.table("environmental_layers").insert(row).execute()
         if result.data:
             record_id = result.data[0]["id"]
     except Exception:

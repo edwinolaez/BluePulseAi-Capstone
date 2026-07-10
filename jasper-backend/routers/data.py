@@ -101,15 +101,15 @@ async def get_layers(
 
     try:
         supabase = get_supabase()
-        ir_query = supabase.table("ingest_records").select("*").eq("sector_id", sector_id)
+        el_query = supabase.table("environmental_layers").select("*").eq("sector_id", sector_id)
         if date_from:
-            ir_query = ir_query.gte("timestamp", date_from)
+            el_query = el_query.gte("timestamp", date_from)
         if date_to:
-            ir_query = ir_query.lte("timestamp", date_to)
+            el_query = el_query.lte("timestamp", date_to)
         if layer_type:
-            ir_query = ir_query.eq("layer_type", layer_type)
-        ir_result = ir_query.execute()
-        for row in ir_result.data:
+            el_query = el_query.eq("layer_type", layer_type)
+        el_result = el_query.execute()
+        for row in el_result.data:
             payload = row.get("payload") or {}
             layers.append({
                 "layer_type": row.get("layer_type", "unknown"),
@@ -122,7 +122,7 @@ async def get_layers(
                 "data": payload,
             })
     except Exception as e:
-        print(f"Supabase ingest_records query error: {e}")
+        print(f"Supabase environmental_layers query error: {e}")
 
     # If no layers were found after querying, return 404
     # Edwin's tests expect 404 when a sector has no data — not an empty 200
