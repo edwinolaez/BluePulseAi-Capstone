@@ -358,6 +358,89 @@ class TestMLOutputContract:
         )
 
 
+# ─── Contract 6: Multi-Source Fusion Endpoint (Feven -> Reyta) ───────────────
+
+class TestMultiSourceFusionContract:
+    """
+    Tests for GET /api/v1/fusion/{sector_id}
+    Owner: Feven | Consumer: Reyta (full risk overlay)
+
+    The fusion endpoint combines environmental_layers, water_quality_archive,
+    and ml_model_outputs into a single response so the frontend can render
+    the complete risk overlay in one call.
+    """
+
+    TEST_SECTOR = "ATH-001"
+
+    def test_fusion_returns_200_or_404(self, http_client, auth_headers):
+        """
+        Fusion endpoint should return 200 (data found) or 404 (no data yet).
+        Must not return 500 (crash) or 401 (auth broken).
+        """
+        response = http_client.get(
+            f"/api/v1/fusion/{self.TEST_SECTOR}",
+            headers=auth_headers
+        )
+
+        assert response.status_code in (200, 404), (
+            f"Unexpected status from fusion endpoint: {response.status_code}. "
+            f"Expected 200 (data found) or 404 (no data for sector)."
+        )
+
+    def test_fusion_200_response_has_required_fields(self, http_client, auth_headers):
+        """
+        When fusion returns 200, the response must include all top-level fields
+        Reyta's frontend expects for the full risk overlay.
+        """
+        response = http_client.get(
+            f"/api/v1/fusion/{self.TEST_SECTOR}",
+            headers=auth_headers
+        )
+
+        if response.status_code == 200:
+            body = response.json()
+            assert_has_required_fields(
+                body,
+                required_fields=["sector_id", "environmental_layers", "water_quality", "ml_outputs", "summary"],
+                context="Fusion response"
+            )
+            assert isinstance(body["environmental_layers"], list), "'environmental_layers' must be a list"
+            assert isinstance(body["water_quality"], list), "'water_quality' must be a list"
+            assert isinstance(body["ml_outputs"], list), "'ml_outputs' must be a list"
+            assert isinstance(body["summary"], dict), "'summary' must be a dict"
+
+    def test_fusion_summary_has_required_fields(self, http_client, auth_headers):
+        """
+        The summary block must include layer_count and highest_risk_score
+        so Reyta can render the headline risk indicator without parsing the full lists.
+        """
+        response = http_client.get(
+            f"/api/v1/fusion/{self.TEST_SECTOR}",
+            headers=auth_headers
+        )
+
+        if response.status_code == 200:
+            summary = response.json().get("summary", {})
+            assert_has_required_fields(
+                summary,
+                required_fields=["layer_count", "water_quality_readings", "ml_output_count", "highest_risk_score"],
+                context="Fusion summary block"
+            )
+
+    def test_fusion_unknown_sector_returns_404(self, http_client, auth_headers):
+        """
+        A sector with no data across any source must return 404.
+        """
+        response = http_client.get(
+            "/api/v1/fusion/DOES-NOT-EXIST-999",
+            headers=auth_headers
+        )
+
+        assert response.status_code == 404, (
+            f"Expected 404 for unknown sector, got {response.status_code}."
+        )
+
+
 # ─── Contract 4 & 5: Convex Queries (Rahil -> Reyta) ─────────────────────────
 
 class TestConvexQueriesContract:
