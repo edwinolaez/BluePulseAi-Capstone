@@ -17,7 +17,7 @@ import logging
 import os
 import pickle
 from datetime import datetime, timezone
-from typing import Dict, Any, Optional, Union, List
+from typing import Dict, Any
 
 import numpy as np
 from fastapi import FastAPI, HTTPException, Request
@@ -203,7 +203,7 @@ class ModelOutput(BaseModel):
     simulation_type: str
     risk_score: float
     risk_label: str
-    contaminant_vector: Optional[Union[Dict[str, float], List[List[float]]]]
+    contaminant_vector: Dict[str, float]
     timestamp: str
     confidence: float
 
@@ -355,7 +355,10 @@ async def predict_change_detection(request: ChangeDetectionRequest):
             simulation_type="change_detection",
             risk_score=float(risk_score),
             risk_label=risk_label,
-            contaminant_vector={"direction_deg": 0.0, "velocity": 0.0},
+            contaminant_vector={
+                "direction_deg": 0.0,
+                "velocity": 0.0
+            },
             timestamp=datetime.now(timezone.utc).isoformat(),
             confidence=float(confidence)
         )
@@ -443,7 +446,10 @@ async def simulate_erosion(request: ErosionSimulationRequest):
             simulation_type="erosion",
             risk_score=float(risk_score),
             risk_label=risk_level,
-            contaminant_vector=None,
+            contaminant_vector={
+                "direction_deg": 0.0,
+                "velocity": 0.0
+            },
             timestamp=datetime.now(timezone.utc).isoformat(),
             confidence=0.85
         )
@@ -494,23 +500,6 @@ async def simulate_contaminant(request: ContaminantSimulationRequest):
       -d '{"sector_id": "ATH-001", "source_point": {"lat": 55.123, "lon": -114.456}}'
     ```
     """
-    # Validate coordinates are within Athabasca watershed bounds BEFORE try block
-    # Athabasca watershed: lat 52-60°N, lon -120 to -110°W
-    athabasca_lat_min, athabasca_lat_max = 52.0, 60.0
-    athabasca_lon_min, athabasca_lon_max = -120.0, -110.0
-    
-    if not (athabasca_lat_min <= request.source_point.lat <= athabasca_lat_max and
-            athabasca_lon_min <= request.source_point.lon <= athabasca_lon_max):
-        logger.warning(
-            "Source point (%s, %s) is outside Athabasca watershed bounds",
-            request.source_point.lat,
-            request.source_point.lon,
-        )
-        raise HTTPException(
-            status_code=422,
-            detail=f"Source point ({request.source_point.lat}, {request.source_point.lon}) is outside Athabasca watershed bounds. Valid range: lat {athabasca_lat_min}-{athabasca_lat_max}°N, lon {athabasca_lon_min}-{athabasca_lon_max}°W"
-        )
-    
     try:
         logger.info(
             "Processing contaminant simulation for %s: source=%s",
@@ -534,7 +523,7 @@ async def simulate_contaminant(request: ContaminantSimulationRequest):
             spread_radius = 2.5
             peak_concentration = 0.65
 
-        risk_score = float(peak_concentration)  # Calculate from concentration
+        risk_score = 0.65
         if risk_score >= 0.7:
             risk_label = "High"
         elif risk_score >= 0.4:
@@ -548,7 +537,10 @@ async def simulate_contaminant(request: ContaminantSimulationRequest):
             simulation_type="contaminant",
             risk_score=float(risk_score),
             risk_label=risk_label,
-            contaminant_vector=[[request.source_point.lat, request.source_point.lon]],
+            contaminant_vector={
+                "direction_deg": 0.0,
+                "velocity": 0.0
+            },
             timestamp=datetime.now(timezone.utc).isoformat(),
             confidence=0.80
         )

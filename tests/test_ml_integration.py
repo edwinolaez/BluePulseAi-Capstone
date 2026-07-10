@@ -399,10 +399,11 @@ class TestContaminantSimulationIntegration:
 
     def test_contaminant_vector_values_are_numbers(self, ml_client):
         """
-        Each value in contaminant_vector must be a finite number.
+        Each value in contaminant_vector must be a [lat, lon] coordinate pair.
 
-        Non-finite values (NaN, Infinity) would cause Reyta's map to draw
-        points at invalid coordinates, crashing the React-Leaflet renderer.
+        The spread path is a list of coordinate pairs — Reyta's map draws an
+        animated line along these points. Non-finite values (NaN, Infinity)
+        would crash the React-Leaflet renderer.
         """
         response = ml_client.post(
             self.ENDPOINT,
@@ -414,14 +415,22 @@ class TestContaminantSimulationIntegration:
             pytest.skip("Endpoint not available")
 
         vector = response.json().get("contaminant_vector", [])
-        for i, value in enumerate(vector[:10]):  # Check first 10 to keep test fast
-            assert isinstance(value, (int, float)), (
-                f"contaminant_vector[{i}] is not a number: {value} ({type(value).__name__})"
+        for i, coord in enumerate(vector[:10]):  # Check first 10 to keep test fast
+            assert isinstance(coord, list), (
+                f"contaminant_vector[{i}] is not a coordinate pair: {coord} ({type(coord).__name__}). "
+                "Richard: each item must be a [lat, lon] list."
             )
-            assert value == value, (  # NaN check: NaN != NaN in Python
-                f"contaminant_vector[{i}] is NaN. "
-                "Richard: ODE solver produced a NaN — check for division by zero in the formula."
+            assert len(coord) == 2, (
+                f"contaminant_vector[{i}] has {len(coord)} values, expected 2 (lat, lon)."
             )
+            for j, val in enumerate(coord):
+                assert isinstance(val, (int, float)), (
+                    f"contaminant_vector[{i}][{j}] is not a number: {val} ({type(val).__name__})"
+                )
+                assert val == val, (  # NaN check: NaN != NaN in Python
+                    f"contaminant_vector[{i}][{j}] is NaN. "
+                    "Richard: ODE solver produced a NaN — check for division by zero in the formula."
+                )
 
     def test_source_point_outside_watershed_returns_error(self, ml_client):
         """

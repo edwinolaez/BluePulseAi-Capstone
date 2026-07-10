@@ -266,9 +266,12 @@ class TestConvexQueries:
 
         body = response.json()
         result = body.get("value") or body
+        # Rahil wraps responses in {status, value} — unwrap one more level
+        if isinstance(result, dict) and "status" in result and "value" in result:
+            result = result["value"]
 
         if result and isinstance(result, dict):
-            for field in ["ph", "turbidity_ntu", "hydrocarbon_ppb", "timestamp"]:
+            for field in ["ph", "turbidity", "hydrocarbonLevel", "timestamp"]:
                 assert field in result, (
                     f"getLiveWaterQuality response missing field '{field}'. "
                     f"Full response: {result}. "
@@ -299,12 +302,15 @@ class TestConvexQueries:
 
         body = response.json()
         result = body.get("value") or body
+        # Rahil wraps responses in {status, value} — unwrap one more level
+        if isinstance(result, dict) and "status" in result and "value" in result:
+            result = result["value"]
 
         if result and isinstance(result, dict):
-            for field in ["model_version", "run_id", "metrics"]:
+            for field in ["modelVersion", "runId", "f1Score"]:
                 assert field in result, (
                     f"getModelMetadata response missing field '{field}'. "
-                    f"Reyta's risk overlay needs model_version, run_id, and metrics to render."
+                    f"Reyta's risk overlay needs modelVersion, runId, and f1Score to render."
                 )
 
 
@@ -426,11 +432,14 @@ class TestConvexMutationQueryRoundTrip:
 
         body = read_response.json()
         result = body.get("value") or body
+        # Rahil wraps responses in {status, value} — unwrap one more level
+        if isinstance(result, dict) and "status" in result and "value" in result:
+            result = result["value"]
 
         if result and isinstance(result, dict):
-            assert result.get("model_version") == test_version, (
-                f"Wrote model_version '{test_version}', "
-                f"but getModelMetadata returned '{result.get('model_version')}'. "
+            assert result.get("modelVersion") == test_version, (
+                f"Wrote modelVersion '{test_version}', "
+                f"but getModelMetadata returned '{result.get('modelVersion')}'. "
                 "Check Rahil's updateModelMetadata function is overwriting the latest record."
             )
 

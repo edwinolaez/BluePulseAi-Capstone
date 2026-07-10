@@ -58,7 +58,7 @@ def test_metrics_endpoint():
 def test_change_detection_endpoint_valid_request():
     """Test change detection endpoint with valid input."""
     payload = {"sector_id": "ATH-001-A"}
-    response = client.post("/api/v1/predict/change-detection", json=payload)
+    response = client.post("/predict/change-detection", json=payload)
     
     assert response.status_code == 200
     data = response.json()
@@ -77,7 +77,7 @@ def test_change_detection_endpoint_valid_request():
 def test_change_detection_output_ranges():
     """Test that change detection output is within valid ranges."""
     payload = {"sector_id": "ATH-001-A"}
-    response = client.post("/api/v1/predict/change-detection", json=payload)
+    response = client.post("/predict/change-detection", json=payload)
     
     assert response.status_code == 200
     data = response.json()
@@ -99,7 +99,7 @@ def test_change_detection_risk_label_matches_score():
     
     # Run multiple times to test label matching logic
     for _ in range(10):
-        response = client.post("/api/v1/predict/change-detection", json=payload)
+        response = client.post("/predict/change-detection", json=payload)
         data = response.json()
         
         score = data["risk_score"]
@@ -116,7 +116,7 @@ def test_change_detection_risk_label_matches_score():
 def test_change_detection_missing_sector_id():
     """Test change detection endpoint with missing required field."""
     payload = {}  # Missing sector_id
-    response = client.post("/api/v1/predict/change-detection", json=payload)
+    response = client.post("/predict/change-detection", json=payload)
     
     # Should return 422 validation error
     assert response.status_code == 422
@@ -125,7 +125,7 @@ def test_change_detection_missing_sector_id():
 def test_change_detection_output_is_serializable():
     """Test that change detection output is JSON serializable."""
     payload = {"sector_id": "ATH-001-A"}
-    response = client.post("/api/v1/predict/change-detection", json=payload)
+    response = client.post("/predict/change-detection", json=payload)
     
     assert response.status_code == 200
     data = response.json()
@@ -144,10 +144,9 @@ def test_erosion_endpoint_valid_request():
     """Test erosion simulation endpoint with valid inputs."""
     params = {
         "sector_id": "ATH-001-B",
-        "slope_deg": 45.0,
         "rainfall_mm": 100.0
     }
-    response = client.get("/api/v1/simulate/erosion", params=params)
+    response = client.post("/simulate/erosion", json=params)
     
     assert response.status_code == 200
     data = response.json()
@@ -163,10 +162,9 @@ def test_erosion_output_ranges():
     """Test that erosion output is within valid ranges."""
     params = {
         "sector_id": "ATH-001-B",
-        "slope_deg": 45.0,
         "rainfall_mm": 100.0
     }
-    response = client.get("/api/v1/simulate/erosion", params=params)
+    response = client.post("/simulate/erosion", json=params)
     
     assert response.status_code == 200
     data = response.json()
@@ -180,86 +178,36 @@ def test_erosion_output_ranges():
     assert data["simulation_type"] == "erosion"
 
 
-def test_erosion_slope_constraint():
-    """Test that erosion endpoint enforces slope constraints."""
-    # Valid: slope within range
-    params = {
-        "sector_id": "ATH-001-B",
-        "slope_deg": 45.0,
-        "rainfall_mm": 100.0
-    }
-    response = client.get("/api/v1/simulate/erosion", params=params)
-    assert response.status_code == 200
-    
-    # Invalid: slope > 90
-    params["slope_deg"] = 95.0
-    response = client.get("/api/v1/simulate/erosion", params=params)
-    assert response.status_code == 422
-    
-    # Invalid: slope < 0
-    params["slope_deg"] = -1.0
-    response = client.get("/api/v1/simulate/erosion", params=params)
-    assert response.status_code == 422
-
 
 def test_erosion_rainfall_constraint():
     """Test that erosion endpoint enforces rainfall constraints."""
     # Valid: rainfall within range
     params = {
         "sector_id": "ATH-001-B",
-        "slope_deg": 45.0,
         "rainfall_mm": 100.0
     }
-    response = client.get("/api/v1/simulate/erosion", params=params)
+    response = client.post("/simulate/erosion", json=params)
     assert response.status_code == 200
     
     # Invalid: rainfall > 500
     params["rainfall_mm"] = 600.0
-    response = client.get("/api/v1/simulate/erosion", params=params)
+    response = client.post("/simulate/erosion", json=params)
     assert response.status_code == 422
     
     # Invalid: rainfall < 0
     params["rainfall_mm"] = -1.0
-    response = client.get("/api/v1/simulate/erosion", params=params)
+    response = client.post("/simulate/erosion", json=params)
     assert response.status_code == 422
 
 
-def test_erosion_extreme_values():
-    """Test erosion model with extreme but valid values."""
-    # Minimum values
-    params = {
-        "sector_id": "ATH-001-B",
-        "slope_deg": 0.0,
-        "rainfall_mm": 0.0
-    }
-    response = client.get("/api/v1/simulate/erosion", params=params)
-    assert response.status_code == 200
-    data = response.json()
-    assert data["risk_score"] >= 0.0
-    assert data["risk_score"] <= 1.0
-    
-    # Maximum values
-    params["slope_deg"] = 90.0
-    params["rainfall_mm"] = 500.0
-    response = client.get("/api/v1/simulate/erosion", params=params)
-    assert response.status_code == 200
-    data = response.json()
-    assert 0.0 <= data["risk_score"] <= 1.0
-
-
-# ============================================================================
-# Contaminant Simulation Endpoint Tests
-# ============================================================================
 
 def test_contaminant_endpoint_valid_request():
     """Test contaminant simulation endpoint with valid inputs."""
     params = {
         "sector_id": "ATH-001-C",
-        "flow_direction_deg": 180.0,
-        "water_velocity_ms": 2.5,
-        "contamination_level": 0.7
+        "source_point": {"lat": 55.123, "lon": -114.456}
     }
-    response = client.get("/api/v1/simulate/contaminant", params=params)
+    response = client.post("/simulate/contaminant", json=params)
     
     assert response.status_code == 200
     data = response.json()
@@ -271,122 +219,59 @@ def test_contaminant_endpoint_valid_request():
     assert "contaminant_vector" in data
 
 
+
+def test_contaminant_watershed_bounds_validation():
+    """Test that contaminant endpoint rejects coordinates outside Athabasca watershed."""
+    # Test coordinates outside watershed (Gulf of Guinea)
+    params = {
+        "sector_id": "OUTSIDE-001",
+        "source_point": {"lat": 0.0, "lon": 0.0}
+    }
+    response = client.post("/simulate/contaminant", json=params)
+    
+    assert response.status_code == 422, f"Expected 422 for out-of-bounds coordinates, got {response.status_code}"
+    data = response.json()
+    assert "outside Athabasca watershed bounds" in data["detail"]
+    
+    # Test valid coordinates within watershed (northern Alberta)
+    params = {
+        "sector_id": "ATH-001-C",
+        "source_point": {"lat": 56.0, "lon": -115.0}
+    }
+    response = client.post("/simulate/contaminant", json=params)
+    
+    assert response.status_code == 200, f"Expected 200 for in-bounds coordinates, got {response.status_code}"
+    data = response.json()
+    assert data["sector_id"] == "ATH-001-C"
+
 def test_contaminant_vector_output_ranges():
     """Test that contaminant vector output is within valid ranges."""
     params = {
         "sector_id": "ATH-001-C",
-        "flow_direction_deg": 180.0,
-        "water_velocity_ms": 2.5,
-        "contamination_level": 0.7
+        "source_point": {"lat": 55.123, "lon": -114.456}
     }
-    response = client.get("/api/v1/simulate/contaminant", params=params)
+    response = client.post("/simulate/contaminant", json=params)
     
     assert response.status_code == 200
     data = response.json()
     
-    # Validate vector ranges
-    assert 0.0 <= data["contaminant_vector"]["direction_deg"] < 360.0
-    assert 0.0 <= data["contaminant_vector"]["velocity"] <= 1.0
+    # Validate contaminant_vector is a non-empty list of coordinates
+    assert isinstance(data["contaminant_vector"], list), "contaminant_vector should be a list"
+    assert len(data["contaminant_vector"]) > 0, "contaminant_vector should not be empty"
+    assert isinstance(data["contaminant_vector"][0], list), "each item should be coordinates"
+    assert len(data["contaminant_vector"][0]) == 2, "each coordinate should have [lat, lon]"
+    
+    # Validate other ranges
     assert 0.0 <= data["confidence"] <= 1.0
     assert 0.0 <= data["risk_score"] <= 1.0
     assert data["risk_label"] in ["High", "Medium", "Low"]
 
 
-def test_contaminant_direction_constraint():
-    """Test that contaminant endpoint enforces direction constraints."""
-    # Valid: direction within range
-    params = {
-        "sector_id": "ATH-001-C",
-        "flow_direction_deg": 180.0,
-        "water_velocity_ms": 2.5,
-        "contamination_level": 0.7
-    }
-    response = client.get("/api/v1/simulate/contaminant", params=params)
-    assert response.status_code == 200
-    
-    # Invalid: direction > 360
-    params["flow_direction_deg"] = 400.0
-    response = client.get("/api/v1/simulate/contaminant", params=params)
-    assert response.status_code == 422
-    
-    # Invalid: direction < 0
-    params["flow_direction_deg"] = -1.0
-    response = client.get("/api/v1/simulate/contaminant", params=params)
-    assert response.status_code == 422
-
-
-def test_contaminant_velocity_constraint():
-    """Test that contaminant endpoint enforces velocity constraints."""
-    params = {
-        "sector_id": "ATH-001-C",
-        "flow_direction_deg": 180.0,
-        "water_velocity_ms": 2.5,
-        "contamination_level": 0.7
-    }
-    
-    # Valid: velocity within range
-    response = client.get("/api/v1/simulate/contaminant", params=params)
-    assert response.status_code == 200
-    
-    # Invalid: velocity > 5
-    params["water_velocity_ms"] = 6.0
-    response = client.get("/api/v1/simulate/contaminant", params=params)
-    assert response.status_code == 422
-    
-    # Invalid: velocity < 0
-    params["water_velocity_ms"] = -1.0
-    response = client.get("/api/v1/simulate/contaminant", params=params)
-    assert response.status_code == 422
-
-
-def test_contaminant_contamination_constraint():
-    """Test that contaminant endpoint enforces contamination level constraints."""
-    params = {
-        "sector_id": "ATH-001-C",
-        "flow_direction_deg": 180.0,
-        "water_velocity_ms": 2.5,
-        "contamination_level": 0.7
-    }
-    
-    # Valid: contamination within range
-    response = client.get("/api/v1/simulate/contaminant", params=params)
-    assert response.status_code == 200
-    
-    # Invalid: contamination > 1
-    params["contamination_level"] = 1.5
-    response = client.get("/api/v1/simulate/contaminant", params=params)
-    assert response.status_code == 422
-    
-    # Invalid: contamination < 0
-    params["contamination_level"] = -0.1
-    response = client.get("/api/v1/simulate/contaminant", params=params)
-    assert response.status_code == 422
-
-
-def test_contaminant_direction_wrapping():
-    """Test that flow direction properly wraps around 360 degrees."""
-    params = {
-        "sector_id": "ATH-001-C",
-        "flow_direction_deg": 350.0,
-        "water_velocity_ms": 2.5,
-        "contamination_level": 0.7
-    }
-    response = client.get("/api/v1/simulate/contaminant", params=params)
-    
-    data = response.json()
-    # Direction should be normalized to 0-360
-    assert 0.0 <= data["contaminant_vector"]["direction_deg"] < 360.0
-
-
-# ============================================================================
-# Schema Compliance Tests
-# ============================================================================
-
 def test_all_endpoints_return_model_output_schema():
     """Test that all endpoints return valid ModelOutput schema."""
     # Change detection
     response = client.post(
-        "/api/v1/predict/change-detection",
+        "/predict/change-detection",
         json={"sector_id": "ATH-001-A"}
     )
     assert response.status_code == 200
@@ -397,11 +282,10 @@ def test_all_endpoints_return_model_output_schema():
     assert output.sector_id == "ATH-001-A"
     
     # Erosion
-    response = client.get(
-        "/api/v1/simulate/erosion",
-        params={
+    response = client.post(
+        "/simulate/erosion",
+        json={
             "sector_id": "ATH-001-B",
-            "slope_deg": 45.0,
             "rainfall_mm": 100.0
         }
     )
@@ -411,14 +295,12 @@ def test_all_endpoints_return_model_output_schema():
     assert output.sector_id == "ATH-001-B"
     
     # Contaminant
-    response = client.get(
-        "/api/v1/simulate/contaminant",
-        params={
-            "sector_id": "ATH-001-C",
-            "flow_direction_deg": 180.0,
-            "water_velocity_ms": 2.5,
-            "contamination_level": 0.7
-        }
+    response = client.post(
+        "/simulate/contaminant",
+        json={
+                "sector_id": "ATH-001-C",
+                "source_point": {"lat": 55.123, "lon": -114.456}
+            }
     )
     assert response.status_code == 200
     data = response.json()
@@ -431,7 +313,7 @@ def test_timestamp_is_valid_iso8601():
     from datetime import datetime as dt
     
     response = client.post(
-        "/api/v1/predict/change-detection",
+        "/predict/change-detection",
         json={"sector_id": "ATH-001-A"}
     )
     data = response.json()
@@ -454,7 +336,7 @@ def test_multiple_sectors_change_detection():
     
     for sector_id in sector_ids:
         response = client.post(
-            "/api/v1/predict/change-detection",
+            "/predict/change-detection",
             json={"sector_id": sector_id}
         )
         assert response.status_code == 200
@@ -466,50 +348,23 @@ def test_erosion_simulation_progression():
     """Test that erosion risk increases with slope and rainfall."""
     base_params = {
         "sector_id": "ATH-001-B",
-        "slope_deg": 10.0,
         "rainfall_mm": 10.0
     }
     
-    response = client.get("/api/v1/simulate/erosion", params=base_params)
+    response = client.post("/simulate/erosion", json=base_params)
     low_risk = response.json()["risk_score"]
     
     # Increase slope
     high_params = base_params.copy()
-    high_params["slope_deg"] = 80.0
     high_params["rainfall_mm"] = 400.0
     
-    response = client.get("/api/v1/simulate/erosion", params=high_params)
+    response = client.post("/simulate/erosion", json=high_params)
     high_risk = response.json()["risk_score"]
     
     # Higher slope and rainfall should generally increase risk
     assert high_risk > low_risk, "Erosion risk should increase with slope/rainfall"
 
 
-def test_contaminant_velocity_scales_with_flow():
-    """Test that contaminant velocity scales appropriately with water flow."""
-    slow_params = {
-        "sector_id": "ATH-001-C",
-        "flow_direction_deg": 180.0,
-        "water_velocity_ms": 0.5,
-        "contamination_level": 0.5
-    }
-    
-    response = client.get("/api/v1/simulate/contaminant", params=slow_params)
-    slow_velocity = response.json()["contaminant_vector"]["velocity"]
-    
-    fast_params = slow_params.copy()
-    fast_params["water_velocity_ms"] = 4.5
-    
-    response = client.get("/api/v1/simulate/contaminant", params=fast_params)
-    fast_velocity = response.json()["contaminant_vector"]["velocity"]
-    
-    # Faster water should produce faster plume movement
-    assert fast_velocity > slow_velocity, "Plume velocity should increase with water velocity"
-
-
-# ============================================================================
-# Performance Tests
-# ============================================================================
 
 def test_endpoint_response_time():
     """Test that endpoints respond within reasonable time."""
@@ -518,7 +373,7 @@ def test_endpoint_response_time():
     # Change detection should respond quickly
     start = time.time()
     response = client.post(
-        "/api/v1/predict/change-detection",
+        "/predict/change-detection",
         json={"sector_id": "ATH-001-A"}
     )
     elapsed = time.time() - start
@@ -527,11 +382,10 @@ def test_endpoint_response_time():
     
     # Erosion simulation should respond quickly
     start = time.time()
-    response = client.get(
-        "/api/v1/simulate/erosion",
-        params={
+    response = client.post(
+        "/simulate/erosion",
+        json={
             "sector_id": "ATH-001-B",
-            "slope_deg": 45.0,
             "rainfall_mm": 100.0
         }
     )
@@ -541,14 +395,12 @@ def test_endpoint_response_time():
     
     # Contaminant simulation should respond quickly
     start = time.time()
-    response = client.get(
-        "/api/v1/simulate/contaminant",
-        params={
-            "sector_id": "ATH-001-C",
-            "flow_direction_deg": 180.0,
-            "water_velocity_ms": 2.5,
-            "contamination_level": 0.7
-        }
+    response = client.post(
+        "/simulate/contaminant",
+        json={
+                "sector_id": "ATH-001-C",
+                "source_point": {"lat": 55.123, "lon": -114.456}
+            }
     )
     elapsed = time.time() - start
     assert response.status_code == 200

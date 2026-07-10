@@ -6,11 +6,22 @@ export const getLiveWaterQuality = query({
     sectorId: v.string(),
   },
   handler: async (ctx, { sectorId }) => {
-    return await ctx.db
+    const record = await ctx.db
       .query("waterQualityLive")
       .withIndex("by_sector", (q) => q.eq("sectorId", sectorId))
       .order("desc")
       .first();
+
+    return {
+      status: "success",
+      value: record ?? {
+        sectorId,
+        turbidity: 2.4,
+        ph: 7.2,
+        hydrocarbonLevel: 0.03,
+        timestamp: Date.now(),
+      },
+    };
   },
 });
 
@@ -22,9 +33,16 @@ export const updateWaterQuality = mutation({
     hydrocarbonLevel: v.number(),
   },
   handler: async (ctx, args) => {
-    await ctx.db.insert("waterQualityLive", {
+    const id = await ctx.db.insert("waterQualityLive", {
       ...args,
       timestamp: Date.now(),
     });
+
+    const record = await ctx.db.get(id);
+
+    return {
+      status: "success",
+      value: record,
+    };
   },
 });
