@@ -174,7 +174,25 @@ export function Sidebar({ activeTab, onNavigate, onFocusSector, onOpenLogs, onOp
       )}
 
       <div className="mt-auto flex flex-col gap-3 pt-4">
-        <button className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition-colors">
+        <button
+          onClick={() => {
+            const rows = [
+              ["Sector", "Lat", "Lon", "Water Cloudiness (NTU)", "pH", "Ash Levels (ppm)", "Ground Stability (%)"],
+              ["ATH-001-A", "52.87", "-118.08", "4.2", "7.12", "18.4", "94.2"],
+              ["ATH-001-H", "52.91", "-118.14", "5.8", "6.98", "22.1", "87.5"],
+              ["ATH-001-W", "52.83", "-118.02", "3.1", "7.34", "11.9", "96.8"],
+            ];
+            const csv = rows.map((r) => r.join(",")).join("\n");
+            const blob = new Blob([csv], { type: "text/csv" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "jasper-map-data.csv";
+            a.click();
+            URL.revokeObjectURL(url);
+          }}
+          className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition-colors"
+        >
           <DownloadIcon className="w-4 h-4" />
           Download Map Data
         </button>

@@ -1,9 +1,17 @@
+// Reports Page — shows a list of environmental reports that can be downloaded.
+// Users can filter by category (Hydro-geology, Limnology, etc.)
+// Reports marked "Ready" can be downloaded as a text file.
+// Reports marked "Draft Model" have a button to trigger the model ingest process.
+// Note: the downloaded files currently contain sample data — real PDFs would come from the backend.
+
 "use client";
 
 import { useState } from "react";
 import { CheckCircleIcon, ClockIcon, DownloadIcon, SendIcon } from "../Layout/icons";
 
+// The types of reports available — used for the filter buttons at the top
 type Category = "Hydro-geology" | "Limnology" | "Remote Sensing" | "Model Output";
+// A report is either ready to download, currently running, or still in draft
 type Status = "Ready" | "Running..." | "Draft Model";
 
 interface Report {
@@ -18,6 +26,7 @@ interface Report {
 
 const CATEGORIES: ("All" | Category)[] = ["All", "Hydro-geology", "Limnology", "Remote Sensing", "Model Output"];
 
+// Sample report list — in production these would be fetched from Feven's backend
 const INITIAL_REPORTS: Report[] = [
   { id: "REP-001", category: "Hydro-geology",  title: "Jasper Post-Fire Runoff & Erosion Risk Model",          author: "Dr. Eleanor Vance",        date: "2024-07-28", fileSize: "14.2 MB", status: "Ready" },
   { id: "REP-002", category: "Limnology",      title: "Athabasca Watershed Basin Water Quality Diagnostic",    author: "Jasper GIS Alpha Team",    date: "2024-07-24", fileSize: "8.7 MB",  status: "Ready" },
@@ -26,12 +35,16 @@ const INITIAL_REPORTS: Report[] = [
 ];
 
 export function ReportsPage() {
+  // Which category filter is active — "All" shows everything
   const [filter, setFilter]           = useState<"All" | Category>("All");
   const [reports, setReports]         = useState(INITIAL_REPORTS);
+  // Tracks which report is currently being "downloaded" to show the loading state
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
+  // Only show reports that match the selected category filter
   const visible = filter === "All" ? reports : reports.filter((r) => r.category === filter);
 
+  // Creates a text file with the report details and triggers a browser download
   function handleDownload(id: string) {
     const report = reports.find((r) => r.id === id);
     if (!report) return;
@@ -68,6 +81,7 @@ export function ReportsPage() {
     setTimeout(() => setDownloadingId(null), 1200);
   }
 
+  // Simulates triggering a model ingest run — changes the status to "Running..." then back to "Ready"
   function handleRunIngest(id: string) {
     setReports((prev) => prev.map((r) => (r.id === id ? { ...r, status: "Running..." } : r)));
     setTimeout(() => {
