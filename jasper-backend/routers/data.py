@@ -81,36 +81,48 @@ async def get_layers(
     layers = []
 
     try:
-        # Get a Supabase client and query water_quality_readings
-        # .select("*") means fetch all columns
-        # .eq("sector_id", sector_id) filters rows to only match our sector
         supabase = get_supabase()
-        query = supabase.table("water_quality_readings").select("*").eq("sector_id", sector_id)
-
-        # Add date range filters if the caller provided them
-        # .gte means "greater than or equal to" — recorded_at >= date_from
-        # .lte means "less than or equal to" — recorded_at <= date_to
+        wq_query = supabase.table("water_quality_readings").select("*").eq("sector_id", sector_id)
         if date_from:
-            query = query.gte("recorded_at", date_from)
+            wq_query = wq_query.gte("recorded_at", date_from)
         if date_to:
-            query = query.lte("recorded_at", date_to)
-
-        # Execute the query and get back the results
-        result = query.execute()
-
-        # Format each database row as a layer object
-        # result.data is a list of dicts, one per row
-        for row in result.data:
+            wq_query = wq_query.lte("recorded_at", date_to)
+        wq_result = wq_query.execute()
+        for row in wq_result.data:
             layers.append({
                 "layer_type": "water_quality",
                 "sector_id": sector_id,
-                "data": row
+                "coordinates": {},
+                "timestamp": row.get("recorded_at"),
+                "data": row,
             })
+    except Exception as e:
+        print(f"Supabase water_quality_readings query error: {e}")
 
-    except (ValueError, RuntimeError) as e:
-        # If the database query fails, log it but don't crash
-        # The layers list will remain empty, and we'll return 404 below
-        print(f"Supabase query error: {e}")
+    try:
+        supabase = get_supabase()
+        ir_query = supabase.table("ingest_records").select("*").eq("sector_id", sector_id)
+        if date_from:
+            ir_query = ir_query.gte("timestamp", date_from)
+        if date_to:
+            ir_query = ir_query.lte("timestamp", date_to)
+        if layer_type:
+            ir_query = ir_query.eq("layer_type", layer_type)
+        ir_result = ir_query.execute()
+        for row in ir_result.data:
+            payload = row.get("payload") or {}
+            layers.append({
+                "layer_type": row.get("layer_type", "unknown"),
+                "sector_id": sector_id,
+                "coordinates": {
+                    "lat": payload.get("lat"),
+                    "lon": payload.get("lon"),
+                },
+                "timestamp": row.get("timestamp"),
+                "data": payload,
+            })
+    except Exception as e:
+        print(f"Supabase ingest_records query error: {e}")
 
     # If no layers were found after querying, return 404
     # Edwin's tests expect 404 when a sector has no data — not an empty 200

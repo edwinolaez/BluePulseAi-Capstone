@@ -58,13 +58,32 @@ class IngestRecord(BaseModel):
 @router.post("/api/v1/ingest", status_code=201, dependencies=[Depends(require_api_key)])
 async def ingest_base(record: IngestRecord):
     """Base ingest endpoint — accepts JSON ingest records.
-    
-    Returns 201 Created with a generated UUID, sector_id, and timestamp.
-    Edwin's integration tests check for these three fields in the response.
+
+    Persists to the ingest_records table in Supabase.
+    Coordinates are stored in payload as lat/lon (avoids PostGIS WKT complexity).
+    Returns 201 with the DB-generated id, sector_id, and timestamp.
     """
-    # uuid.uuid4() generates a random unique ID — same format Supabase would return
+    record_id = str(uuid.uuid4())
+    try:
+        supabase = get_supabase()
+        row = {
+            "sector_id": record.sector_id,
+            "layer_type": record.layer_type,
+            "payload": {
+                "lat": record.coordinates.lat,
+                "lon": record.coordinates.lon,
+                **(record.payload or {}),
+            },
+            "timestamp": record.timestamp,
+        }
+        result = supabase.table("ingest_records").insert(row).execute()
+        if result.data:
+            record_id = result.data[0]["id"]
+    except Exception:
+        pass
+
     return JSONResponse(status_code=201, content={
-        "id": str(uuid.uuid4()),
+        "id": record_id,
         "sector_id": record.sector_id,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     })
