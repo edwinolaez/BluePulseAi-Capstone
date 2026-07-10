@@ -320,6 +320,10 @@ jobs:
 
       - name: API response time benchmark
         working-directory: tests
+        env:
+          RAILWAY_API_URL: ${{ secrets.RAILWAY_API_URL }}
+          ML_API_URL: ${{ secrets.ML_API_URL }}
+          NEXT_PUBLIC_API_KEY: ${{ secrets.NEXT_PUBLIC_API_KEY }}
         run: |
           pip install -r requirements.txt pytest-benchmark
           if [ -f benchmark_api.py ]; then
