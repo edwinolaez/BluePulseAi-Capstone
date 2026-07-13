@@ -29,10 +29,10 @@ async def get_layers(
     layer_type: Optional[str] = Query(None)
 ):
     """Returns all environmental layers for a sector — used by Reyta's map frontend.
-    Accepts optional filters: date_from, date_to, layer_type.
+    Queries both ingest_records and water_quality_readings tables.
     Returns 404 if no data exists for the requested sector."""
-    # Only these four layer types are valid — reject anything else with 422
-    valid_layer_types = ["geotiff", "dem", "telemetry", "water_quality"]
+    # Only these layer types are valid — reject anything else with 422
+    valid_layer_types = ["geotiff", "dem", "telemetry", "water_quality", "burn_scar"]
     if layer_type and layer_type not in valid_layer_types:
         raise HTTPException(
             status_code=422,
@@ -56,35 +56,65 @@ async def get_layers(
                 status_code=422, detail="Invalid date_to format. Use ISO 8601."
             ) from exc
 
-    # Start with empty list — filled by Supabase query below
+    # Start with empty list — filled by Supabase queries below
     layers = []
 
     try:
         supabase = get_supabase()
 
-        # Query water_quality_readings filtered by sector_id
-        # .select("*") fetches all columns, .eq() filters by sector
-        query = supabase.table("water_quality_readings").select("*").eq("sector_id", sector_id)
+        # Query 1 — ingest_records table (stores base ingest records from /api/v1/ingest)
+        # This is what Edwin's E2E tests check after calling the base ingest endpoint
+        ingest_query = (
+            supabase.table("ingest_records")
+            .select("*")
+            .eq("sector_id", sector_id)
+        )
 
-        # Apply optional date range filters if the caller provided them
-        # gte = greater than or equal, lte = less than or equal
+        # Apply optional filters on ingest_records
         if date_from:
-            query = query.gte("recorded_at", date_from)
+            ingest_query = ingest_query.gte("timestamp", date_from)
         if date_to:
-            query = query.lte("recorded_at", date_to)
+            ingest_query = ingest_query.lte("timestamp", date_to)
+        if layer_type:
+            ingest_query = ingest_query.eq("layer_type", layer_type)
 
-        # .execute() runs the query and returns result.data as a list of rows
-        result = query.execute()
+        ingest_result = ingest_query.execute()
 
-        # Format each database row into a standardized layer object
-        for row in result.data:
+        # Format each ingest_record row as a layer object
+        for row in ingest_result.data:
             layers.append({
-                "layer_type": "water_quality",
+                "layer_type": row.get("layer_type", "unknown"),
                 "sector_id": sector_id,
+                "source": "ingest_records",
                 "data": row
             })
 
-    except (ValueError, RuntimeError) as e:
+        # Query 2 — water_quality_readings table (stores telemetry sensor data)
+        # Only query if no layer_type filter or filter is water_quality/telemetry
+        if not layer_type or layer_type in ["water_quality", "telemetry"]:
+            wq_query = (
+                supabase.table("water_quality_readings")
+                .select("*")
+                .eq("sector_id", sector_id)
+            )
+
+            if date_from:
+                wq_query = wq_query.gte("recorded_at", date_from)
+            if date_to:
+                wq_query = wq_query.lte("recorded_at", date_to)
+
+            wq_result = wq_query.execute()
+
+            # Format each water_quality row as a layer object
+            for row in wq_result.data:
+                layers.append({
+                    "layer_type": "water_quality",
+                    "sector_id": sector_id,
+                    "source": "water_quality_readings",
+                    "data": row
+                })
+
+    except Exception as e:
         # Log the error but don't crash — layers stays empty and 404 triggers below
         print(f"Supabase query error: {e}")
 

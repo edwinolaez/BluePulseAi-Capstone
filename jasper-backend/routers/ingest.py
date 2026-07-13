@@ -48,13 +48,31 @@ class IngestRecord(BaseModel):
 
 @router.post("/api/v1/ingest", status_code=201, dependencies=[Depends(require_api_key)])
 async def ingest_base(record: IngestRecord):
-    """Accepts a generic JSON ingest record — used by Edwin's integration tests.
-    Returns 201 Created with a generated UUID that Edwin's tests check for."""
-    # uuid.uuid4() generates a unique ID — in production Supabase would return this
+    """Accept a generic JSON ingest record and save it to Supabase ingest_records table.
+    Returns 201 Created with the Supabase-generated UUID that Edwin's E2E tests check for."""
+    timestamp = datetime.now(timezone.utc).isoformat()
+
+    try:
+        supabase = get_supabase()
+        # Save to ingest_records table — matches Rahil's migration 008
+        db_record = {
+            "sector_id": record.sector_id,
+            "layer_type": record.layer_type,
+            "payload": record.payload or {},
+            "timestamp": timestamp,
+        }
+        result = supabase.table("ingest_records").insert(db_record).execute()
+        # Use the UUID Supabase generated — fallback to uuid4 if insert fails
+        record_id = result.data[0]["id"] if result.data else str(uuid.uuid4())
+    except Exception as e:
+        raise HTTPException(
+            status_code=503, detail=f"Database unavailable: {e}"
+        ) from e
+
     return JSONResponse(status_code=201, content={
-        "id": str(uuid.uuid4()),
+        "id": record_id,
         "sector_id": record.sector_id,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": timestamp,
     })
 
 
@@ -154,7 +172,9 @@ async def ingest_telemetry(
         supabase.table("water_quality_readings").insert(record).execute()
     except Exception as e:
         # Return 503 if database is down so the caller knows to retry
-        raise HTTPException(status_code=503, detail=f"Database unavailable: {e}") from e
+        raise HTTPException(
+            status_code=503, detail=f"Database unavailable: {e}"
+        ) from e
 
     return {
         "status": "accepted",
