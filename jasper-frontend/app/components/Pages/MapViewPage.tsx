@@ -35,7 +35,7 @@ export function MapViewPage({ flyTo }: Props) {
   const [dateFrom, setDateFrom]               = useState("2024-06-01");
   const [dateTo, setDateTo]                   = useState("2024-07-24");
 
-  // These three booleans control which layers are visible on the map
+  // These booleans control which layers are visible on the map
   const [showBurnScar, setShowBurnScar]       = useState(true);
   const [showErosion, setShowErosion]         = useState(true);
   const [showContaminant, setShowContaminant] = useState(true);
