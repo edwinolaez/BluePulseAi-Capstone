@@ -23,7 +23,7 @@ const SEED_USERS: StoredUser[] = [
   { id: "u3", name: "Robert Johnson",email: "superadmin@jasper.ca",  password: "Super@2024",    role: "superadmin",  createdAt: "2024-06-01" },
 ];
 
-const USERS_KEY   = "jasper_users_v2";
+const USERS_KEY   = "jasper_users_v3";
 const SESSION_KEY = "jasper_session";
 
 function loadUsers(): StoredUser[] {
