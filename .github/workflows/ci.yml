@@ -216,8 +216,11 @@ jobs:
           python-version: "3.11"
 
       - name: Install backend deps
-        working-directory: jasper-backend
-        run: pip install -r requirements.txt
+        run: |
+          pip install \
+            fastapi "uvicorn[standard]" \
+            pydantic PyJWT python-multipart python-dotenv \
+            supabase httpx
 
       - name: Start backend locally
         working-directory: jasper-backend
