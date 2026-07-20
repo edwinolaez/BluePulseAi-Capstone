@@ -215,30 +215,30 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Install backend deps
+        working-directory: jasper-backend
+        run: pip install -r requirements.txt
+
+      - name: Start backend locally
+        working-directory: jasper-backend
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          nohup uvicorn main:app --host 0.0.0.0 --port 8000 > /tmp/backend.log 2>&1 &
+          echo "Waiting for local backend to be ready..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8000/health > /dev/null 2>&1; then
+              echo "Backend ready after ${i}s"; break
+            fi
+            sleep 1
+          done
+          curl -sf http://localhost:8000/health || (echo "--- backend log ---"; cat /tmp/backend.log; exit 1)
+
       - name: Install integration test deps
         working-directory: tests
         run: |
-          pip install pytest httpx pytest-asyncio
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-
-      - name: Wait for Railway backend to be ready
-        env:
-          RAILWAY_API_URL: ${{ secrets.RAILWAY_API_URL }}
-        run: |
-          echo "Waiting for Railway backend to finish deploying..."
-          MAX_WAIT=180
-          ELAPSED=0
-          until curl -sf "${RAILWAY_API_URL}/health" > /dev/null 2>&1; do
-            if [ $ELAPSED -ge $MAX_WAIT ]; then
-              echo "WARNING: Railway did not respond after ${MAX_WAIT}s — running tests anyway"
-              break
-            fi
-            echo "  Backend not ready yet (${ELAPSED}s elapsed) — retrying in 10s..."
-            sleep 10
-            ELAPSED=$((ELAPSED + 10))
-          done
-          echo "Backend is up (${ELAPSED}s). Waiting 30s for rolling deploy to finish..."
-          sleep 30
 
       - name: Run integration tests
         working-directory: tests
@@ -249,7 +249,7 @@ jobs:
             echo "No integration tests yet — skipping"
           fi
         env:
-          RAILWAY_API_URL: ${{ secrets.RAILWAY_API_URL }}
+          RAILWAY_API_URL: http://127.0.0.1:8000
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
