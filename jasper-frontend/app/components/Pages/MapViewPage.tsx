@@ -83,7 +83,7 @@ export function MapViewPage({ flyTo }: Props) {
           {/* Toggle between 2D Leaflet and 3D deck.gl view */}
           {is3D ? (
             <ThreeDView
-              interpolated={interpolated}
+              centerDate={centerDate}
               activeSectorId={sectorId}
               onSectorClick={setSectorId}
             />

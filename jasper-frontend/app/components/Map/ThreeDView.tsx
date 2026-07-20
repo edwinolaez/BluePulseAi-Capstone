@@ -1,14 +1,19 @@
 // ThreeDView renders the five monitoring sectors as 3D extruded columns using deck.gl.
 // Column height encodes erosion_risk_score (0–1 → 0–900 m).
 // Column colour encodes the risk label (red / amber / green).
-// For the active sector the values update live from the timeline interpolation.
+// All five sectors fetch their own timeline data and interpolate independently
+// as the slider moves — so every column animates, not just the selected one.
 // Loaded dynamically (ssr: false) in MapViewPage because deck.gl uses WebGL.
 
 "use client";
 
+import { useEffect, useState } from "react";
 import DeckGL from "@deck.gl/react";
 import { ColumnLayer, BitmapLayer } from "@deck.gl/layers";
 import { TileLayer } from "@deck.gl/geo-layers";
+import { fetchTimeline } from "../../../lib/api";
+import type { TimelineScan } from "../../../lib/api";
+import { interpolateScans } from "../../../lib/interpolation";
 import type { InterpolatedState } from "../../../lib/interpolation";
 
 // ── View ─────────────────────────────────────────────────────────────────────
@@ -48,38 +53,75 @@ const RISK_RGBA: Record<string, [number, number, number, number]> = {
 // ── Datum type ────────────────────────────────────────────────────────────────
 
 interface SectorDatum {
-  id:         SectorId;
-  label:      string;
-  lat:        number;
-  lon:        number;
-  score:      number;
-  risk:       string;
-  isActive:   boolean;
+  id:          SectorId;
+  label:       string;
+  lat:         number;
+  lon:         number;
+  score:       number;
+  risk:        string;
+  isActive:    boolean;
   isEstimated: boolean;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 interface Props {
-  interpolated:   InterpolatedState | null;
+  centerDate:     string;        // ISO date from the timeline slider
   activeSectorId: string | null;
   onSectorClick:  (id: string) => void;
 }
 
-export function ThreeDView({ interpolated, activeSectorId, onSectorClick }: Props) {
+export function ThreeDView({ centerDate, activeSectorId, onSectorClick }: Props) {
 
-  // Build per-sector data — active sector uses live interpolated values
+  // One entry per sector — populated by parallel fetchTimeline calls on mount
+  const [sectorScans, setSectorScans] = useState<Record<string, TimelineScan[]>>(
+    () => Object.fromEntries(SECTORS.map(s => [s.id, []]))
+  );
+
+  // Interpolated state per sector — recomputed whenever the slider moves
+  const [sectorInterps, setSectorInterps] = useState<Record<string, InterpolatedState | null>>(
+    () => Object.fromEntries(SECTORS.map(s => [s.id, null]))
+  );
+
+  // Fetch all five sector timelines in parallel on mount
+  useEffect(() => {
+    let cancelled = false;
+    SECTORS.forEach(async (s) => {
+      try {
+        const data = await fetchTimeline(s.id);
+        if (!cancelled) {
+          setSectorScans(prev => ({ ...prev, [s.id]: data.scans }));
+        }
+      } catch {
+        // backend has no data for this sector yet — keep the empty array default
+      }
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Re-interpolate every sector whenever the slider date or scan data changes
+  useEffect(() => {
+    const ms = new Date(centerDate).getTime();
+    setSectorInterps(
+      Object.fromEntries(
+        SECTORS.map(s => [s.id, interpolateScans(sectorScans[s.id] ?? [], ms)])
+      )
+    );
+  }, [centerDate, sectorScans]);
+
+  // Build the ColumnLayer data array — prefer live interpolated values, fall back to defaults
   const data: SectorDatum[] = SECTORS.map((s) => {
-    const isActive = s.id === activeSectorId && interpolated !== null;
+    const interp = sectorInterps[s.id];
+    const isActive = s.id === activeSectorId;
     return {
       id:          s.id,
       label:       s.label,
       lat:         s.lat,
       lon:         s.lon,
-      score:       isActive ? interpolated!.erosion_risk_score : s.defaultScore,
-      risk:        isActive ? interpolated!.erosion_risk       : s.defaultRisk,
+      score:       interp ? interp.erosion_risk_score : s.defaultScore,
+      risk:        interp ? interp.erosion_risk       : s.defaultRisk,
       isActive,
-      isEstimated: isActive ? (interpolated?.is_estimated ?? false) : false,
+      isEstimated: interp ? interp.is_estimated : false,
     };
   });
 
@@ -94,7 +136,7 @@ export function ThreeDView({ interpolated, activeSectorId, onSectorClick }: Prop
         const bbox = (props.tile as any).bbox as { west: number; south: number; east: number; north: number };
         return new BitmapLayer({
           ...props,
-          data:   undefined,
+          data:  undefined,
           // props.data is the resolved tile image at runtime; TypeScript types it as URLTemplate
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           image:  props.data as any,
@@ -103,30 +145,33 @@ export function ThreeDView({ interpolated, activeSectorId, onSectorClick }: Prop
       },
     }),
 
-    // One extruded column per monitoring sector
+    // One extruded column per monitoring sector — all animated by the slider
     new ColumnLayer<SectorDatum>({
       id:             "sector-columns",
       data,
-      diskResolution: 32,      // smooth circle cross-section
-      radius:         700,     // column base radius in metres
+      diskResolution: 32,
+      radius:         700,
       extruded:       true,
       pickable:       true,
       opacity:        0.9,
       getPosition:    (d) => [d.lon, d.lat],
-      getElevation:   (d) => d.score * 900,  // risk 0–1 → 0–900 m
+      getElevation:   (d) => d.score * 900,
       getFillColor:   (d) => RISK_RGBA[d.risk] ?? RISK_RGBA.Medium,
       getLineColor:   [20, 20, 20, 60],
       lineWidthMinPixels: 1,
-      // Re-evaluate colour/height whenever the active sector or interpolation changes
+      // Trigger re-evaluation on every slider tick (centerDate drives all five interpolations)
       updateTriggers: {
-        getElevation: [activeSectorId, interpolated?.erosion_risk_score],
-        getFillColor:  [activeSectorId, interpolated?.erosion_risk],
+        getElevation: centerDate,
+        getFillColor:  centerDate,
       },
       onClick: (info) => {
         if (info.object) onSectorClick(info.object.id);
       },
     }),
   ];
+
+  // Count how many sectors have live data (vs. still using hardcoded defaults)
+  const liveCount = SECTORS.filter(s => (sectorScans[s.id]?.length ?? 0) > 0).length;
 
   return (
     <div className="relative w-full h-full">
@@ -136,7 +181,6 @@ export function ThreeDView({ interpolated, activeSectorId, onSectorClick }: Prop
         layers={layers}
         getTooltip={({ object }: { object?: SectorDatum }) => {
           if (!object) return null;
-          const estimated = object.isActive && object.isEstimated;
           return {
             html: `
               <div style="
@@ -149,7 +193,12 @@ export function ThreeDView({ interpolated, activeSectorId, onSectorClick }: Prop
                 <div>Risk: <span style="font-weight:600">${object.risk}</span></div>
                 <div>Score: <span style="font-weight:600">${(object.score * 100).toFixed(0)} %</span></div>
                 <div>ID: <span style="color:#94a3b8">${object.id}</span></div>
-                ${estimated ? '<div style="color:#60a5fa;font-size:10px;margin-top:4px;">● Timeline estimated</div>' : ""}
+                ${object.isEstimated
+                  ? '<div style="color:#60a5fa;font-size:10px;margin-top:4px;">● Timeline interpolated</div>'
+                  : ""}
+                ${object.isActive
+                  ? '<div style="color:#a78bfa;font-size:10px;">★ Selected</div>'
+                  : ""}
               </div>`,
             style: { background: "none" },
           };
@@ -177,6 +226,11 @@ export function ThreeDView({ interpolated, activeSectorId, onSectorClick }: Prop
           Column height = risk score<br />
           Click a column to select
         </p>
+        {liveCount > 0 && (
+          <p className="text-[10px] text-green-500 mt-1.5">
+            ● {liveCount}/5 sectors live
+          </p>
+        )}
       </div>
 
       {/* ── Navigation hint ── */}
