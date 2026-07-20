@@ -232,6 +232,34 @@ export function Sidebar({ activeTab, onNavigate, onFocusSector, onOpenLogs, onOp
             <p className="text-[10px] text-gray-400 dark:text-gray-500">Column height = risk score</p>
             <p className="text-[10px] text-gray-400 dark:text-gray-500">Terrain = real Rocky Mtn elevation</p>
           </div>
+          {/* Data provenance per layer */}
+          <div className="pt-2 border-t border-gray-200/60 dark:border-gray-700/40 space-y-2">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">Data Provenance</p>
+            {[
+              { color: "#a855f7", layer: "Soil Erosion",    source: "USGS SRTM + Env. Canada", quality: "Good", refresh: "Jul 18, 2026" },
+              { color: "#0ea5e9", layer: "Water Quality",   source: "WSC Station 07AA001",      quality: "Good", refresh: "Jul 20, 2026" },
+              { color: "#2563eb", layer: "Forest Regrowth", source: "Sentinel-2 B4/B8A/B12",    quality: "Good", refresh: "Jul 18, 2026" },
+            ].map(({ color, layer, source, quality, refresh }) => (
+              <div key={layer} className="rounded-md bg-gray-50 dark:bg-gray-800/50 p-2 space-y-0.5">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+                  <span className="text-[10px] font-semibold text-gray-600 dark:text-gray-300">{layer}</span>
+                </div>
+                <div className="flex justify-between text-[10px]">
+                  <span className="text-gray-400">Source</span>
+                  <span className="text-gray-500 dark:text-gray-400 text-right">{source}</span>
+                </div>
+                <div className="flex justify-between text-[10px]">
+                  <span className="text-gray-400">Refreshed</span>
+                  <span className="text-gray-500 dark:text-gray-400">{refresh}</span>
+                </div>
+                <div className="flex justify-between text-[10px]">
+                  <span className="text-gray-400">Quality</span>
+                  <span className="text-green-600 dark:text-green-400 font-semibold">✓ {quality}</span>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

@@ -6,10 +6,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Security
 from fastapi.security.api_key import APIKeyHeader
 
 from database import get_supabase
+from config import API_KEY
 
 router = APIRouter()
 
-API_KEY = "jasper-dev-api-key-2026"
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
