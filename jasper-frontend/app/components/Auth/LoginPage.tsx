@@ -1,3 +1,8 @@
+// Login Page — the first screen users see before they're signed in.
+// Supports both light and dark mode — it checks localStorage to see which
+// theme the user had last time, so signing out and back in looks consistent.
+// The demo credentials section at the bottom is just for testing — remove before going live.
+
 "use client";
 
 import { useState } from "react";
@@ -12,8 +17,11 @@ export function LoginPage({ onLoginSuccess, onSuperadminPending }: Props) {
   const { login } = useAuth();
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
+  // Error message shown below the password field if login fails
   const [error, setError]       = useState("");
+  // Shows a spinner on the sign in button while the login is being processed
   const [loading, setLoading]   = useState(false);
+  // Toggles the password field between hidden dots and readable text
   const [showPw, setShowPw]     = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {

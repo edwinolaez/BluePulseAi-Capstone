@@ -1,3 +1,8 @@
+// Archives Page — stores historical GIS survey records of the Jasper watershed.
+// Users can search by name or ID, and click "View Snapshot" to expand a record.
+// The snapshot preview currently shows a placeholder message — it would display
+// the actual map data once connected to the archive storage backend.
+
 "use client";
 
 import { useState } from "react";
@@ -11,6 +16,8 @@ interface Snapshot {
   size: string;
 }
 
+// Historical survey records — each one represents a point-in-time snapshot of the watershed.
+// In production these would be loaded from the backend storage service.
 const SNAPSHOTS: Snapshot[] = [
   { id: "ARC-014", name: "Pre-Fire Baseline Survey",      date: "2023-05-01", type: "Full Survey",     size: "212 MB" },
   { id: "ARC-021", name: "Post-Fire Initial Assessment",  date: "2023-08-10", type: "Full Survey",     size: "248 MB" },
@@ -27,9 +34,12 @@ const TYPE_BADGE: Record<Snapshot["type"], string> = {
 };
 
 export function ArchivesPage() {
+  // Text typed into the search box
   const [query, setQuery] = useState("");
+  // Tracks which archive row is currently expanded (only one at a time)
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
+  // Filter the list to only show records matching what the user searched for
   const visible = SNAPSHOTS.filter((s) =>
     s.name.toLowerCase().includes(query.toLowerCase()) || s.id.toLowerCase().includes(query.toLowerCase())
   );
