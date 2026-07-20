@@ -1,4 +1,4 @@
-"""Ingest routers for GeoTIFF, DEM, and telemetry data ingestion."""
+"""Ingest endpoints for GeoTIFF, DEM, and telemetry data — Owner: Feven."""
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
@@ -14,40 +14,25 @@ router = APIRouter()
 
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB in bytes
 
-# API key security — checks X-API-Key header on every protected endpoint
 API_KEY = "jasper-dev-api-key-2026"
-
-# APIKeyHeader tells FastAPI to look for a header called "X-API-Key"
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
 async def require_api_key(api_key: str = Security(api_key_header)):
-    """Validate the X-API-Key header — returns 401 if missing or wrong."""
-    # If no key provided or wrong key, reject the request immediately
+    """Runs before every protected endpoint — returns 401 if key is missing or wrong."""
     if api_key != API_KEY:
         raise HTTPException(status_code=401, detail="Invalid or missing API key")
 
 
 class Coordinates(BaseModel):
-    """Geographic coordinates with range validation.
-    
-    lat must be between -90 and 90 (south to north pole)
-    lon must be between -180 and 180 (west to east)
-    ge means 'greater than or equal to', le means 'less than or equal to'
-    If coordinates are out of range, Pydantic automatically returns 422.
-    """
-
+    """Validates lat/lon ranges — automatically rejects values like lat=999."""
     lat: float = Field(..., ge=-90, le=90)
     lon: float = Field(..., ge=-180, le=180)
 
 
 class IngestRecord(BaseModel):
-    """Schema for a generic ingest record sent as JSON body.
-    
-    This tells FastAPI exactly what fields are required in the request body.
-    If any required field is missing, FastAPI automatically returns 422.
-    """
-
+    """JSON body schema for the base ingest endpoint.
+    FastAPI automatically returns 422 if any required field is missing."""
     sector_id: str
     layer_type: str
     coordinates: Coordinates
@@ -57,38 +42,29 @@ class IngestRecord(BaseModel):
 
 @router.post("/api/v1/ingest", status_code=201, dependencies=[Depends(require_api_key)])
 async def ingest_base(record: IngestRecord):
-    """Base ingest endpoint — accepts JSON ingest records.
+    """Accept a generic JSON ingest record and save it to Supabase ingest_records table.
+    Returns 201 Created with the Supabase-generated UUID that Edwin's E2E tests check for."""
+    timestamp = datetime.now(timezone.utc).isoformat()
 
-    Persists to the ingest_records table in Supabase.
-    Coordinates are stored in payload as lat/lon (avoids PostGIS WKT complexity).
-    Returns 201 with the DB-generated id, sector_id, and timestamp.
-    """
-    record_id = str(uuid.uuid4())
-    db_saved = False
     try:
         supabase = get_supabase()
-        row = {
+        db_record = {
             "sector_id": record.sector_id,
             "layer_type": record.layer_type,
-            "payload": {
-                "lat": record.coordinates.lat,
-                "lon": record.coordinates.lon,
-                **(record.payload or {}),
-            },
-            "timestamp": record.timestamp,
+            "payload": record.payload or {},
+            "timestamp": timestamp,
         }
-        result = supabase.table("environmental_layers").insert(row).execute()
-        if result.data:
-            record_id = result.data[0]["id"]
-            db_saved = True
-    except Exception:
-        pass
+        result = supabase.table("ingest_records").insert(db_record).execute()
+        record_id = result.data[0]["id"] if result.data else str(uuid.uuid4())
+    except Exception as e:
+        raise HTTPException(
+            status_code=503, detail=f"Database unavailable: {e}"
+        ) from e
 
     return JSONResponse(status_code=201, content={
         "id": record_id,
         "sector_id": record.sector_id,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "db_saved": db_saved,
+        "timestamp": timestamp,
     })
 
 
@@ -99,21 +75,15 @@ async def ingest_geotiff(
     data_source: str = Form(...),  # noqa: ARG001
     user_id: str = Form(...),
 ):
-    """Ingest a GeoTIFF satellite imagery file into the pipeline.
-    
-    Accepts multipart/form-data with a .tif or .tiff file.
-    Rejects files larger than 50MB or files with wrong format.
-    """
-    # Check file size before reading — avoids loading huge files into memory
+    """Accepts Sentinel-2 satellite imagery files from Copernicus.
+    Only .tif/.tiff files under 50MB are accepted."""
     if file.size and file.size > MAX_FILE_SIZE:
         raise HTTPException(status_code=413, detail="File too large. Max size is 50MB.")
 
-    # Read file contents into memory so we can check format and size
     contents = await file.read()
     if len(contents) > MAX_FILE_SIZE:
         raise HTTPException(status_code=413, detail="File too large. Max size is 50MB.")
 
-    # Check file extension — only accept .tif or .tiff files
     if not file.filename.endswith(".tif") and not file.filename.endswith(".tiff"):
         raise HTTPException(
             status_code=422, detail="Invalid file format. Only GeoTIFF files accepted."
@@ -139,11 +109,8 @@ async def ingest_dem(
     data_source: str = Form(...),  # noqa: ARG001
     user_id: str = Form(...),
 ):
-    """Ingest a Digital Elevation Model (DEM) GeoTIFF file.
-    
-    Accepts multipart/form-data with a .tif or .tiff file.
-    Rejects files larger than 50MB or files with wrong format.
-    """
+    """Accepts terrain elevation files from Altalis provincial open data.
+    Richard's ML models use DEM data to calculate erosion and landslide risk."""
     if file.size and file.size > MAX_FILE_SIZE:
         raise HTTPException(status_code=413, detail="File too large. Max size is 50MB.")
 
@@ -177,28 +144,21 @@ async def ingest_telemetry(
     turbidity: float = Form(...),
     flow_rate: float = Form(...),
 ):
-    """Ingest water quality telemetry data and store in Supabase.
-    
-    Accepts form data with turbidity and flow_rate readings.
-    Stores the record in the water_quality_readings table.
-    flow_rate goes into the payload JSONB field since Rahil's schema
-    doesn't have a dedicated column for it yet.
-    """
+    """Accepts water quality sensor readings from Environment Canada Water Office.
+    Stores the record in Rahil's water_quality_readings table in Supabase."""
     timestamp = datetime.now(timezone.utc).isoformat()
 
     try:
-        # Get a Supabase client and insert the telemetry record
         supabase = get_supabase()
         record = {
             "sector_id": sector_id,
             "turbidity": turbidity,
             "recorded_at": timestamp,
-            # flow_rate goes in payload since there's no dedicated column yet
+            # flow_rate stored in payload JSONB — no dedicated column yet (agreed with Rahil)
             "payload": {"flow_rate": flow_rate, "data_source": data_source},
         }
         supabase.table("water_quality_readings").insert(record).execute()
     except Exception as e:
-        # If database is down, return 503 Service Unavailable
         raise HTTPException(
             status_code=503, detail=f"Database unavailable: {e}"
         ) from e
