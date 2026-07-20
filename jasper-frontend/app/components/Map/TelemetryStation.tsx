@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import L from "leaflet";
-import { Marker, Popup, Tooltip } from "react-leaflet";
-import { StationPopupCard } from "./StationPopupCard";
+import { Marker } from "react-leaflet";
+import type { SensorInfo } from "./JasperMap";
 
 const STATION_CENTER: [number, number] = [52.875, -118.08];
 
@@ -24,34 +23,37 @@ const radarPinIcon = L.divIcon({
   iconAnchor: [18, 18],
 });
 
-export function TelemetryStation() {
-  const markerRef = useRef<L.Marker>(null);
+const STATION_INFO: SensorInfo = {
+  icon: "sensor",
+  title: "TELEMETRY STATION",
+  badge: "LIVE",
+  badgeVariant: "cyan",
+  name: "Jasper-A1 Monitoring Station",
+  fields: [
+    { label: "STATION ID", value: "JAS-A1" },
+    { label: "STATUS",     value: "Active",        valueColor: "#22c55e" },
+    { label: "LOCATION",   value: "Jasper, AB" },
+    { label: "ELEVATION",  value: "1,061 m" },
+  ],
+};
 
-  useEffect(() => {
-    markerRef.current?.openPopup();
-  }, []);
+interface Props {
+  onSectorClick?:  (id: string) => void; // accepted for API compatibility with other layers
+  onSensorSelect?: (info: SensorInfo) => void;
+  onMarkerClick?:  () => void;
+}
+
+export function TelemetryStation({ onSensorSelect, onMarkerClick }: Props) {
+  function handleClick() {
+    onSensorSelect?.(STATION_INFO);
+    onMarkerClick?.();
+  }
 
   return (
-    <Marker ref={markerRef} position={STATION_CENTER} icon={radarPinIcon}>
-      <Tooltip permanent direction="bottom" offset={[0, 14]} className="jasper-zone-label" opacity={1}>
-        <span className="font-semibold text-[11px] leading-none text-cyan-600">
-          Live Sensor — SEC-B4
-        </span>
-      </Tooltip>
-      <Popup className="jasper-popup" closeButton={false} minWidth={260}>
-        <StationPopupCard
-          icon="🎯"
-          title="Live Water Sensor Station"
-          status="OPERATIONAL"
-          name="Sector B-4 Upper Stream"
-          fields={[
-            { label: "Station ID", value: "SEC-B4" },
-            { label: "Last Updated", value: "12 mins ago" },
-            { label: "Location (Lat / Lng)", value: "54.6800° N, 113.5500° W" },
-            { label: "Water Acidity", value: "5.5 pH (Acidic)", valueColor: "text-red-600" },
-          ]}
-        />
-      </Popup>
-    </Marker>
+    <Marker
+      position={STATION_CENTER}
+      icon={radarPinIcon}
+      eventHandlers={{ click: handleClick }}
+    />
   );
 }

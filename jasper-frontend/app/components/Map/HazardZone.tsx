@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Circle, Marker, Popup, Tooltip, useMap } from "react-leaflet";
+import { Circle, Marker, useMap } from "react-leaflet";
 import { createBadgeIcon, BadgeIconType } from "./badgeIcon";
-import { PopupField, StationPopupCard, StationStatus } from "./StationPopupCard";
+import type { SensorInfo } from "./JasperMap";
 
 interface Props {
   center: [number, number];
@@ -11,17 +11,17 @@ interface Props {
   borderColor: string;
   fillColor: string;
   fillOpacity: number;
-  label: string;
   badgeIcon: BadgeIconType;
   badgeBg?: string;
   badgeBorderColor?: string;
   dotColor: string;
   dotPulse?: boolean;
-  popupIcon?: string;
-  popupTitle: string;
-  status: StationStatus;
-  name: string;
-  fields: PopupField[];
+  // Sensor-specific data shown in the right panel when this marker is clicked.
+  // The parent layer builds this and passes it down.
+  sensorInfo?: SensorInfo;
+  onSectorClick?: (id: string) => void;
+  onSensorSelect?: (info: SensorInfo) => void;
+  onMarkerClick?: () => void;
 }
 
 export function HazardZone({
@@ -30,18 +30,17 @@ export function HazardZone({
   borderColor,
   fillColor,
   fillOpacity,
-  label,
   badgeIcon,
   badgeBg,
   badgeBorderColor,
   dotColor,
   dotPulse,
-  popupIcon,
-  popupTitle,
-  status,
-  name,
-  fields,
+  sensorInfo,
+  onSectorClick,
+  onSensorSelect,
+  onMarkerClick,
 }: Props) {
+  const sectorId = `sector_${Math.floor(center[0] / 0.05)}_${Math.floor(center[1] / 0.05)}`;
   const map = useMap();
   const [zoom, setZoom] = useState(() => map.getZoom());
 
@@ -51,8 +50,14 @@ export function HazardZone({
     return () => { map.off("zoomend", onZoomEnd); };
   }, [map]);
 
-  // Below zoom 10 the zones visually merge — suppress markers to keep the map clean
   const showDetail = zoom >= 10;
+
+  function handleClick() {
+    if (sensorInfo) onSensorSelect?.(sensorInfo);
+    // onSectorClick intentionally NOT called here — marker clicks show sensor-specific info,
+    // not generic sector data. CanvasClickHandler is the only caller of onSectorClick.
+    onMarkerClick?.();
+  }
 
   return (
     <>
@@ -79,23 +84,8 @@ export function HazardZone({
             dotColor,
             dotPulse,
           })}
-        >
-          {/* Permanent label below the badge — same pattern as TelemetryStation */}
-          <Tooltip permanent direction="bottom" offset={[0, 14]} className="jasper-zone-label" opacity={1}>
-            <span style={{ color: borderColor }} className="font-semibold text-[11px] leading-none">
-              {label}
-            </span>
-          </Tooltip>
-          <Popup className="jasper-popup" closeButton={false} minWidth={260}>
-            <StationPopupCard
-              icon={popupIcon}
-              title={popupTitle}
-              status={status}
-              name={name}
-              fields={fields}
-            />
-          </Popup>
-        </Marker>
+          eventHandlers={{ click: handleClick }}
+        />
       )}
     </>
   );

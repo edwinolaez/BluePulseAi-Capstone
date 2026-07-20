@@ -36,11 +36,13 @@ export function PipelineStatusWidget() {
   const [ingestPct, setIngestPct] = useState(98);
   const [syncing, setSyncing]     = useState(false);
 
-  // Mock animation — bounces the percentage between 94–100% when Convex isn't set up
+  // Always animate the sync pulse so the widget feels live.
+  // Only update the percentage number when Convex isn't connected.
   useEffect(() => {
-    if (isConvexReady) return;
     const id = setInterval(() => {
-      setIngestPct((p) => Math.min(100, Math.max(94, p + (Math.random() > 0.5 ? 1 : -1))));
+      if (!isConvexReady) {
+        setIngestPct((p) => Math.min(100, Math.max(94, p + (Math.random() > 0.5 ? 1 : -1))));
+      }
       setSyncing(true);
       setTimeout(() => setSyncing(false), 800);
     }, 4000);

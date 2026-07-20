@@ -52,13 +52,15 @@ export function WaterQualityWidget() {
   const [ph, setPh]               = useState(7.21);
   const [sparkline, setSparkline] = useState(SPARKLINE_BASE);
 
-  // Animated mock data — only runs when Convex isn't configured yet.
-  // Simulates realistic sensor readings so the widget always looks live.
+  // Always animate the sparkline so the widget feels live.
+  // When Convex is not connected, also jitter the numeric values.
+  // When Convex IS connected, real data drives the numbers via handleLiveData.
   useEffect(() => {
-    if (isConvexReady) return;
     const id = setInterval(() => {
-      setTurbidity((t) => Math.round(jitter(t, 0.4, 1.8, 9.5) * 100) / 100);
-      setPh((p)        => Math.round(jitter(p, 0.08, 6.2, 8.4) * 100) / 100);
+      if (!isConvexReady) {
+        setTurbidity((t) => Math.round(jitter(t, 0.4, 1.8, 9.5) * 100) / 100);
+        setPh((p)        => Math.round(jitter(p, 0.08, 6.2, 8.4) * 100) / 100);
+      }
       setSparkline((s) => {
         const next = [...s.slice(1), clamp(s[s.length - 1] + (Math.random() - 0.5) * 20, 10, 95)];
         return next;

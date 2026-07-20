@@ -17,33 +17,43 @@ export interface FlyToTarget {
   nonce: number;
 }
 
+// Sensor-specific information shown in the right panel when a map marker is clicked.
+// Each layer builds this object from its own data and passes it up via onSensorSelect.
+export type SensorInfo = {
+  icon: "flame" | "mountain" | "map" | "sensor";
+  title: string;
+  badge?: string;
+  badgeVariant?: "red" | "amber" | "green" | "cyan";
+  name: string;
+  fields: Array<{ label: string; value: string; valueColor?: string; fullWidth?: boolean }>;
+};
+
 interface Props {
-  onSectorClick?:  (sectorId: string) => void;
-  activeSectorId?: string | null;
-  dateFrom?:       string;
-  dateTo?:         string;
-  showBurnScar?:   boolean;
-  showErosion?:    boolean;
-  showContaminant?: boolean;
-  onMapInit?:      (zoomIn: () => void, zoomOut: () => void) => void;
-  flyTo?:          FlyToTarget | null;
+  onSensorSelect?:   (info: SensorInfo) => void;
+  showBurnScar?:     boolean;
+  showErosion?:      boolean;
+  showContaminant?:  boolean;
+  onMapInit?:        (zoomIn: () => void, zoomOut: () => void, invalidateSize: () => void) => void;
+  flyTo?:            FlyToTarget | null;
+  onMapClick?:       () => void;
+  onMarkerClick?:    () => void;
 }
 
-function SectorClickHandler({ onClick }: { onClick: (id: string) => void }) {
-  useMapEvents({
-    click(e) {
-      const lat = Math.floor(e.latlng.lat / 0.05);
-      const lng = Math.floor(e.latlng.lng / 0.05);
-      onClick(`sector_${lat}_${lng}`);
-    },
-  });
+// Fires on true canvas clicks only (markers have bubblingMouseEvents:false by default).
+// Sole purpose: toggle the panel open/closed.
+function CanvasClickHandler({ onCanvasClick }: { onCanvasClick?: () => void }) {
+  useMapEvents({ click() { onCanvasClick?.(); } });
   return null;
 }
 
-function MapController({ onMapInit }: { onMapInit: (zi: () => void, zo: () => void) => void }) {
+function MapController({ onMapInit }: { onMapInit: (zi: () => void, zo: () => void, inv: () => void) => void }) {
   const map = useMap();
   useEffect(() => {
-    onMapInit(() => map.zoomIn(), () => map.zoomOut());
+    onMapInit(
+      () => map.zoomIn(),
+      () => map.zoomOut(),
+      () => map.invalidateSize(),
+    );
   }, [map, onMapInit]);
   return null;
 }
@@ -58,12 +68,14 @@ function FlyToController({ target }: { target: FlyToTarget }) {
 }
 
 export default function JasperMap({
-  onSectorClick,
+  onSensorSelect,
   showBurnScar    = false,
   showErosion     = false,
   showContaminant = false,
   onMapInit,
   flyTo,
+  onMapClick,
+  onMarkerClick,
 }: Props) {
   return (
     <MapContainer
@@ -73,21 +85,20 @@ export default function JasperMap({
       zoomControl={false}
       style={{ height: "100%", width: "100%" }}
     >
-      {/* Base map tiles — shows roads, rivers, and place names */}
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
 
-      {onSectorClick && <SectorClickHandler onClick={onSectorClick} />}
-      {onMapInit     && <MapController onMapInit={onMapInit} />}
-      {flyTo         && <FlyToController target={flyTo} />}
+      <CanvasClickHandler onCanvasClick={onMapClick} />
+      {onMapInit && <MapController onMapInit={onMapInit} />}
+      {flyTo     && <FlyToController target={flyTo} />}
 
-      {showErosion     && <ErosionLayer />}
-      {showContaminant && <ContaminantLayer />}
-      {showBurnScar    && <BurnScarLayer />}
+      {showErosion     && <ErosionLayer     onSensorSelect={onSensorSelect} onMarkerClick={onMarkerClick} />}
+      {showContaminant && <ContaminantLayer onSensorSelect={onSensorSelect} onMarkerClick={onMarkerClick} />}
+      {showBurnScar    && <BurnScarLayer    onSensorSelect={onSensorSelect} onMarkerClick={onMarkerClick} />}
 
-      <TelemetryStation />
+      <TelemetryStation onSensorSelect={onSensorSelect} onMarkerClick={onMarkerClick} />
     </MapContainer>
   );
 }

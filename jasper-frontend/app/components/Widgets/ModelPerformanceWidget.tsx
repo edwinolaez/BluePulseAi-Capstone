@@ -47,13 +47,15 @@ export function ModelPerformanceWidget() {
     return () => clearInterval(ticker);
   }, []);
 
-  // Mock data animation — gently varies F1 and loss when Convex isn't set up
+  // Always update the "Last Update" timer and vary values when Convex isn't connected.
+  // When Convex IS connected, real model metrics come in via handleLiveData.
   useEffect(() => {
-    if (isConvexReady) return;
     const updater = setInterval(() => {
-      setF1Score((f) => Math.round(clamp(f + (Math.random() - 0.5) * 0.008, 0.84, 0.96) * 1000) / 1000);
-      setTrainingLoss((l) => Math.round(clamp(l + (Math.random() - 0.5) * 0.0004, 0.001, 0.008) * 10000) / 10000);
-      setSecondsAgo(0);
+      if (!isConvexReady) {
+        setF1Score((f) => Math.round(clamp(f + (Math.random() - 0.5) * 0.008, 0.84, 0.96) * 1000) / 1000);
+        setTrainingLoss((l) => Math.round(clamp(l + (Math.random() - 0.5) * 0.0004, 0.001, 0.008) * 10000) / 10000);
+        setSecondsAgo(0);
+      }
     }, 6000);
     return () => clearInterval(updater);
   }, [isConvexReady]);

@@ -1,145 +1,93 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { fetchLayerData } from "../../../lib/api";
+import type { SensorInfo } from "../Map/JasperMap";
 
-interface SectorData {
-  vegetationCover:     number;
-  preFireVegetation:   number;
-  erosionRisk:         "High" | "Medium" | "Low";
-  slopeStability:      "Stable" | "Moderate" | "Unstable";
-  hydrocarbonDetected: boolean;
-}
-
-const EROSION_STYLE = {
-  High:   "text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30",
-  Medium: "text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/30",
-  Low:    "text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30",
+const BADGE_STYLE: Record<string, string> = {
+  red:   "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400",
+  amber: "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400",
+  green: "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400",
+  cyan:  "bg-cyan-100 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400",
 };
 
-// Deterministic mock from sectorId hash — used as fallback when API is offline
-function getMockData(sectorId: string): SectorData {
-  const hash = sectorId.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-  const levels: Array<"High" | "Medium" | "Low">            = ["High", "Medium", "Low"];
-  const stability: Array<"Stable" | "Moderate" | "Unstable"> = ["Stable", "Moderate", "Unstable"];
-  return {
-    vegetationCover:     10 + (hash % 35),
-    preFireVegetation:   65 + (hash % 20),
-    erosionRisk:         levels[hash % 3],
-    slopeStability:      stability[hash % 3],
-    hydrocarbonDetected: hash % 2 === 0,
-  };
-}
+const SENSOR_ICON_PATH: Record<SensorInfo["icon"], string> = {
+  mountain: `<path d="m8 3 4 8 5-5 5 15H2L8 3z" />`,
+  flame:    `<path d="M8.5 14.5A2.5 2.5 0 0 0 11 17a2.5 2.5 0 0 0 2.5-2.5c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2 1Z" />`,
+  map:      `<path d="M9 20l-5.447-2.724A1 1 0 0 1 3 16.382V5.618a1 1 0 0 1 1.447-.894L9 7m0 13l6-3m-6-13l6 3m0 13l5.447 2.724A1 1 0 0 0 21 18.382V7.618a1 1 0 0 0-1.447-.894L15 9m0 11V9m0 0L9 7" />`,
+  sensor:   `<circle cx="12" cy="12" r="2" /><path d="M12 2v4M12 18v4M2 12h4M18 12h4" />`,
+};
+
+const SENSOR_ICON_COLOR: Record<SensorInfo["icon"], string> = {
+  mountain: "#a855f7",
+  flame:    "#ef4444",
+  map:      "#0ea5e9",
+  sensor:   "#0ea5e9",
+};
 
 interface Props {
-  sectorId: string | null;
-  dateFrom: string;
-  dateTo:   string;
+  sensorInfo?: SensorInfo | null;
 }
 
-export function SectorPanel({ sectorId, dateFrom, dateTo }: Props) {
-  const [data, setData]         = useState<SectorData | null>(null);
-  const [loading, setLoading]   = useState(false);
-  const [isLive, setIsLive]     = useState(false);
-
-  useEffect(() => {
-    if (!sectorId) { setData(null); return; }
-
-    setLoading(true);
-    setIsLive(false);
-
-    // Try Feven's real API first; fall back to mock on failure
-    fetchLayerData(sectorId, dateFrom, dateTo, "geotiff")
-      .then((apiData) => {
-        // API returned — build SectorData from response
-        // Until Feven's layers array is populated, fall back to mock values
-        const mock = getMockData(sectorId);
-        setData(apiData.layers.length > 0
-          ? mock  // will use real fields once layers API populates
-          : mock
-        );
-        setIsLive(true);
-      })
-      .catch(() => {
-        // Network/auth failure — use mock data
-        setData(getMockData(sectorId));
-        setIsLive(false);
-      })
-      .finally(() => setLoading(false));
-  }, [sectorId, dateFrom, dateTo]);
-
+export function SectorPanel({ sensorInfo }: Props) {
   return (
     <div className="rounded-xl border border-gray-200/60 dark:border-gray-700/40 bg-surface p-3.5">
+
+      {/* Header — always "Selected Area"; badge appears when a sensor is selected */}
       <div className="flex items-center justify-between mb-2">
         <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
           Selected Area
         </p>
-        {isLive && (
-          <span className="flex items-center gap-1 text-[10px] text-green-500 font-semibold">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-            Live
+        {sensorInfo?.badge && (
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${BADGE_STYLE[sensorInfo.badgeVariant ?? "cyan"]}`}>
+            {sensorInfo.badge}
           </span>
         )}
       </div>
 
-      {!sectorId && (
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          Click anywhere on the map to view environmental data for that area.
-        </p>
-      )}
-
-      {sectorId && loading && (
-        <p className="text-sm text-gray-400 dark:text-gray-500">Loading data…</p>
-      )}
-
-      {sectorId && !loading && data && (
-        <div className="space-y-2.5">
-          <p className="text-[10px] font-semibold text-gray-400 tracking-wide">{sectorId}</p>
-
-          <div>
-            <div className="flex justify-between text-xs mb-1">
-              <span className="text-gray-600 dark:text-gray-400">Forest regrowth</span>
-              <span className="font-medium text-gray-800 dark:text-gray-200">
-                {data.vegetationCover}%
-              </span>
-            </div>
-            <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-green-500 rounded-full transition-all"
-                style={{ width: `${data.vegetationCover}%` }}
+      {/* Sensor badge clicked — show that sensor's ML model data */}
+      {sensorInfo && (() => {
+        const iconColor = SENSOR_ICON_COLOR[sensorInfo.icon];
+        return (
+          <>
+            <div className="flex items-center gap-1.5 mb-2">
+              <svg
+                width="13" height="13" viewBox="0 0 24 24"
+                fill="none" stroke={iconColor}
+                strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                dangerouslySetInnerHTML={{ __html: SENSOR_ICON_PATH[sensorInfo.icon] }}
               />
+              <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: iconColor }}>
+                {sensorInfo.title}
+              </p>
             </div>
-            <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
-              Before fire: {data.preFireVegetation}%
+
+            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">
+              {sensorInfo.name}
             </p>
-          </div>
 
-          <div className="flex justify-between items-center">
-            <span className="text-xs text-gray-600 dark:text-gray-400">Soil erosion risk</span>
-            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${EROSION_STYLE[data.erosionRisk]}`}>
-              {data.erosionRisk}
-            </span>
-          </div>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-2.5">
+              {sensorInfo.fields.map((field) => (
+                <div key={field.label} className={field.fullWidth ? "col-span-2" : ""}>
+                  <p className="text-[10px] uppercase text-gray-400 dark:text-gray-500 tracking-wide mb-0.5">
+                    {field.label}
+                  </p>
+                  <p
+                    className="text-sm font-semibold text-gray-800 dark:text-gray-100"
+                    style={field.valueColor ? { color: field.valueColor } : undefined}
+                  >
+                    {field.value}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </>
+        );
+      })()}
 
-          <div className="flex justify-between items-center">
-            <span className="text-xs text-gray-600 dark:text-gray-400">Ground stability</span>
-            <span className="text-xs font-medium text-gray-800 dark:text-gray-200">
-              {data.slopeStability}
-            </span>
-          </div>
-
-          <div className="flex justify-between items-center">
-            <span className="text-xs text-gray-600 dark:text-gray-400">Chemical traces</span>
-            <span className={`text-xs font-medium ${data.hydrocarbonDetected ? "text-red-500" : "text-green-500"}`}>
-              {data.hydrocarbonDetected ? "Detected" : "Not detected"}
-            </span>
-          </div>
-
-          <div className="pt-2 border-t border-gray-200/60 dark:border-gray-700/40 text-[10px] text-gray-400 dark:text-gray-500">
-            {!isLive && <span className="mr-1 text-amber-500">⚠ Estimated data —</span>}
-            {dateFrom} → {dateTo}
-          </div>
-        </div>
+      {/* Nothing selected yet */}
+      {!sensorInfo && (
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          Click a sensor badge on the map to view environmental data for that area.
+        </p>
       )}
     </div>
   );

@@ -37,6 +37,8 @@ export default function Home() {
   const [supportOpen, setSupportOpen] = useState(false);
   // Controls whether the mobile sidebar drawer is open
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // When true, both side panels collapse so the map fills the whole screen
+  const [mapFullscreen, setMapFullscreen] = useState(false);
   // When a user clicks a sector in the sidebar, flyTo tells the map to pan there
   const [flyTo, setFlyTo]             = useState<FlyToTarget | null>(null);
 
@@ -57,10 +59,12 @@ export default function Home() {
     setFlyTo({ lat, lng, zoom, nonce: Date.now() });
   }, []);
 
-  // Switches the active tab and closes the mobile sidebar at the same time
+  // Switches the active tab and closes the mobile sidebar at the same time.
+  // Also exits fullscreen so panels are always visible when switching pages.
   const handleTabChange = useCallback((tab: AppTab) => {
     setActiveTab(tab);
     setSidebarOpen(false);
+    setMapFullscreen(false);
   }, []);
 
   // ── Loading state — shown while the auth check runs on first load ─────────
@@ -122,10 +126,11 @@ export default function Home() {
           onOpenSupport={() => setSupportOpen(true)}
           mobileOpen={sidebarOpen}
           onCloseMobile={() => setSidebarOpen(false)}
+          collapsed={activeTab === "map" && mapFullscreen}
         />
 
         {/* Only one of these pages renders at a time depending on the active tab */}
-        {activeTab === "map"       && <MapViewPage flyTo={flyTo} />}
+        {activeTab === "map"       && <MapViewPage flyTo={flyTo} mapFullscreen={mapFullscreen} onSetFullscreen={setMapFullscreen} />}
         {activeTab === "dashboard" && <DashboardPage />}
         {activeTab === "ai"        && <AiOverviewPage />}
         {activeTab === "reports"   && <ReportsPage />}

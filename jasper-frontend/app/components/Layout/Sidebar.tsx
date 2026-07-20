@@ -45,9 +45,10 @@ interface Props {
   onOpenSupport: () => void;
   mobileOpen: boolean;
   onCloseMobile: () => void;
+  collapsed?: boolean;
 }
 
-export function Sidebar({ activeTab, onNavigate, onFocusSector, onOpenLogs, onOpenSupport, mobileOpen, onCloseMobile }: Props) {
+export function Sidebar({ activeTab, onNavigate, onFocusSector, onOpenLogs, onOpenSupport, mobileOpen, onCloseMobile, collapsed }: Props) {
   const [expandedPanel, setExpandedPanel] = useState<ExpandedPanel>(null);
 
   // Tool buttons — these are map utilities, not page navigation.
@@ -82,9 +83,10 @@ export function Sidebar({ activeTab, onNavigate, onFocusSector, onOpenLogs, onOp
         fixed inset-y-0 left-0 z-[1100] w-64 shrink-0 flex flex-col
         bg-surface border-r border-gray-200/60 dark:border-gray-800/60
         px-4 py-5 overflow-y-auto
-        transition-transform duration-300
+        transition-all duration-300
         ${mobileOpen ? "translate-x-0" : "-translate-x-full"}
         md:relative md:translate-x-0 md:z-auto
+        ${collapsed ? "md:w-0 md:px-0 md:py-0 md:overflow-hidden md:opacity-0 md:border-0" : ""}
       `}>
       <div className="flex items-center gap-2 px-2 mb-0.5">
         <MapPinIcon className="w-5 h-5 text-cyan-500" />

@@ -1,38 +1,45 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { SectorPanel } from "../../app/components/Controls/SectorPanel";
 
-// Mock lib/api to avoid real HTTP calls in tests
-jest.mock("../../lib/api", () => ({
-  fetchLayerData: jest.fn().mockRejectedValue(new Error("API offline")),
-}));
-
-it("shows click-prompt when no sector is selected", () => {
-  render(<SectorPanel sectorId={null} dateFrom="2024-06-01" dateTo="2024-07-24" />);
-  expect(screen.getByText(/Click anywhere on the map/i)).toBeInTheDocument();
+it("shows click-prompt when no sensor is selected", () => {
+  render(<SectorPanel />);
+  expect(screen.getByText(/Click a sensor badge/i)).toBeInTheDocument();
 });
 
-it("shows loading state immediately after a sector is set", () => {
-  render(<SectorPanel sectorId="sector_1057_-2361" dateFrom="2024-06-01" dateTo="2024-07-24" />);
-  expect(screen.getByText(/Loading/i)).toBeInTheDocument();
+it("shows sensor info when sensorInfo is provided", () => {
+  render(
+    <SectorPanel
+      sensorInfo={{
+        icon: "mountain",
+        title: "SOIL EROSION ANALYSIS",
+        badge: "CRITICAL",
+        badgeVariant: "red",
+        name: "Slope Area ATH-001-H",
+        fields: [
+          { label: "AREA ID",    value: "ATH-001-H" },
+          { label: "RISK LEVEL", value: "High", valueColor: "#ef4444" },
+        ],
+      }}
+    />
+  );
+  expect(screen.getByText("SOIL EROSION ANALYSIS")).toBeInTheDocument();
+  expect(screen.getByText("Slope Area ATH-001-H")).toBeInTheDocument();
+  expect(screen.getByText("ATH-001-H")).toBeInTheDocument();
+  expect(screen.getByText("CRITICAL")).toBeInTheDocument();
 });
 
-it("renders mock sector data after API fallback resolves", async () => {
-  render(<SectorPanel sectorId="sector_1057_-2361" dateFrom="2024-06-01" dateTo="2024-07-24" />);
-  await waitFor(() => {
-    expect(screen.getByText(/Forest regrowth/i)).toBeInTheDocument();
-  });
-});
-
-it("shows estimated-data warning when API is offline", async () => {
-  render(<SectorPanel sectorId="sector_1057_-2361" dateFrom="2024-06-01" dateTo="2024-07-24" />);
-  await waitFor(() => {
-    expect(screen.getByText(/Estimated data/i)).toBeInTheDocument();
-  });
-});
-
-it("shows the date range in the footer", async () => {
-  render(<SectorPanel sectorId="sector_1057_-2361" dateFrom="2024-06-01" dateTo="2024-07-24" />);
-  await waitFor(() => {
-    expect(screen.getByText(/2024-06-01/)).toBeInTheDocument();
-  });
+it("shows the badge with correct label", () => {
+  render(
+    <SectorPanel
+      sensorInfo={{
+        icon: "flame",
+        title: "FOREST BURN SCAR",
+        badge: "LOW",
+        badgeVariant: "green",
+        name: "Burn Scar Zone ATH-001-A",
+        fields: [{ label: "STATUS", value: "Active Monitoring" }],
+      }}
+    />
+  );
+  expect(screen.getByText("LOW")).toBeInTheDocument();
 });
