@@ -44,7 +44,7 @@ class IngestRecord(BaseModel):
 async def ingest_base(record: IngestRecord):
     """Accept a generic JSON ingest record and save it to Supabase ingest_records table.
     Returns 201 Created with the Supabase-generated UUID that Edwin's E2E tests check for."""
-    timestamp = datetime.now(timezone.utc).isoformat()
+    timestamp = record.timestamp
 
     try:
         supabase = get_supabase()
