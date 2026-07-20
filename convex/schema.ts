@@ -26,4 +26,18 @@ export default defineSchema({
     trainingDate: v.number(),
     lastPrediction: v.number(),
   }),
+
+  droneScans: defineTable({
+    storageId:   v.id("_storage"),
+    filename:    v.string(),
+    uploadedBy:  v.string(),
+    sectorId:    v.string(),
+    scanDate:    v.number(),
+    notes:       v.optional(v.string()),
+    fileSize:    v.number(),
+    mimeType:    v.string(),
+    status:      v.union(v.literal("processing"), v.literal("ready"), v.literal("error")),
+  })
+    .index("by_sector", ["sectorId"])
+    .index("by_date",   ["scanDate"]),
 });

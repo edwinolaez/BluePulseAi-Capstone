@@ -1,21 +1,9 @@
-// ThreeDView — full 3D scene using deck.gl.
-//
-// Base map: TerrainLayer fetches elevation data from AWS Terrain Tiles and
-// drapes OSM tiles on top, giving us real Rocky Mountain topography (no API key needed).
-//
-// Each monitoring sector is rendered as an extruded ColumnLayer column whose:
-//   - base is positioned at the sector's actual terrain elevation
-//   - height encodes erosion_risk_score  (0–1 → 0–900 m above base)
-//   - colour encodes risk label          (red / amber / green)
-//
-// All five sectors interpolate live from the timeline slider.
-// Loaded dynamically (ssr: false) in MapViewPage because deck.gl uses WebGL.
-
 "use client";
 
 import { useEffect, useState } from "react";
 import DeckGL from "@deck.gl/react";
-import { ColumnLayer } from "@deck.gl/layers";
+import { LightingEffect, AmbientLight, DirectionalLight } from "@deck.gl/core";
+import { ColumnLayer, ScatterplotLayer, PolygonLayer } from "@deck.gl/layers";
 import { TerrainLayer } from "@deck.gl/geo-layers";
 import { fetchTimeline } from "../../../lib/api";
 import type { TimelineScan } from "../../../lib/api";
@@ -47,21 +35,34 @@ const ELEVATION_DECODER = {
   offset:  -32768,
 };
 
-// OSM tiles draped as surface texture over the terrain mesh
-const SURFACE_TILES = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
+// ESRI World Imagery — free satellite tiles, no API key, much higher visual quality than OSM
+// Note: ESRI uses {z}/{y}/{x} ordering (row/col), not {z}/{x}/{y}
+const SURFACE_TILES = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
+
+// ── Lighting ──────────────────────────────────────────────────────────────────
+
+// Simulates afternoon sun over the Rockies — southwest direction, moderate elevation angle
+const SUN_LIGHT   = new DirectionalLight({ color: [255, 248, 220], intensity: 1.8, direction: [-2, -3, -1] });
+const SKY_AMBIENT = new AmbientLight({ color: [200, 220, 255], intensity: 0.6 });
+const LIGHTING    = new LightingEffect({ SUN_LIGHT, SKY_AMBIENT });
 
 // ── Sector definitions ────────────────────────────────────────────────────────
 
-// Positions match the 2D Leaflet circles.
-// elevation = approximate terrain height (m above sea level) at each sector's GPS position.
-// The Jasper valley sits at ~1060 m; surrounding Rockies reach 2500–3700 m.
-// Column bases are planted here so they rise from — not through — the terrain.
+// Sector GPS positions and elevations.
+// ★ = real public-database coordinates   ○ = estimated (no public point-sensor network exists)
+//
+// ATH-001-W: Water Survey of Canada station 07AA001, Miette River at Jasper
+//            Source: wateroffice.ec.gc.ca
+// ATH-001-A: 2024 Jasper Wildfire burn-scar centroid
+//            Source: Alberta Wildfire open data / NFDB fire polygon
+// ATH-001-H/M/L: approximate erosion-risk zones derived from DEM terrain analysis
+//                (no public point-sensor network for soil erosion in Jasper NP)
 const SECTORS = [
-  { id: "ATH-001-H", label: "High Erosion Zone",  lat: 52.858, lon: -118.092, elevation: 1380, defaultScore: 0.87, defaultRisk: "High"   },
-  { id: "ATH-001-M", label: "Mid Erosion Zone",   lat: 52.870, lon: -118.070, elevation: 1180, defaultScore: 0.52, defaultRisk: "Medium" },
-  { id: "ATH-001-L", label: "Low Erosion Zone",   lat: 52.884, lon: -118.045, elevation: 1090, defaultScore: 0.22, defaultRisk: "Low"    },
-  { id: "ATH-001-A", label: "Burn Scar Zone",     lat: 52.882, lon: -118.065, elevation: 1100, defaultScore: 0.75, defaultRisk: "High"   },
-  { id: "ATH-001-W", label: "Contaminant Zone",   lat: 52.875, lon: -118.060, elevation: 1055, defaultScore: 0.44, defaultRisk: "Medium" },
+  { id: "ATH-001-H", label: "High Erosion Zone",          lat: 52.858,  lon: -118.092,  elevation: 1380, defaultScore: 0.87, defaultRisk: "High",   source: ""                      },
+  { id: "ATH-001-M", label: "Mid Erosion Zone",            lat: 52.870,  lon: -118.070,  elevation: 1180, defaultScore: 0.52, defaultRisk: "Medium", source: ""                      },
+  { id: "ATH-001-L", label: "Low Erosion Zone",            lat: 52.884,  lon: -118.045,  elevation: 1090, defaultScore: 0.22, defaultRisk: "Low",    source: ""                      },
+  { id: "ATH-001-A", label: "2024 Wildfire Burn Scar",     lat: 52.848,  lon: -118.083,  elevation: 1080, defaultScore: 0.75, defaultRisk: "High",   source: "Alberta Wildfire 2024" },
+  { id: "ATH-001-W", label: "Miette River (WSC 07AA001)",  lat: 52.8639, lon: -118.1069, elevation: 1062, defaultScore: 0.44, defaultRisk: "Medium", source: "WSC 07AA001"           },
 ] as const;
 
 type SectorId = typeof SECTORS[number]["id"];
@@ -84,7 +85,24 @@ const RISK_RGBA: Record<string, [number, number, number, number]> = {
   Low:    [34,  197, 94,  220],
 };
 
-// ── Datum type ────────────────────────────────────────────────────────────────
+// Sensor dot colours — match the toggle dotColor props in MapViewPage
+const SENSOR_COLOR: Record<"erosion" | "contaminant" | "burnScar", [number, number, number, number]> = {
+  erosion:     [168, 85,  247, 255],  // #a855f7 purple  — Soil Erosion
+  contaminant: [14,  165, 233, 255],  // #0ea5e9 sky     — River Water Quality
+  burnScar:    [37,  99,  235, 255],  // #2563eb blue    — Forest Regrowth
+};
+
+
+// ── Datum types ───────────────────────────────────────────────────────────────
+
+interface SensorDot {
+  id:        SectorId;
+  label:     string;
+  lon:       number;
+  lat:       number;
+  elevation: number;
+  layerType: "erosion" | "contaminant" | "burnScar";
+}
 
 interface SectorDatum {
   id:          SectorId;
@@ -96,6 +114,12 @@ interface SectorDatum {
   risk:        string;
   isActive:    boolean;
   isEstimated: boolean;
+  source:      string;
+}
+
+interface OsmBuilding {
+  polygon: [number, number][];
+  height:  number;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -117,6 +141,11 @@ export function ThreeDView({
   showContaminant,
   showBurnScar,
 }: Props) {
+
+  const [viewState, setViewState] = useState(INITIAL_VIEW_STATE);
+
+  const handleZoomIn  = () => setViewState(v => ({ ...v, zoom: Math.min(v.zoom + 1, INITIAL_VIEW_STATE.maxZoom),  transitionDuration: 250 }));
+  const handleZoomOut = () => setViewState(v => ({ ...v, zoom: Math.max(v.zoom - 1, INITIAL_VIEW_STATE.minZoom), transitionDuration: 250 }));
 
   const [sectorScans, setSectorScans] = useState<Record<string, TimelineScan[]>>(
     () => Object.fromEntries(SECTORS.map(s => [s.id, []]))
@@ -149,6 +178,37 @@ export function ThreeDView({
     );
   }, [centerDate, sectorScans]);
 
+  const [buildings, setBuildings] = useState<OsmBuilding[]>([]);
+
+  // Fetch OSM building footprints for Jasper townsite on mount
+  useEffect(() => {
+    const query = `
+      [out:json][timeout:25];
+      (way["building"](52.84,-118.16,52.92,-118.03););
+      out body;>;out skel qt;
+    `;
+    fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`)
+      .then(r => r.json())
+      .then((json: { elements: { type: string; id: number; lat?: number; lon?: number; nodes?: number[]; tags?: Record<string, string> }[] }) => {
+        const nodes = new Map<number, [number, number]>();
+        for (const el of json.elements) {
+          if (el.type === "node" && el.lon != null && el.lat != null)
+            nodes.set(el.id, [el.lon, el.lat]);
+        }
+        const polys: OsmBuilding[] = [];
+        for (const el of json.elements) {
+          if (el.type !== "way" || !el.nodes) continue;
+          const coords = el.nodes.map(id => nodes.get(id)).filter((c): c is [number, number] => c != null);
+          if (coords.length < 3) continue;
+          const levels = parseFloat(el.tags?.["building:levels"] ?? "2");
+          const tagged = parseFloat(el.tags?.["height"] ?? "0");
+          polys.push({ polygon: coords, height: tagged > 0 ? tagged : levels * 3.2 });
+        }
+        setBuildings(polys);
+      })
+      .catch(() => { /* Overpass unavailable — render without buildings */ });
+  }, []);
+
   const layerVisible: Record<string, boolean> = {
     erosion:     showErosion,
     contaminant: showContaminant,
@@ -169,13 +229,25 @@ export function ThreeDView({
         risk:        interp ? interp.erosion_risk       : s.defaultRisk,
         isActive:    s.id === activeSectorId,
         isEstimated: interp ? interp.is_estimated : false,
+        source:      s.source,
       };
     });
 
   const liveCount = SECTORS.filter(s => (sectorScans[s.id]?.length ?? 0) > 0).length;
 
+  // Sensor dots — always visible regardless of layer toggles
+  const sensorDots: SensorDot[] = SECTORS
+    .map(s => ({
+      id:        s.id,
+      label:     s.label,
+      lon:       s.lon,
+      lat:       s.lat,
+      elevation: s.elevation + 50,
+      layerType: SECTOR_LAYER[s.id],
+    }));
+
   const layers = [
-    // 3D terrain — elevation mesh from AWS + OSM texture draped on top
+    // 3D terrain — high-res elevation mesh with satellite imagery draped on top
     new TerrainLayer({
       id:               "terrain",
       minZoom:          0,
@@ -185,6 +257,42 @@ export function ThreeDView({
       elevationData:    ELEVATION_TILES,
       texture:          SURFACE_TILES,
       elevationScale:   1,
+      meshMaxError:     1.5,   // default 4m — lower = sharper ridgelines and valleys
+    }),
+
+    // OSM 3D buildings — extruded footprints from Overpass API
+    new PolygonLayer<OsmBuilding>({
+      id:                   "osm-buildings",
+      data:                 buildings,
+      getPolygon:           (d) => d.polygon,
+      getElevation:         (d) => d.height,
+      getFillColor:         [235, 228, 215, 210],
+      getLineColor:         [180, 170, 155, 120],
+      lineWidthMinPixels:   1,
+      extruded:             true,
+      pickable:             false,
+      material: {
+        ambient:       0.35,
+        diffuse:       0.65,
+        shininess:     24,
+        specularColor: [255, 255, 255],
+      },
+    }),
+
+    // Sensor location dots — visual only, not pickable (hit-target layer below handles events)
+    new ScatterplotLayer<SensorDot>({
+      id:                  "sensor-dots",
+      data:                sensorDots,
+      getPosition:         (d) => [d.lon, d.lat, d.elevation],
+      getFillColor:        (d) => SENSOR_COLOR[d.layerType],
+      getLineColor:        [255, 255, 255, 220],
+      getRadius:           160,
+      radiusMinPixels:     6,
+      radiusMaxPixels:     12,
+      filled:              true,
+      stroked:             true,
+      lineWidthMinPixels:  2,
+      pickable:            false,
     }),
 
     // Risk columns — bases anchored at sector terrain elevation, height = risk score
@@ -196,7 +304,6 @@ export function ThreeDView({
       extruded:       true,
       pickable:       true,
       opacity:        0.88,
-      // [lon, lat, elevation] — plants each column at the correct terrain height
       getPosition:    (d) => [d.lon, d.lat, d.elevation],
       getElevation:   (d) => d.score * 900,
       getFillColor:   (d) => RISK_RGBA[d.risk] ?? RISK_RGBA.Medium,
@@ -210,16 +317,67 @@ export function ThreeDView({
         if (info.object) onSectorClick(info.object.id);
       },
     }),
+
+    // Transparent hit-target layer for sensor dots — rendered last so it wins picking over columns.
+    // Larger radius makes hover + click reliable without changing the visual dot size.
+    new ScatterplotLayer<SensorDot>({
+      id:              "sensor-dots-hit",
+      data:            sensorDots,
+      getPosition:     (d) => [d.lon, d.lat, d.elevation],
+      getFillColor:    [0, 0, 0, 0],
+      getLineColor:    [0, 0, 0, 0],
+      getRadius:       350,
+      radiusMinPixels: 20,
+      radiusMaxPixels: 32,
+      filled:          true,
+      stroked:         false,
+      pickable:        true,
+      onClick: (info) => {
+        if (info.object) onSectorClick(info.object.id);
+      },
+    }),
   ];
 
   return (
     <div className="relative w-full h-full">
       <DeckGL
-        initialViewState={INITIAL_VIEW_STATE}
+        viewState={viewState}
+        onViewStateChange={({ viewState: vs }) => setViewState(vs as typeof INITIAL_VIEW_STATE)}
         controller
         layers={layers}
-        getTooltip={({ object }: { object?: SectorDatum }) => {
+        effects={[LIGHTING]}
+        getTooltip={({ object }: { object?: SectorDatum | SensorDot }) => {
           if (!object) return null;
+
+          const SENSOR_TYPE_LABEL: Record<"erosion" | "contaminant" | "burnScar", string> = {
+            erosion:     "Soil Erosion Sensor",
+            contaminant: "River Water Quality Sensor",
+            burnScar:    "Forest Regrowth Sensor",
+          };
+
+          // Sensor dot hover — show name + coordinates
+          if ("layerType" in object) {
+            const latStr = `${Math.abs(object.lat).toFixed(4)}°${object.lat >= 0 ? "N" : "S"}`;
+            const lonStr = `${Math.abs(object.lon).toFixed(4)}°${object.lon >= 0 ? "E" : "W"}`;
+            return {
+              html: `
+                <div style="
+                  background:#1e293b;color:#f1f5f9;
+                  padding:10px 14px;border-radius:10px;
+                  font-size:12px;line-height:1.7;
+                  box-shadow:0 4px 20px rgba(0,0,0,.4);
+                ">
+                  <div style="font-weight:700;margin-bottom:4px;">${object.label}</div>
+                  <div style="color:#94a3b8;font-size:11px;margin-bottom:4px;">${SENSOR_TYPE_LABEL[object.layerType]}</div>
+                  <div>ID: <span style="color:#94a3b8">${object.id}</span></div>
+                  <div>Location: <span style="color:#94a3b8">${latStr}, ${lonStr}</span></div>
+                  <div style="color:#64748b;font-size:10px;margin-top:4px;">Click to select sector</div>
+                </div>`,
+              style: { background: "none" },
+            };
+          }
+
+          // Column hover — show full risk detail
           return {
             html: `
               <div style="
@@ -233,7 +391,8 @@ export function ThreeDView({
                 <div>Score: <span style="font-weight:600">${(object.score * 100).toFixed(0)} %</span></div>
                 <div>Terrain: <span style="color:#94a3b8">${object.elevation.toLocaleString()} m asl</span></div>
                 <div>ID: <span style="color:#94a3b8">${object.id}</span></div>
-                ${object.isEstimated ? '<div style="color:#60a5fa;font-size:10px;margin-top:4px;">● Timeline interpolated</div>' : ""}
+                ${object.source      ? `<div style="color:#34d399;font-size:10px;margin-top:4px;">★ ${object.source}</div>` : '<div style="color:#94a3b8;font-size:10px;margin-top:4px;">○ Estimated position</div>'}
+                ${object.isEstimated ? '<div style="color:#60a5fa;font-size:10px;">● Timeline interpolated</div>' : ""}
                 ${object.isActive    ? '<div style="color:#a78bfa;font-size:10px;">★ Selected</div>' : ""}
               </div>`,
             style: { background: "none" },
@@ -241,28 +400,36 @@ export function ThreeDView({
         }}
       />
 
-      {/* ── Legend ── */}
-      <div className="absolute top-4 left-4 z-10 bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-xl border border-gray-200/60 dark:border-gray-700/40 p-3 shadow-xl select-none pointer-events-none">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-2">
-          Erosion Risk · 3D Terrain
-        </p>
-        {(["High", "Medium", "Low"] as const).map((level) => {
-          const [r, g, b] = RISK_RGBA[level];
-          return (
-            <div key={level} className="flex items-center gap-2 mb-1 last:mb-0">
-              <span className="inline-block w-3 h-3 rounded-sm flex-shrink-0"
-                style={{ background: `rgb(${r},${g},${b})` }} />
-              <span className="text-xs text-gray-700 dark:text-gray-300">{level}</span>
-            </div>
-          );
-        })}
-        <div className="mt-2 pt-2 border-t border-gray-200/60 dark:border-gray-700/40 space-y-0.5">
-          <p className="text-[10px] text-gray-400 dark:text-gray-500">Column height = risk score</p>
-          <p className="text-[10px] text-gray-400 dark:text-gray-500">Terrain = real Rocky Mtn elevation</p>
+      {/* ── Live count badge ── */}
+      {liveCount > 0 && (
+        <div className="absolute top-4 left-4 z-10 pointer-events-none">
+          <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-full px-2.5 py-1 shadow text-[10px] text-green-500 font-semibold border border-gray-200/60 dark:border-gray-700/40">
+            ● {liveCount}/5 live
+          </div>
         </div>
-        {liveCount > 0 && (
-          <p className="text-[10px] text-green-500 mt-1.5">● {liveCount}/5 sectors live</p>
-        )}
+      )}
+
+      {/* ── Zoom buttons ── */}
+      <div className="absolute bottom-16 right-4 hidden md:flex flex-col gap-2">
+        <button
+          onClick={handleZoomIn}
+          title="Zoom in"
+          className="w-9 h-9 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 text-gray-800 dark:text-white shadow-lg hover:scale-105 hover:bg-cyan-50 dark:hover:bg-gray-700 transition-transform border border-gray-200/60 dark:border-gray-600"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <line x1="8" y1="2" x2="8" y2="14" />
+            <line x1="2" y1="8" x2="14" y2="8" />
+          </svg>
+        </button>
+        <button
+          onClick={handleZoomOut}
+          title="Zoom out"
+          className="w-9 h-9 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 text-gray-800 dark:text-white shadow-lg hover:scale-105 hover:bg-cyan-50 dark:hover:bg-gray-700 transition-transform border border-gray-200/60 dark:border-gray-600"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <line x1="2" y1="8" x2="14" y2="8" />
+          </svg>
+        </button>
       </div>
 
       {/* ── Navigation hint ── */}

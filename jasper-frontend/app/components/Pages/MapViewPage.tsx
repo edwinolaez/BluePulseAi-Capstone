@@ -9,7 +9,6 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import { TemporalSlider } from "../Controls/TemporalSlider";
 import { SectorPanel } from "../Controls/SectorPanel";
-import { ToggleSwitch } from "../Controls/ToggleSwitch";
 import { ChartLineIcon } from "../Layout/icons";
 import { WaterQualityWidget } from "../Widgets/WaterQualityWidget";
 import { PipelineStatusWidget } from "../Widgets/PipelineStatusWidget";
@@ -31,21 +30,21 @@ const ThreeDView = dynamic(
 );
 
 interface Props {
-  flyTo?: FlyToTarget | null;
+  flyTo?:          FlyToTarget | null;
+  is3D:            boolean;
+  showErosion:     boolean;
+  showContaminant: boolean;
+  showBurnScar:    boolean;
 }
 
-export function MapViewPage({ flyTo }: Props) {
+export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBurnScar }: Props) {
   const [sectorId, setSectorId]               = useState<string | null>(null);
   const [dateFrom, setDateFrom]               = useState("2024-06-01");
   const [dateTo, setDateTo]                   = useState("2024-07-24");
   const [centerDate, setCenterDate]           = useState("2024-06-24");
-  const [showBurnScar, setShowBurnScar]       = useState(true);
-  const [showErosion, setShowErosion]         = useState(true);
-  const [showContaminant, setShowContaminant] = useState(true);
   const [zoomIn, setZoomIn]   = useState<(() => void) | null>(null);
   const [zoomOut, setZoomOut] = useState<(() => void) | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
-  const [is3D, setIs3D]           = useState(false);
 
   // Timeline scans fetched from Feven's backend for the selected sector
   const [timelineScans, setTimelineScans] = useState<TimelineScan[]>([]);
@@ -105,51 +104,6 @@ export function MapViewPage({ flyTo }: Props) {
           )}
         </div>
 
-        {/* Layer toggle panel — sits in the top-right corner of the map.
-            Each toggle shows/hides one of the three environmental overlays. */}
-        <div className="absolute top-4 right-4 z-[1001]">
-          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-3 md:p-4 min-w-[180px] md:min-w-[230px] shadow-xl space-y-3">
-            {/* 2D / 3D view toggle */}
-            <div className="flex items-center gap-1 p-0.5 rounded-lg bg-gray-100 dark:bg-gray-800">
-              <button
-                onClick={() => setIs3D(false)}
-                className={[
-                  "flex-1 text-xs font-semibold py-1.5 rounded-md transition-all",
-                  !is3D
-                    ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
-                    : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300",
-                ].join(" ")}
-              >
-                2D Map
-              </button>
-              <button
-                onClick={() => setIs3D(true)}
-                className={[
-                  "flex-1 text-xs font-semibold py-1.5 rounded-md transition-all",
-                  is3D
-                    ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
-                    : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300",
-                ].join(" ")}
-              >
-                3D Risk
-              </button>
-            </div>
-
-            {/* Layer toggles — work in both 2D and 3D */}
-            <div className="space-y-2 md:space-y-3">
-              <ToggleSwitch label="Soil Erosion Risk"      dotColor="#a855f7" checked={showErosion}     onChange={setShowErosion} />
-              <ToggleSwitch label="River Water Quality"    dotColor="#0ea5e9" checked={showContaminant} onChange={setShowContaminant} />
-              <ToggleSwitch label="Forest Regrowth Status" dotColor="#2563eb" checked={showBurnScar}    onChange={setShowBurnScar} />
-            </div>
-
-            {is3D && (
-              <p className="text-[10px] text-gray-400 dark:text-gray-500 leading-tight">
-                Drag to orbit · scroll to zoom.
-              </p>
-            )}
-          </div>
-        </div>
-
         {/* Bottom bar: [mobile: live data button] + slider + [desktop: zoom buttons] */}
         <div className="absolute bottom-4 left-4 right-4 z-[1001] flex items-end gap-3">
 
@@ -173,8 +127,8 @@ export function MapViewPage({ flyTo }: Props) {
             />
           </div>
 
-          {/* Zoom buttons — desktop only. On mobile, use pinch-to-zoom instead. */}
-          <div className="hidden md:flex flex-col gap-2 shrink-0">
+          {/* Zoom buttons — desktop only, 2D mode only (3D uses deck.gl orbit controls). */}
+          <div className={["hidden md:flex flex-col gap-2 shrink-0", is3D ? "invisible" : ""].join(" ")}>
             <button
               onClick={() => zoomIn?.()}
               title="Zoom in"

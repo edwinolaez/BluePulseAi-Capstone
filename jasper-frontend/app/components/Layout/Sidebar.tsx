@@ -13,6 +13,7 @@ import {
   MapPinIcon,
 } from "./icons";
 import { AppTab } from "./TopNav";
+import { ToggleSwitch } from "../Controls/ToggleSwitch";
 
 const PAGE_NAV: { id: AppTab; icon: typeof MapPinIcon; label: string }[] = [
   { id: "dashboard", icon: ChartLineIcon, label: "Dashboard" },
@@ -22,10 +23,16 @@ const PAGE_NAV: { id: AppTab; icon: typeof MapPinIcon; label: string }[] = [
   { id: "archives",  icon: FolderIcon,    label: "Archives" },
 ];
 
-const LEGEND_ITEMS = [
-  { color: "#a855f7", label: "Erosion Outlines" },
-  { color: "#0ea5e9", label: "Water Chemistry" },
-  { color: "#2563eb", label: "Vegetation Index" },
+const RISK_COLORS = [
+  { color: "#ef4444", label: "High" },
+  { color: "#f59e0b", label: "Med" },
+  { color: "#22c55e", label: "Low" },
+];
+
+const LAYER_LEGEND = [
+  { color: "#a855f7", label: "Soil Erosion"    },
+  { color: "#0ea5e9", label: "Water Quality"   },
+  { color: "#2563eb", label: "Forest Regrowth" },
 ];
 
 const SECTORS = [
@@ -45,9 +52,17 @@ interface Props {
   onOpenSupport: () => void;
   mobileOpen: boolean;
   onCloseMobile: () => void;
+  is3D: boolean;
+  onToggle3D: (v: boolean) => void;
+  showErosion: boolean;
+  onToggleErosion: (v: boolean) => void;
+  showContaminant: boolean;
+  onToggleContaminant: (v: boolean) => void;
+  showBurnScar: boolean;
+  onToggleBurnScar: (v: boolean) => void;
 }
 
-export function Sidebar({ activeTab, onNavigate, onFocusSector, onOpenLogs, onOpenSupport, mobileOpen, onCloseMobile }: Props) {
+export function Sidebar({ activeTab, onNavigate, onFocusSector, onOpenLogs, onOpenSupport, mobileOpen, onCloseMobile, is3D, onToggle3D, showErosion, onToggleErosion, showContaminant, onToggleContaminant, showBurnScar, onToggleBurnScar }: Props) {
   const [expandedPanel, setExpandedPanel] = useState<ExpandedPanel>(null);
 
   // Tool buttons — these are map utilities, not page navigation.
@@ -133,14 +148,90 @@ export function Sidebar({ activeTab, onNavigate, onFocusSector, onOpenLogs, onOp
         ))}
       </nav>
 
+      {/* 2D / 3D toggle + layer switches — only shown on the Map tab */}
+      {activeTab === "map" && (
+        <div className="mt-3 space-y-3">
+          {/* View mode pill */}
+          <div className="flex items-center gap-1 p-0.5 rounded-lg bg-gray-100 dark:bg-gray-800">
+            <button
+              onClick={() => onToggle3D(false)}
+              className={[
+                "flex-1 text-xs font-semibold py-1.5 rounded-md transition-all",
+                !is3D
+                  ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300",
+              ].join(" ")}
+            >
+              2D Map
+            </button>
+            <button
+              onClick={() => onToggle3D(true)}
+              className={[
+                "flex-1 text-xs font-semibold py-1.5 rounded-md transition-all",
+                is3D
+                  ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300",
+              ].join(" ")}
+            >
+              3D Risk
+            </button>
+          </div>
+          {/* Layer toggles */}
+          <div className="px-1 space-y-2">
+            <ToggleSwitch
+              label="Soil Erosion Risk"
+              dotColor="#a855f7"
+              iconPath="m8 3 4 8 5-5 5 15H2L8 3z"
+              checked={showErosion}
+              onChange={onToggleErosion}
+            />
+            <ToggleSwitch
+              label="River Water Quality"
+              dotColor="#0ea5e9"
+              iconPath="M9 20l-5.447-2.724A1 1 0 0 1 3 16.382V5.618a1 1 0 0 1 1.447-.894L9 7m0 13l6-3m-6-13l6 3m0 13l5.447 2.724A1 1 0 0 0 21 18.382V7.618a1 1 0 0 0-1.447-.894L15 9m0 11V9m0 0L9 7"
+              checked={showContaminant}
+              onChange={onToggleContaminant}
+            />
+            <ToggleSwitch
+              label="Forest Regrowth Status"
+              dotColor="#2563eb"
+              iconPath="M8.5 14.5A2.5 2.5 0 0 0 11 17a2.5 2.5 0 0 0 2.5-2.5c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2 1Z"
+              checked={showBurnScar}
+              onChange={onToggleBurnScar}
+            />
+          </div>
+        </div>
+      )}
+
       {expandedPanel === "legend" && (
         <div className="mt-2 mx-1 p-3 rounded-lg bg-surface-alt space-y-2">
-          {LEGEND_ITEMS.map(({ color, label }) => (
-            <div key={label} className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
-              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />
-              {label}
+          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2">
+            Sensors &amp; Risk
+          </p>
+          {/* Each row: sensor colour circle + name + High/Med/Low risk squares */}
+          {LAYER_LEGEND.map(({ color, label }) => (
+            <div key={label} className="flex items-center gap-2">
+              <span
+                className="w-2.5 h-2.5 rounded-full shrink-0 border border-white/60 dark:border-gray-700"
+                style={{ background: color }}
+              />
+              <span className="text-xs text-gray-600 dark:text-gray-300 flex-1 leading-none">{label}</span>
+              <div className="flex items-center gap-1">
+                {RISK_COLORS.map(({ color: rc, label: rl }) => (
+                  <span
+                    key={rl}
+                    title={rl === "High" ? "High Risk" : rl === "Med" ? "Medium Risk" : "Low Risk"}
+                    className="w-2 h-2 rounded-sm shrink-0"
+                    style={{ background: rc }}
+                  />
+                ))}
+              </div>
             </div>
           ))}
+          <div className="pt-2 border-t border-gray-200/60 dark:border-gray-700/40 space-y-0.5">
+            <p className="text-[10px] text-gray-400 dark:text-gray-500">Column height = risk score</p>
+            <p className="text-[10px] text-gray-400 dark:text-gray-500">Terrain = real Rocky Mtn elevation</p>
+          </div>
         </div>
       )}
 

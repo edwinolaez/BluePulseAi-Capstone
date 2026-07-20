@@ -39,6 +39,10 @@ export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   // When a user clicks a sector in the sidebar, flyTo tells the map to pan there
   const [flyTo, setFlyTo]             = useState<FlyToTarget | null>(null);
+  const [is3D, setIs3D]               = useState(false);
+  const [showErosion, setShowErosion]         = useState(true);
+  const [showContaminant, setShowContaminant] = useState(true);
+  const [showBurnScar, setShowBurnScar]       = useState(true);
 
   // The superadmin confirmation modal — only shows after a superadmin logs in
   const [showSuperConfirm, setShowSuperConfirm] = useState(false);
@@ -112,9 +116,8 @@ export default function Home() {
       {/* Main content area — sidebar on the left, active page on the right */}
       <div className="flex flex-1 min-h-0 relative overflow-hidden">
 
-        {/* Sidebar — shows sector navigation and quick links.
-            On mobile, it slides in as a drawer when the hamburger icon is tapped. */}
-        <Sidebar
+        {/* Sidebar — map-only; hidden on all other tabs */}
+        {activeTab === "map" && <Sidebar
           activeTab={activeTab}
           onNavigate={handleTabChange}
           onFocusSector={focusSector}
@@ -122,10 +125,18 @@ export default function Home() {
           onOpenSupport={() => setSupportOpen(true)}
           mobileOpen={sidebarOpen}
           onCloseMobile={() => setSidebarOpen(false)}
-        />
+          is3D={is3D}
+          onToggle3D={setIs3D}
+          showErosion={showErosion}
+          onToggleErosion={setShowErosion}
+          showContaminant={showContaminant}
+          onToggleContaminant={setShowContaminant}
+          showBurnScar={showBurnScar}
+          onToggleBurnScar={setShowBurnScar}
+        />}
 
         {/* Only one of these pages renders at a time depending on the active tab */}
-        {activeTab === "map"       && <MapViewPage flyTo={flyTo} />}
+        {activeTab === "map"       && <MapViewPage flyTo={flyTo} is3D={is3D} showErosion={showErosion} showContaminant={showContaminant} showBurnScar={showBurnScar} />}
         {activeTab === "dashboard" && <DashboardPage />}
         {activeTab === "ai"        && <AiOverviewPage />}
         {activeTab === "reports"   && <ReportsPage />}

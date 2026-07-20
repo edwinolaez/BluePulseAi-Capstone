@@ -15,6 +15,7 @@ import {
   ChartLineIcon,
   LayersIcon,
 } from "../Layout/icons";
+import { DroneScanWidget } from "../Widgets/DroneScanWidget";
 
 // The list of sensor stations the user can filter by
 const STATIONS = ["All Stations", "IoT Jasper-A1", "Silt Monitor S-2", "Slope Sensor SL-4"] as const;
@@ -258,6 +259,11 @@ export function DashboardPage() {
             ))}
           </div>
         </div>
+      </div>
+
+      {/* CIRUS Drone Scans — full-width section below the main grid */}
+      <div className="mt-4">
+        <DroneScanWidget />
       </div>
     </div>
   );

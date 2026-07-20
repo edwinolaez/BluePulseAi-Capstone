@@ -7,6 +7,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CircleMarker, Tooltip } from "react-leaflet";
 import { fetchErosionSimulation, ModelOutput } from "../../../lib/api";
 import { HazardZone } from "./HazardZone";
 
@@ -45,15 +46,12 @@ export function ErosionLayer() {
     });
   }, []);
 
-  // Render one HazardZone circle per erosion monitoring area
   return (
     <>
       {ZONES.map((zone, i) => {
-        // Use the live risk label if available, otherwise use the preset default for this zone
-        const risk = results[i]?.risk_label ?? DEFAULT_RISK[i];
+        const risk  = results[i]?.risk_label ?? DEFAULT_RISK[i];
         const style = STYLE_BY_LABEL[risk as keyof typeof STYLE_BY_LABEL] ?? STYLE_BY_LABEL.Medium;
         const score = results[i]?.risk_score;
-
         return (
           <HazardZone
             key={zone.sectorId}
@@ -64,7 +62,7 @@ export function ErosionLayer() {
             fillOpacity={0.12}
             label={style.label}
             badgeIcon="mountain"
-            dotColor="#ef4444"
+            dotColor={risk === "High" ? "#ef4444" : risk === "Medium" ? "#f59e0b" : "#22c55e"}
             popupIcon="⛰️"
             popupTitle="Soil Erosion Analysis"
             status={risk === "High" ? "CRITICAL" : risk === "Medium" ? "WARNING" : "OPERATIONAL"}
@@ -73,13 +71,28 @@ export function ErosionLayer() {
               { label: "Area ID",        value: zone.sectorId },
               { label: "Risk Level",     value: risk, valueColor: risk === "High" ? "text-red-600" : risk === "Medium" ? "text-amber-600" : "text-green-600" },
               { label: "Risk Score",     value: score != null ? score.toFixed(3) : "—" },
-              // Slope and rainfall are the inputs sent to Richard's RUSLE model
               { label: "Slope Angle",    value: `${zone.slopeDeg}°`, valueColor: "text-purple-600" },
               { label: "Rainfall Input", value: `${zone.rainfallMm} mm` },
             ]}
           />
         );
       })}
+
+      {/* Soil Erosion sensor dots — purple #a855f7, matches 3D map colour */}
+      {ZONES.map((zone) => (
+        <CircleMarker
+          key={`dot-${zone.sectorId}`}
+          center={zone.center}
+          radius={7}
+          pathOptions={{ color: "#ffffff", fillColor: "#a855f7", fillOpacity: 1, weight: 2 }}
+        >
+          <Tooltip direction="top" offset={[0, -8]} opacity={1}>
+            <div className="text-xs font-semibold">{zone.sectorId}</div>
+            <div className="text-xs text-gray-500">Soil Erosion Sensor</div>
+            <div className="text-xs text-gray-400">{zone.center[0].toFixed(4)}°N, {Math.abs(zone.center[1]).toFixed(4)}°W</div>
+          </Tooltip>
+        </CircleMarker>
+      ))}
     </>
   );
 }

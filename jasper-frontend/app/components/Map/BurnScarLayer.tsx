@@ -7,19 +7,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CircleMarker, Tooltip } from "react-leaflet";
 import { fetchChangeDetection, ModelOutput } from "../../../lib/api";
 import { HazardZone } from "./HazardZone";
 
 // The sector ID we're monitoring — maps to a specific area in the watershed
 const DEFAULT_SECTOR = "ATH-001-A";
-// GPS centre of the burn scar zone — where the map circle is drawn
-const CENTER: [number, number] = [52.882, -118.065];
+// GPS centre of the burn scar zone — 2024 Jasper Wildfire centroid (Alberta Wildfire open data / NFDB fire polygon)
+const CENTER: [number, number] = [52.848, -118.083];
 
-// Visual styles for each risk level — controls the circle's border and fill colour
+// Zone border/fill always uses Forest sensor blue (#2563eb) so the zone colour matches
+// the sensor dot. Risk level is shown via fill lightness and in the popup badge.
 const RISK_STYLE = {
-  High:   { borderColor: "#ef4444", fillColor: "#f43f5e", badge: "text-red-500" },
-  Medium: { borderColor: "#f59e0b", fillColor: "#fbbf24", badge: "text-amber-500" },
-  Low:    { borderColor: "#22c55e", fillColor: "#4ade80", badge: "text-green-500" },
+  High:   { borderColor: "#2563eb", fillColor: "#3b82f6", badge: "text-red-500",   dotColor: "#ef4444" },
+  Medium: { borderColor: "#2563eb", fillColor: "#60a5fa", badge: "text-amber-500", dotColor: "#f59e0b" },
+  Low:    { borderColor: "#1d4ed8", fillColor: "#93c5fd", badge: "text-green-500", dotColor: "#22c55e" },
 } as const;
 
 export function BurnScarLayer() {
@@ -41,8 +43,21 @@ export function BurnScarLayer() {
   // Show confidence percentage in the popup if live data is available
   const confidence = result ? ` (${(result.confidence * 100).toFixed(0)}% confidence)` : "";
 
-  // HazardZone draws a Leaflet circle with a tooltip and a click popup
-  return (
+  const dot = (
+    <CircleMarker
+      center={CENTER}
+      radius={7}
+      pathOptions={{ color: "#ffffff", fillColor: "#2563eb", fillOpacity: 1, weight: 2 }}
+    >
+      <Tooltip direction="top" offset={[0, -8]} opacity={1}>
+        <div className="text-xs font-semibold">ATH-001-A</div>
+        <div className="text-xs text-gray-500">Forest Regrowth Sensor</div>
+        <div className="text-xs text-gray-400">52.8480°N, 118.0830°W</div>
+      </Tooltip>
+    </CircleMarker>
+  );
+
+  const zone = (
     <HazardZone
       center={CENTER}
       radius={2400}
@@ -52,7 +67,7 @@ export function BurnScarLayer() {
       label="Forest Regrowth Monitor"
       badgeIcon="flame"
       badgeBg="#fff1f2"
-      dotColor="#ef4444"
+      dotColor={style.dotColor}
       dotPulse
       popupIcon="🌲"
       popupTitle="Forest Regrowth Status"
@@ -68,4 +83,6 @@ export function BurnScarLayer() {
       ]}
     />
   );
+
+  return <>{dot}{zone}</>;
 }
