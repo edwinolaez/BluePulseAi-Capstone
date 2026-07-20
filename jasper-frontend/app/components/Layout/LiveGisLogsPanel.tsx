@@ -71,6 +71,14 @@ export function LiveGisLogsPanel({ open, onClose }: Props) {
   }, [logs]);
 
   function handleExport() {
+    const text = logs.map((l) => `[${l.time}] ${l.level} — ${l.message}`).join("\n");
+    const blob = new Blob([text], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `jasper-activity-logs-${new Date().toISOString().split("T")[0]}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
     setExported(true);
     setTimeout(() => setExported(false), 1500);
   }

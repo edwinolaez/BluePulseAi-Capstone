@@ -41,6 +41,26 @@ export interface LayerData {
   layers:     unknown[];
 }
 
+// One timestamped scan record returned by the timeline endpoint.
+// The three numeric fields (vegetation_pct, erosion_risk_score, water_turbidity)
+// are normalized by the backend so the frontend can blend them directly.
+export interface TimelineScan {
+  timestamp:           string;
+  layer_type:          string;
+  source:              string;
+  vegetation_pct:      number;
+  erosion_risk_score:  number;
+  water_turbidity:     number;
+  data:                Record<string, unknown>;
+}
+
+// Response shape of GET /api/v1/sectors/{sector_id}/timeline
+export interface TimelineData {
+  sector_id:  string;
+  scan_count: number;
+  scans:      TimelineScan[];
+}
+
 // ─── Data type shared by all three of Richard's ML models ────────────────────
 // Every model (burn scar, erosion, contaminant) returns the same shape of data.
 // This makes it easy to display all three in a consistent way on the AI Overview page.
@@ -60,6 +80,15 @@ export interface ModelOutput {
 }
 
 // ─── Functions that call Feven's backend ─────────────────────────────────────
+
+// Fetches all timestamped scan records for a sector — used by the timeline slider
+// interpolation to blend values between real capture dates.
+export async function fetchTimeline(sectorId: string): Promise<TimelineData> {
+  const url = `${FEVEN_API}/api/v1/sectors/${encodeURIComponent(sectorId)}/timeline`;
+  const res = await fetchWithTimeout(url, { headers: apiHeaders() });
+  if (!res.ok) throw new Error(`Timeline fetch failed: ${res.status}`);
+  return res.json();
+}
 
 // Fetches environmental layer data for a given sector and date range.
 // Used by the map layers to colour the zones based on real data.

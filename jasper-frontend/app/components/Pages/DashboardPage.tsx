@@ -1,3 +1,9 @@
+// Dashboard Page — the first thing users see after logging in.
+// Shows a health overview of the Jasper watershed with 4 key readings:
+// water cloudiness, acidity, ash levels, and ground stability.
+// Users can click each card to change the chart below it,
+// and filter by sensor station using the buttons at the top right.
+
 "use client";
 
 import { useState } from "react";
@@ -10,9 +16,11 @@ import {
   LayersIcon,
 } from "../Layout/icons";
 
+// The list of sensor stations the user can filter by
 const STATIONS = ["All Stations", "IoT Jasper-A1", "Silt Monitor S-2", "Slope Sensor SL-4"] as const;
 type Station = (typeof STATIONS)[number];
 
+// The four environmental readings shown on the dashboard cards
 type MetricKey = "turbidity" | "ph" | "ash" | "soil";
 
 interface StationStats {
@@ -22,6 +30,7 @@ interface StationStats {
   soil: number; soilStatus: string; soilBadge: string; soilDelta: string; trendSoil: number[];
 }
 
+// Color styles for the status badges (green = good, amber = warning, red = danger)
 const BADGE = {
   green: "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400",
   amber: "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400",
@@ -29,6 +38,8 @@ const BADGE = {
   gray:  "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400",
 };
 
+// Sample readings for each station — these are placeholder numbers until the real API is connected.
+// Each station has its own set of values and a trend array (12 hourly data points for the chart).
 const STATION_DATA: Record<Station, StationStats> = {
   "All Stations": {
     turbidity: 4.2, turbidityStatus: "Elevated", turbidityBadge: BADGE.amber, turbidityDelta: "+0.4 NTU from last week", trendTurbidity: [20, 28, 30, 26, 34, 46, 62, 70, 58, 60, 64, 70],
@@ -56,6 +67,7 @@ const STATION_DATA: Record<Station, StationStats> = {
   },
 };
 
+// Config for each metric — label shown on the card, the unit, and where the danger line sits on the chart
 const METRICS: Record<MetricKey, { label: string; unit: string; dangerValue: number; dangerLabel: string }> = {
   turbidity: { label: "Water Cloudiness",  unit: "NTU", dangerValue: 50, dangerLabel: "Warning Level (5.0 NTU)" },
   ph:        { label: "Acidity (pH)",      unit: "pH",  dangerValue: 40, dangerLabel: "Warning Level (6.0 pH)" },
@@ -63,9 +75,11 @@ const METRICS: Record<MetricKey, { label: string; unit: string; dangerValue: num
   soil:      { label: "Ground Stability",  unit: "%",   dangerValue: 70, dangerLabel: "Stability Floor (80%)" },
 };
 
+// Time labels along the bottom of the chart — shows the last 12 hours of data
 const HOUR_LABELS = ["06:00", "07:00", "08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "Now"];
 const CHART_MAX = 100;
 
+// Area health alerts shown in the right panel — highlights anything that needs attention
 const ALERTS = [
   {
     icon: FlameIcon,
@@ -90,6 +104,9 @@ const ALERTS = [
   },
 ];
 
+// The line chart that appears below the stat cards.
+// It draws the hourly trend for whichever card the user last clicked,
+// and shows a dashed warning line so you can see if readings are getting close to danger levels.
 function TrendChart({ data, dangerValue, dangerLabel }: { data: number[]; dangerValue: number; dangerLabel: string }) {
   const width = 700;
   const height = 180;
@@ -123,6 +140,8 @@ function TrendChart({ data, dangerValue, dangerLabel }: { data: number[]; danger
   );
 }
 
+// Each of the 4 clickable cards at the top of the dashboard.
+// Clicking a card selects it (shows a blue border) and updates the chart below to match that metric.
 function StatCard({
   icon: Icon, label, value, unit, status, badge, delta, selected, onClick,
 }: {
@@ -154,7 +173,9 @@ function StatCard({
 }
 
 export function DashboardPage() {
+  // Which station the user has selected — starts on "All Stations"
   const [station, setStation] = useState<Station>("All Stations");
+  // Which metric card is currently selected — starts on water cloudiness
   const [metric, setMetric] = useState<MetricKey>("turbidity");
   const s = STATION_DATA[station];
   const metricConfig = METRICS[metric];

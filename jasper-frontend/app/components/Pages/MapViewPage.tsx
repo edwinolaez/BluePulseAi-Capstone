@@ -5,7 +5,7 @@
 
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import { TemporalSlider } from "../Controls/TemporalSlider";
 import { SectorPanel } from "../Controls/SectorPanel";
@@ -16,6 +16,10 @@ import { PipelineStatusWidget } from "../Widgets/PipelineStatusWidget";
 import { ModelPerformanceWidget } from "../Widgets/ModelPerformanceWidget";
 import { FieldPhotosWidget } from "../Widgets/FieldPhotosWidget";
 import type { FlyToTarget } from "../Map/JasperMap";
+import { fetchTimeline } from "../../../lib/api";
+import type { TimelineScan } from "../../../lib/api";
+import { interpolateScans } from "../../../lib/interpolation";
+import type { InterpolatedState } from "../../../lib/interpolation";
 
 // The map is loaded dynamically with ssr:false because Leaflet uses browser APIs
 // that don't exist on the server — this tells Next.js to only load it in the browser.
@@ -28,27 +32,39 @@ interface Props {
 }
 
 export function MapViewPage({ flyTo }: Props) {
-  // Tracks which sector the user clicked on the map (used to update the sector panel)
   const [sectorId, setSectorId]               = useState<string | null>(null);
-
-  // Date range controlled by the temporal slider at the bottom of the map
   const [dateFrom, setDateFrom]               = useState("2024-06-01");
   const [dateTo, setDateTo]                   = useState("2024-07-24");
-
-  // These three booleans control which layers are visible on the map
+  const [centerDate, setCenterDate]           = useState("2024-06-24");
   const [showBurnScar, setShowBurnScar]       = useState(true);
   const [showErosion, setShowErosion]         = useState(true);
   const [showContaminant, setShowContaminant] = useState(true);
-
-  // These hold the zoom functions passed up from the map component
-  // so the custom zoom buttons outside the map can control it
   const [zoomIn, setZoomIn]   = useState<(() => void) | null>(null);
   const [zoomOut, setZoomOut] = useState<(() => void) | null>(null);
-
-  // Controls whether the Live Readings drawer is open on mobile
   const [panelOpen, setPanelOpen] = useState(false);
 
-  // Called by JasperMap once it's ready — passes up its zoom functions
+  // Timeline scans fetched from Feven's backend for the selected sector
+  const [timelineScans, setTimelineScans] = useState<TimelineScan[]>([]);
+  // Interpolated values for the current slider position — passed to SectorPanel
+  const [interpolated, setInterpolated]   = useState<InterpolatedState | null>(null);
+  // Prevents stale fetches from overwriting a newer sector's data
+  const fetchIdRef = useRef(0);
+
+  // Fetch timeline scans whenever the user selects a different sector
+  useEffect(() => {
+    if (!sectorId) { setTimelineScans([]); setInterpolated(null); return; }
+    const id = ++fetchIdRef.current;
+    fetchTimeline(sectorId)
+      .then(data => { if (id === fetchIdRef.current) setTimelineScans(data.scans); })
+      .catch(() => { if (id === fetchIdRef.current) setTimelineScans([]); });
+  }, [sectorId]);
+
+  // Re-interpolate whenever the slider moves or new scans arrive
+  useEffect(() => {
+    const ms = new Date(centerDate).getTime();
+    setInterpolated(interpolateScans(timelineScans, ms));
+  }, [centerDate, timelineScans]);
+
   const handleMapInit = useCallback((zi: () => void, zo: () => void) => {
     setZoomIn(() => zi);
     setZoomOut(() => zo);
@@ -101,9 +117,10 @@ export function MapViewPage({ flyTo }: Props) {
 
           <div className="flex-1 min-w-0">
             <TemporalSlider
-              onDateRangeChange={(from, to) => {
+              onDateRangeChange={(from, to, center) => {
                 setDateFrom(from);
                 setDateTo(to);
+                setCenterDate(center);
               }}
             />
           </div>
@@ -169,8 +186,15 @@ export function MapViewPage({ flyTo }: Props) {
           </button>
         </div>
 
-        {/* Shows data for the sector the user clicked on the map */}
-        <SectorPanel sectorId={sectorId} dateFrom={dateFrom} dateTo={dateTo} />
+        {/* Shows data for the sector the user clicked on the map.
+            interpolated carries blended values from the timeline slider — null
+            when no sector is selected or the backend has no scan data yet. */}
+        <SectorPanel
+          sectorId={sectorId}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          interpolated={interpolated}
+        />
 
         {/* Desktop-only section label */}
         <div className="hidden md:flex items-center gap-2 px-0.5 mt-1">

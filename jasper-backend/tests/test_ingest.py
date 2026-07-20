@@ -1,5 +1,6 @@
 """Unit tests for Project Jasper ingest and data endpoints."""
 from fastapi.testclient import TestClient
+from unittest.mock import MagicMock, patch
 import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -68,18 +69,22 @@ def test_dem_ingest_wrong_format():
 
 # Telemetry tests
 def test_telemetry_ingest_valid():
-    """Valid telemetry data should be accepted."""
-    response = client.post(
-        "/api/v1/ingest/telemetry",
-        headers=API_HEADERS,
-        data={
-            "sector_id": "S1",
-            "data_source": "wateroffice",
-            "user_id": "user1",
-            "turbidity": "12.5",
-            "flow_rate": "3.2"
-        }
-    )
+    """Valid telemetry data should be accepted.
+    Mocks get_supabase so this unit test doesn't need a live DB — E2E tests cover real persistence."""
+    mock_supabase = MagicMock()
+    mock_supabase.table.return_value.insert.return_value.execute.return_value = MagicMock(data=[])
+    with patch("routers.ingest.get_supabase", return_value=mock_supabase):
+        response = client.post(
+            "/api/v1/ingest/telemetry",
+            headers=API_HEADERS,
+            data={
+                "sector_id": "S1",
+                "data_source": "wateroffice",
+                "user_id": "user1",
+                "turbidity": "12.5",
+                "flow_rate": "3.2"
+            }
+        )
     assert response.status_code == 200
     assert response.json()["status"] == "accepted"
 
