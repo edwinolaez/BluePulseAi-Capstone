@@ -86,6 +86,9 @@ export function MapViewPage({ flyTo }: Props) {
               centerDate={centerDate}
               activeSectorId={sectorId}
               onSectorClick={setSectorId}
+              showErosion={showErosion}
+              showContaminant={showContaminant}
+              showBurnScar={showBurnScar}
             />
           ) : (
             <JasperMap
@@ -132,19 +135,15 @@ export function MapViewPage({ flyTo }: Props) {
               </button>
             </div>
 
-            {/* Layer toggles — only relevant in 2D mode */}
-            {!is3D && (
-              <div className="space-y-2 md:space-y-3">
-                <ToggleSwitch label="Soil Erosion Risk"      dotColor="#a855f7" checked={showErosion}     onChange={setShowErosion} />
-                <ToggleSwitch label="River Water Quality"    dotColor="#0ea5e9" checked={showContaminant} onChange={setShowContaminant} />
-                <ToggleSwitch label="Forest Regrowth Status" dotColor="#2563eb" checked={showBurnScar}    onChange={setShowBurnScar} />
-              </div>
-            )}
+            {/* Layer toggles — work in both 2D and 3D */}
+            <div className="space-y-2 md:space-y-3">
+              <ToggleSwitch label="Soil Erosion Risk"      dotColor="#a855f7" checked={showErosion}     onChange={setShowErosion} />
+              <ToggleSwitch label="River Water Quality"    dotColor="#0ea5e9" checked={showContaminant} onChange={setShowContaminant} />
+              <ToggleSwitch label="Forest Regrowth Status" dotColor="#2563eb" checked={showBurnScar}    onChange={setShowBurnScar} />
+            </div>
 
-            {/* 3D mode hint */}
             {is3D && (
               <p className="text-[10px] text-gray-400 dark:text-gray-500 leading-tight">
-                Column height = erosion risk score.<br />
                 Drag to orbit · scroll to zoom.
               </p>
             )}

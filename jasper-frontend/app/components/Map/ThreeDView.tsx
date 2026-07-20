@@ -66,12 +66,24 @@ interface SectorDatum {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 interface Props {
-  centerDate:     string;        // ISO date from the timeline slider
-  activeSectorId: string | null;
-  onSectorClick:  (id: string) => void;
+  centerDate:      string;        // ISO date from the timeline slider
+  activeSectorId:  string | null;
+  onSectorClick:   (id: string) => void;
+  showErosion:     boolean;
+  showContaminant: boolean;
+  showBurnScar:    boolean;
 }
 
-export function ThreeDView({ centerDate, activeSectorId, onSectorClick }: Props) {
+// Maps each sector to which toggle controls its visibility
+const SECTOR_LAYER: Record<SectorId, "erosion" | "contaminant" | "burnScar"> = {
+  "ATH-001-H": "erosion",
+  "ATH-001-M": "erosion",
+  "ATH-001-L": "erosion",
+  "ATH-001-W": "contaminant",
+  "ATH-001-A": "burnScar",
+};
+
+export function ThreeDView({ centerDate, activeSectorId, onSectorClick, showErosion, showContaminant, showBurnScar }: Props) {
 
   // One entry per sector — populated by parallel fetchTimeline calls on mount
   const [sectorScans, setSectorScans] = useState<Record<string, TimelineScan[]>>(
@@ -109,21 +121,29 @@ export function ThreeDView({ centerDate, activeSectorId, onSectorClick }: Props)
     );
   }, [centerDate, sectorScans]);
 
-  // Build the ColumnLayer data array — prefer live interpolated values, fall back to defaults
-  const data: SectorDatum[] = SECTORS.map((s) => {
-    const interp = sectorInterps[s.id];
-    const isActive = s.id === activeSectorId;
-    return {
-      id:          s.id,
-      label:       s.label,
-      lat:         s.lat,
-      lon:         s.lon,
-      score:       interp ? interp.erosion_risk_score : s.defaultScore,
-      risk:        interp ? interp.erosion_risk       : s.defaultRisk,
-      isActive,
-      isEstimated: interp ? interp.is_estimated : false,
-    };
-  });
+  const layerVisible: Record<string, boolean> = {
+    erosion:     showErosion,
+    contaminant: showContaminant,
+    burnScar:    showBurnScar,
+  };
+
+  // Build the ColumnLayer data array — filtered by toggle state, then interpolated
+  const data: SectorDatum[] = SECTORS
+    .filter(s => layerVisible[SECTOR_LAYER[s.id]])
+    .map((s) => {
+      const interp = sectorInterps[s.id];
+      const isActive = s.id === activeSectorId;
+      return {
+        id:          s.id,
+        label:       s.label,
+        lat:         s.lat,
+        lon:         s.lon,
+        score:       interp ? interp.erosion_risk_score : s.defaultScore,
+        risk:        interp ? interp.erosion_risk       : s.defaultRisk,
+        isActive,
+        isEstimated: interp ? interp.is_estimated : false,
+      };
+    });
 
   const layers = [
     // OSM base map tiles rendered as flat bitmaps beneath the 3D columns
@@ -161,8 +181,8 @@ export function ThreeDView({ centerDate, activeSectorId, onSectorClick }: Props)
       lineWidthMinPixels: 1,
       // Trigger re-evaluation on every slider tick (centerDate drives all five interpolations)
       updateTriggers: {
-        getElevation: centerDate,
-        getFillColor:  centerDate,
+        getElevation: [centerDate, showErosion, showContaminant, showBurnScar],
+        getFillColor:  [centerDate, showErosion, showContaminant, showBurnScar],
       },
       onClick: (info) => {
         if (info.object) onSectorClick(info.object.id);
