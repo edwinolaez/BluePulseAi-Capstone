@@ -73,14 +73,20 @@ async def get_layers(
         ingest_result = ingest_query.execute()
         for row in ingest_result.data:
             coords = row.get("coordinates") or {}
+            lat = lon = None
+            if isinstance(coords, dict):
+                if coords.get("type") == "Point" and isinstance(coords.get("coordinates"), list):
+                    coord_list = coords["coordinates"]
+                    lon = coord_list[0] if len(coord_list) >= 1 else None
+                    lat = coord_list[1] if len(coord_list) >= 2 else None
+                else:
+                    lat = coords.get("lat")
+                    lon = coords.get("lon")
             layers.append({
                 "layer_type": row.get("layer_type", "unknown"),
                 "sector_id": sector_id,
                 "source": "ingest_records",
-                "coordinates": {
-                    "lat": coords.get("lat") if isinstance(coords, dict) else None,
-                    "lon": coords.get("lon") if isinstance(coords, dict) else None,
-                },
+                "coordinates": {"lat": lat, "lon": lon},
                 "timestamp": row.get("timestamp"),
                 "data": row,
             })

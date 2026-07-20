@@ -21,11 +21,14 @@ import type { TimelineScan } from "../../../lib/api";
 import { interpolateScans } from "../../../lib/interpolation";
 import type { InterpolatedState } from "../../../lib/interpolation";
 
-// The map is loaded dynamically with ssr:false because Leaflet uses browser APIs
-// that don't exist on the server — this tells Next.js to only load it in the browser.
-const JasperMap = dynamic(() => import("../Map/JasperMap"), {
-  ssr: false,
-});
+// Both map components are loaded dynamically with ssr:false — Leaflet and deck.gl
+// both use browser/WebGL APIs that don't exist on the server.
+const JasperMap = dynamic(() => import("../Map/JasperMap"), { ssr: false });
+
+const ThreeDView = dynamic(
+  () => import("../Map/ThreeDView").then((m) => ({ default: m.ThreeDView })),
+  { ssr: false }
+);
 
 interface Props {
   flyTo?: FlyToTarget | null;
@@ -42,6 +45,7 @@ export function MapViewPage({ flyTo }: Props) {
   const [zoomIn, setZoomIn]   = useState<(() => void) | null>(null);
   const [zoomOut, setZoomOut] = useState<(() => void) | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
+  const [is3D, setIs3D]           = useState(false);
 
   // Timeline scans fetched from Feven's backend for the selected sector
   const [timelineScans, setTimelineScans] = useState<TimelineScan[]>([]);
@@ -76,29 +80,74 @@ export function MapViewPage({ flyTo }: Props) {
       {/* ── Map area — takes up all available space ── */}
       <div className="relative flex-1 overflow-hidden">
         <div className="absolute inset-0">
-          {/* The Leaflet map — passes layer visibility and date range as props */}
-          <JasperMap
-            onSectorClick={setSectorId}
-            activeSectorId={sectorId}
-            dateFrom={dateFrom}
-            dateTo={dateTo}
-            showBurnScar={showBurnScar}
-            showErosion={showErosion}
-            showContaminant={showContaminant}
-            onMapInit={handleMapInit}
-            flyTo={flyTo}
-          />
+          {/* Toggle between 2D Leaflet and 3D deck.gl view */}
+          {is3D ? (
+            <ThreeDView
+              interpolated={interpolated}
+              activeSectorId={sectorId}
+              onSectorClick={setSectorId}
+            />
+          ) : (
+            <JasperMap
+              onSectorClick={setSectorId}
+              activeSectorId={sectorId}
+              dateFrom={dateFrom}
+              dateTo={dateTo}
+              showBurnScar={showBurnScar}
+              showErosion={showErosion}
+              showContaminant={showContaminant}
+              onMapInit={handleMapInit}
+              flyTo={flyTo}
+            />
+          )}
         </div>
 
         {/* Layer toggle panel — sits in the top-right corner of the map.
             Each toggle shows/hides one of the three environmental overlays. */}
         <div className="absolute top-4 right-4 z-[1001]">
-          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-3 md:p-4 min-w-[180px] md:min-w-[230px] shadow-xl">
-            <div className="space-y-2 md:space-y-3">
-              <ToggleSwitch label="Soil Erosion Risk"      dotColor="#a855f7" checked={showErosion}     onChange={setShowErosion} />
-              <ToggleSwitch label="River Water Quality"    dotColor="#0ea5e9" checked={showContaminant} onChange={setShowContaminant} />
-              <ToggleSwitch label="Forest Regrowth Status" dotColor="#2563eb" checked={showBurnScar}    onChange={setShowBurnScar} />
+          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-3 md:p-4 min-w-[180px] md:min-w-[230px] shadow-xl space-y-3">
+            {/* 2D / 3D view toggle */}
+            <div className="flex items-center gap-1 p-0.5 rounded-lg bg-gray-100 dark:bg-gray-800">
+              <button
+                onClick={() => setIs3D(false)}
+                className={[
+                  "flex-1 text-xs font-semibold py-1.5 rounded-md transition-all",
+                  !is3D
+                    ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                    : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300",
+                ].join(" ")}
+              >
+                2D Map
+              </button>
+              <button
+                onClick={() => setIs3D(true)}
+                className={[
+                  "flex-1 text-xs font-semibold py-1.5 rounded-md transition-all",
+                  is3D
+                    ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                    : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300",
+                ].join(" ")}
+              >
+                3D Risk
+              </button>
             </div>
+
+            {/* Layer toggles — only relevant in 2D mode */}
+            {!is3D && (
+              <div className="space-y-2 md:space-y-3">
+                <ToggleSwitch label="Soil Erosion Risk"      dotColor="#a855f7" checked={showErosion}     onChange={setShowErosion} />
+                <ToggleSwitch label="River Water Quality"    dotColor="#0ea5e9" checked={showContaminant} onChange={setShowContaminant} />
+                <ToggleSwitch label="Forest Regrowth Status" dotColor="#2563eb" checked={showBurnScar}    onChange={setShowBurnScar} />
+              </div>
+            )}
+
+            {/* 3D mode hint */}
+            {is3D && (
+              <p className="text-[10px] text-gray-400 dark:text-gray-500 leading-tight">
+                Column height = erosion risk score.<br />
+                Drag to orbit · scroll to zoom.
+              </p>
+            )}
           </div>
         </div>
 
