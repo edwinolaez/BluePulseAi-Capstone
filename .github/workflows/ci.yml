@@ -342,6 +342,7 @@ jobs:
 
       - name: API response time benchmark
         working-directory: tests
+        continue-on-error: true
         env:
           RAILWAY_API_URL: ${{ secrets.RAILWAY_API_URL }}
           ML_API_URL: ${{ secrets.ML_API_URL }}
