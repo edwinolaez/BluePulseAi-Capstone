@@ -72,11 +72,17 @@ async def get_layers(
 
         ingest_result = ingest_query.execute()
         for row in ingest_result.data:
+            coords = row.get("coordinates") or {}
             layers.append({
                 "layer_type": row.get("layer_type", "unknown"),
                 "sector_id": sector_id,
                 "source": "ingest_records",
-                "data": row
+                "coordinates": {
+                    "lat": coords.get("lat") if isinstance(coords, dict) else None,
+                    "lon": coords.get("lon") if isinstance(coords, dict) else None,
+                },
+                "timestamp": row.get("timestamp"),
+                "data": row,
             })
 
         # Query 2 — water_quality_readings table (telemetry sensor data)

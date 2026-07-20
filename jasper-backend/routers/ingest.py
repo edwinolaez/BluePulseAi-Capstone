@@ -51,6 +51,7 @@ async def ingest_base(record: IngestRecord):
         db_record = {
             "sector_id": record.sector_id,
             "layer_type": record.layer_type,
+            "coordinates": {"lat": record.coordinates.lat, "lon": record.coordinates.lon},
             "payload": record.payload or {},
             "timestamp": timestamp,
         }
