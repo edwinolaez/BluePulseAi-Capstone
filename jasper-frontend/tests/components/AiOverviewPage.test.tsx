@@ -1,6 +1,12 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { AiOverviewPage } from "../../app/components/Pages/AiOverviewPage";
 
+// Mock ResearcherChatPanel — it uses scrollIntoView which jsdom doesn't implement,
+// and it has its own test suite, so we don't need to render it here.
+jest.mock("../../app/components/Widgets/ResearcherChatPanel", () => ({
+  ResearcherChatPanel: () => null,
+}));
+
 // Mock the API functions from lib/api so tests don't make real HTTP calls.
 // In the default mock they never resolve, so the page stays in loading state —
 // individual tests can override this to test resolved data.
