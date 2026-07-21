@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { fetchChangeDetection, fetchErosionSimulation, fetchContaminantSimulation, ModelOutput } from "../../../lib/api";
+import { ResearcherChatPanel } from "../Widgets/ResearcherChatPanel";
 
 const MODELS = [
   {
@@ -317,6 +318,11 @@ export function AiOverviewPage() {
       {loading && (
         <p className="text-xs text-gray-400 mt-4 text-center">Fetching live model data…</p>
       )}
+
+      {/* ── Researcher Chatbot ───────────────────────────────────────────────── */}
+      <div className="mt-6">
+        <ResearcherChatPanel />
+      </div>
     </div>
   );
 }
