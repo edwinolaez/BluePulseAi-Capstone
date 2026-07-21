@@ -124,6 +124,12 @@ class ChangeDetectionRequest(BaseModel):
     sector_id: str = Field(..., description="Grid sector ID (e.g., ATH-001-A)")
 
 
+class SourcePoint(BaseModel):
+    """Source point coordinates with lat/lon."""
+    lat: float = Field(..., description="Latitude")
+    lon: float = Field(..., description="Longitude")
+
+
 class ErosionSimulationRequest(BaseModel):
     """Validate erosion risk simulation request."""
     model_config = ConfigDict(
@@ -145,12 +151,6 @@ class ErosionSimulationRequest(BaseModel):
         description="Sector centre lat/lon for real terrain slope lookup via SRTM. "
                     "Omit to use the known ATH sector centre or Jasper watershed default.",
     )
-
-
-class SourcePoint(BaseModel):
-    """Source point coordinates with lat/lon."""
-    lat: float = Field(..., description="Latitude")
-    lon: float = Field(..., description="Longitude")
 
 
 class ContaminantSimulationRequest(BaseModel):
