@@ -28,9 +28,9 @@ const SNAPSHOTS: Snapshot[] = [
 ];
 
 const TYPE_BADGE: Record<Snapshot["type"], string> = {
-  "Full Survey":    "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400",
-  "Incremental":    "bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400",
-  "Satellite Pass": "bg-cyan-50 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400",
+  "Full Survey":    "bg-sait-blue/10 text-sait-blue",
+  "Incremental":    "bg-sait-purple/10 text-sait-purple",
+  "Satellite Pass": "bg-sait-sky/10 text-sait-sky",
 };
 
 export function ArchivesPage() {
@@ -60,7 +60,7 @@ export function ArchivesPage() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search archives..."
-          className="px-3 py-2 rounded-lg bg-surface-alt text-sm text-gray-800 dark:text-gray-100 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-blue-500 min-w-[220px]"
+          className="px-3 py-2 rounded-lg bg-surface-alt text-sm text-gray-800 dark:text-gray-100 placeholder:text-gray-400 outline-none focus:ring-2 focus:ring-sait-sky min-w-[220px]"
         />
       </div>
 
@@ -89,7 +89,7 @@ export function ArchivesPage() {
                 <span className="hidden sm:inline text-xs text-gray-400 w-16 text-right">{snap.size}</span>
                 <button
                   onClick={() => setExpandedId((id) => (id === snap.id ? null : snap.id))}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sait-red hover:bg-sait-red-deep text-white text-xs font-semibold transition-colors"
                 >
                   <LayersIcon className="w-3.5 h-3.5" />
                   {expandedId === snap.id ? "Hide Snapshot" : "View Snapshot"}
@@ -100,8 +100,8 @@ export function ArchivesPage() {
             {expandedId === snap.id && (
               <div className="mt-4 pt-4 border-t border-gray-200/60 dark:border-gray-700/40">
                 <div className="rounded-lg bg-surface-alt border border-gray-200/60 dark:border-gray-700/40 p-4 flex flex-col items-center gap-3 text-center">
-                  <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                    <HistoryIcon className="w-5 h-5 text-blue-500" />
+                  <div className="w-10 h-10 rounded-full bg-sait-sky/10 flex items-center justify-center">
+                    <HistoryIcon className="w-5 h-5 text-sait-sky" />
                   </div>
                   <div>
                     <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">{snap.name}</p>

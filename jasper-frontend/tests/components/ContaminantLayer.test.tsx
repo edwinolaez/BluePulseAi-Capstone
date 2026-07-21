@@ -7,8 +7,9 @@ jest.mock("../../lib/api", () => ({
 }));
 
 jest.mock("react-leaflet", () => ({
-  Polyline: () => <div data-testid="river-polyline" />,
-  Circle:   ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  Polyline:      () => <div data-testid="river-polyline" />,
+  Circle:        ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  CircleMarker:  ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
   Tooltip:  ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
   Marker:   forwardRef<unknown, { children?: React.ReactNode }>(({ children }, _ref) => <div>{children}</div>),
   Popup:    ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,

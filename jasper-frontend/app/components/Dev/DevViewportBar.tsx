@@ -51,7 +51,7 @@ export function DevViewportBar({ mode, onChange }: Props) {
           title={btn.label}
           className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors ${
             mode === btn.id
-              ? "bg-cyan-500 text-white"
+              ? "bg-sait-red text-white"
               : "text-gray-500 hover:text-gray-200 hover:bg-gray-800"
           }`}
         >

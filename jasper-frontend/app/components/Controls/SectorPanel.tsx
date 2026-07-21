@@ -90,7 +90,7 @@ export function SectorPanel({ sectorId, dateFrom, dateTo, interpolated }: Props)
             </span>
           )}
           {interpolated?.is_estimated && (
-            <span className="text-[10px] text-blue-500 font-semibold px-1.5 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/20">
+            <span className="text-[10px] text-sait-sky font-semibold px-1.5 py-0.5 rounded-full bg-sait-sky/10">
               Estimated
             </span>
           )}
@@ -153,7 +153,7 @@ export function SectorPanel({ sectorId, dateFrom, dateTo, interpolated }: Props)
           <div className="pt-2 border-t border-gray-200/60 dark:border-gray-700/40 text-[10px] text-gray-400 dark:text-gray-500">
             {!isLive && <span className="mr-1 text-amber-500">⚠ Estimated data —</span>}
             {interpolated?.nearest_before && interpolated?.nearest_after && interpolated.is_estimated && (
-              <span className="block text-blue-400 dark:text-blue-500 mb-0.5">
+              <span className="block text-sait-sky mb-0.5">
                 Blending {interpolated.nearest_before.slice(0, 10)} → {interpolated.nearest_after.slice(0, 10)}
               </span>
             )}

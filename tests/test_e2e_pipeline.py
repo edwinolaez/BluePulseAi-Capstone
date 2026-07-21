@@ -30,6 +30,7 @@ import pytest
 import httpx
 import os
 import time
+import uuid
 from dotenv import load_dotenv
 
 load_dotenv(dotenv_path=".env.local")
@@ -63,12 +64,12 @@ def unique_sector_id():
     """
     Generates a unique sector ID for each E2E test run.
 
-    We use a timestamp so two tests running at the same time never collide.
+    We use a UUID so two tests running in the same second never collide.
     The prefix E2E- makes it easy to identify and clean up test data in the DB.
 
-    Example: "E2E-1719360000" (Unix timestamp of when the test started)
+    Example: "E2E-a3f8c2d1e5b0"
     """
-    return f"E2E-{int(time.time())}"
+    return f"E2E-{uuid.uuid4().hex[:12]}"
 
 
 @pytest.fixture

@@ -9,12 +9,12 @@ from fastapi.security.api_key import APIKeyHeader
 from pydantic import BaseModel, Field
 
 from database import get_supabase
+from config import API_KEY
 
 router = APIRouter()
 
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB in bytes
 
-API_KEY = "jasper-dev-api-key-2026"
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 

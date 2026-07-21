@@ -9,6 +9,15 @@
 import { useState } from "react";
 import { CheckCircleIcon, ClockIcon, DownloadIcon, SendIcon } from "../Layout/icons";
 
+interface AuditEntry {
+  id: string;
+  action: "downloaded" | "ingest_run";
+  reportId: string;
+  reportTitle: string;
+  actor: string;
+  timestamp: string;
+}
+
 // The types of reports available — used for the filter buttons at the top
 type Category = "Hydro-geology" | "Limnology" | "Remote Sensing" | "Model Output";
 // A report is either ready to download, currently running, or still in draft
@@ -35,11 +44,24 @@ const INITIAL_REPORTS: Report[] = [
 ];
 
 export function ReportsPage() {
-  // Which category filter is active — "All" shows everything
-  const [filter, setFilter]           = useState<"All" | Category>("All");
-  const [reports, setReports]         = useState(INITIAL_REPORTS);
-  // Tracks which report is currently being "downloaded" to show the loading state
+  const [filter, setFilter]               = useState<"All" | Category>("All");
+  const [reports, setReports]             = useState(INITIAL_REPORTS);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [auditLog, setAuditLog]           = useState<AuditEntry[]>([]);
+
+  function addAuditEntry(action: AuditEntry["action"], report: Report) {
+    setAuditLog((prev) => [
+      {
+        id:          `${Date.now()}-${action}`,
+        action,
+        reportId:    report.id,
+        reportTitle: report.title,
+        actor:       "Edwin Olaez",
+        timestamp:   new Date().toLocaleString("en-CA", { hour12: false }),
+      },
+      ...prev.slice(0, 19), // keep last 20 entries
+    ]);
+  }
 
   // Only show reports that match the selected category filter
   const visible = filter === "All" ? reports : reports.filter((r) => r.category === filter);
@@ -78,11 +100,14 @@ export function ReportsPage() {
     a.click();
     URL.revokeObjectURL(url);
 
+    addAuditEntry("downloaded", report);
     setTimeout(() => setDownloadingId(null), 1200);
   }
 
-  // Simulates triggering a model ingest run — changes the status to "Running..." then back to "Ready"
   function handleRunIngest(id: string) {
+    const report = reports.find((r) => r.id === id);
+    if (!report) return;
+    addAuditEntry("ingest_run", report);
     setReports((prev) => prev.map((r) => (r.id === id ? { ...r, status: "Running..." } : r)));
     setTimeout(() => {
       setReports((prev) => prev.map((r) => (r.id === id ? { ...r, status: "Ready" } : r)));
@@ -107,7 +132,7 @@ export function ReportsPage() {
               onClick={() => setFilter(cat)}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                 filter === cat
-                  ? "bg-blue-600 text-white shadow"
+                  ? "bg-sait-red text-white shadow"
                   : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
               }`}
             >
@@ -117,11 +142,11 @@ export function ReportsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
         {visible.map((report) => (
           <div key={report.id} className="rounded-xl border border-gray-200/60 dark:border-gray-700/40 bg-surface p-5">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
+              <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded bg-sait-sky/10 text-sait-sky">
                 {report.category}
               </span>
               <span className="text-xs font-mono text-gray-400">{report.id}</span>
@@ -157,7 +182,7 @@ export function ReportsPage() {
               <button
                 onClick={() => handleDownload(report.id)}
                 disabled={downloadingId === report.id}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-70 text-white text-sm font-semibold transition-colors"
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-sait-red hover:bg-sait-red-deep disabled:opacity-70 text-white text-sm font-semibold transition-colors"
               >
                 <DownloadIcon className="w-4 h-4" />
                 {downloadingId === report.id ? "Preparing Download..." : "Download PDF Report"}
@@ -174,6 +199,46 @@ export function ReportsPage() {
             )}
           </div>
         ))}
+      </div>
+      {/* Audit Log — MVP: tracks downloads and ingest runs with actor + timestamp */}
+      <div className="rounded-xl border border-gray-200/60 dark:border-gray-700/40 bg-surface overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-200/60 dark:border-gray-700/40 flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">Activity Log</h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Record of report actions taken this session</p>
+          </div>
+          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">MVP — Session Only</span>
+        </div>
+
+        {auditLog.length === 0 ? (
+          <div className="px-5 py-8 text-center text-xs text-gray-400 dark:text-gray-500">
+            No actions recorded yet — downloads and ingest runs will appear here.
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-100 dark:divide-gray-800/60">
+            {auditLog.map((entry) => (
+              <div key={entry.id} className="flex items-start gap-3 px-5 py-3">
+                <div className={`mt-0.5 w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
+                  entry.action === "downloaded" ? "bg-sait-sky/10" : "bg-green-50 dark:bg-green-900/20"
+                }`}>
+                  {entry.action === "downloaded"
+                    ? <DownloadIcon className="w-3.5 h-3.5 text-sait-sky" />
+                    : <SendIcon className="w-3.5 h-3.5 text-green-500" />
+                  }
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-gray-700 dark:text-gray-200">
+                    <span className="font-semibold">{entry.actor}</span>
+                    {" "}{entry.action === "downloaded" ? "downloaded" : "triggered ingest for"}{" "}
+                    <span className="font-medium text-gray-900 dark:text-gray-100">{entry.reportId}</span>
+                    {" — "}<span className="text-gray-500 dark:text-gray-400 truncate">{entry.reportTitle}</span>
+                  </p>
+                </div>
+                <span className="text-[10px] text-gray-400 shrink-0 tabular-nums">{entry.timestamp}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

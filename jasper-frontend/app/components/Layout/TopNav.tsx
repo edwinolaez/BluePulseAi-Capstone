@@ -23,9 +23,9 @@ const ROLE_LABELS: Record<UserRole, string> = {
 
 // Colour coding for each role badge — makes it easy to tell roles apart at a glance
 const ROLE_COLORS: Record<UserRole, string> = {
-  researcher: "bg-blue-500/15 text-blue-500",
-  admin:      "bg-purple-500/15 text-purple-500",
-  superadmin: "bg-amber-500/15 text-amber-500",
+  researcher: "bg-sait-sky/15 text-sait-sky",
+  admin:      "bg-sait-purple/15 text-sait-purple",
+  superadmin: "bg-sait-red/15 text-sait-red",
 };
 
 // The base set of tabs shown to all users
@@ -91,7 +91,7 @@ export function TopNav({
         {/* User info header — shows avatar initial, name, email, and role badge */}
         <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center text-white text-sm font-bold shrink-0">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-sait-plum to-sait-purple flex items-center justify-center text-white text-sm font-bold shrink-0">
               {currentUser.name.charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0">
@@ -164,7 +164,7 @@ export function TopNav({
           </button>
 
           {/* App name / branding */}
-          <h1 className="text-base md:text-lg font-bold text-cyan-500 tracking-tight whitespace-nowrap shrink-0">
+          <h1 className="text-base md:text-lg font-bold text-sait-sky tracking-tight whitespace-nowrap shrink-0">
             Jasper Environmental Twin
           </h1>
 
@@ -176,9 +176,9 @@ export function TopNav({
                 onClick={() => onTabChange(tab.id)}
                 className={`text-sm font-medium pb-1 border-b-2 whitespace-nowrap transition-colors ${
                   activeTab === tab.id
-                    ? "text-cyan-500 border-cyan-500"
+                    ? "text-sait-red border-sait-red"
                     : "text-gray-600 dark:text-gray-400 border-transparent hover:text-gray-900 dark:hover:text-gray-200"
-                } ${tab.id === "admin" ? "text-amber-500 border-amber-500/0 hover:border-amber-500" : ""}`}
+                } ${tab.id === "admin" ? "text-sait-red border-sait-red/0 hover:border-sait-red" : ""}`}
               >
                 {tab.label}
               </button>
@@ -207,7 +207,7 @@ export function TopNav({
           <button
             onClick={() => currentUser.role === "superadmin" ? onTabChange("admin") : onOpenSupport()}
             title={currentUser.role === "superadmin" ? "User Management" : "Support & Settings"}
-            className="hidden sm:flex w-9 h-9 items-center justify-center rounded-full text-gray-600 dark:text-gray-300 hover:bg-surface-alt hover:text-cyan-500 transition-colors"
+            className="hidden sm:flex w-9 h-9 items-center justify-center rounded-full text-gray-600 dark:text-gray-300 hover:bg-surface-alt hover:text-sait-sky transition-colors"
           >
             <SettingsIcon className="w-5 h-5" />
           </button>
@@ -229,7 +229,7 @@ export function TopNav({
                 </span>
               </div>
               {/* Circular avatar with the user's initial */}
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-sait-plum to-sait-purple flex items-center justify-center text-white text-xs font-bold shrink-0">
                 {currentUser.name.charAt(0).toUpperCase()}
               </div>
             </button>

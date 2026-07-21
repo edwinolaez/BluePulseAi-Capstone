@@ -3,19 +3,23 @@
 @tailwind utilities;
 
 :root {
-  --background: #f1f5f9;
-  --foreground: #0f172a;
+  /* 60% dominant — SAIT Light Grey background, Charcoal text */
+  --background: #F6F7F9;
+  --foreground: #212529;
+  /* 30% secondary — white panels, soft grey hover */
   --surface: #ffffff;
   --surface-container: #ffffff;
-  --surface-alt: #e2e8f0;
+  --surface-alt: #e8ecf0;
 }
 
 .dark {
-  --background: #121416;
-  --foreground: #e2e2e5;
-  --surface: #1e2022;
-  --surface-container: #1e2022;
-  --surface-alt: #2a2d30;
+  /* 60% dominant — SAIT Midnight Blue background */
+  --background: #0C2340;
+  --foreground: #e8ecf0;
+  /* 30% secondary — lighter navy for panels and cards */
+  --surface: #132952;
+  --surface-container: #132952;
+  --surface-alt: #1a3a64;
 }
 
 body {

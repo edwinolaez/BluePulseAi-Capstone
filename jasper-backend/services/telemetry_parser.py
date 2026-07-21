@@ -4,10 +4,59 @@ This service fetches real-time hydrometric data from Environment Canada.
 Station 07AA002 monitors the Athabasca River near Jasper — this is our
 primary source for flow rate and water level readings post-wildfire.
 """
+import csv
+import io
 import requests
+from datetime import datetime, timezone
 
-# Base URL for Environment Canada's Water Office bulk data download
 WATEROFFICE_URL = "https://wateroffice.ec.gc.ca/services/real_time_data/csv/inline"
+
+# Athabasca River at Jasper cross-section estimate (~50 m wide, ~1 m deep)
+# Converts bulk discharge (m³/s) to an approximate surface velocity (m/s)
+_CROSS_SECTION_M2 = 50.0
+
+
+def _parse_discharge(csv_text: str) -> float | None:
+    """
+    Extract the most-recent discharge reading from a Water Office CSV response.
+
+    The CSV has one column per requested parameter. We look for a column whose
+    name contains "discharge", "flow", or "46" (the Water Office parameter code
+    for discharge). Falls back to the third column if no named match is found,
+    since Water Office CSVs are typically ordered: Date, Level, Discharge.
+    """
+    lines = [l for l in csv_text.splitlines()
+             if l.strip() and not l.lstrip().startswith("#")]
+    if len(lines) < 2:
+        return None
+
+    reader = csv.DictReader(io.StringIO("\n".join(lines)))
+    target_col: str | None = None
+    last_value: float | None = None
+
+    for row in reader:
+        if target_col is None:
+            hints = ("discharge", "flow", "46")
+            target_col = next(
+                (c for c in row if any(h in c.lower() for h in hints)),
+                None
+            )
+            if target_col is None:
+                cols = list(row.keys())
+                if len(cols) >= 3:
+                    target_col = cols[2]
+
+        if target_col:
+            raw = row.get(target_col, "").strip().strip('"')
+            if raw and raw not in ("M", "T", ""):
+                try:
+                    v = float(raw.replace(",", ""))
+                    if v >= 0:
+                        last_value = v
+                except ValueError:
+                    pass
+
+    return last_value
 
 
 def fetch_wateroffice_data(station_id: str = "07AA002") -> dict:
@@ -23,42 +72,55 @@ def fetch_wateroffice_data(station_id: str = "07AA002") -> dict:
         station_id: The Water Office station ID — default is Athabasca River near Jasper
 
     Returns:
-        dict: Status, station info, and raw CSV data from Environment Canada
-              Returns unavailable/error status if the request fails
+        dict with keys:
+          station_id, source, status, records,
+          discharge_m3s  — raw discharge in cubic metres per second (None if unavailable)
+          water_velocity_ms — estimated surface velocity in m/s (None if unavailable)
     """
+    now = datetime.now(timezone.utc)
     try:
-        # Build the query parameters for the bulk data download
-        # timeframe=2 means hourly data, parameters 47 and 46 are level and flow
         params = {
             "format": "csv",
             "stationID": station_id,
-            "Year": "2024",
-            "Month": "1",
-            "Day": "1",
+            "Year":  str(now.year),
+            "Month": str(now.month),
+            "Day":   str(now.day),
             "timeframe": "2",
             "submit": "Download+Data",
-            # Request both water level (47) and discharge/flow rate (46)
             "parameters[]": [47, 46],
         }
 
-        # Make the GET request with a 10 second timeout
-        # timeout prevents the server from hanging if Environment Canada is slow
         response = requests.get(WATEROFFICE_URL, params=params, timeout=10)
 
-        # If successful, return the data with a record count
         if response.status_code == 200:
+            discharge_m3s = _parse_discharge(response.text)
+            if discharge_m3s is not None:
+                water_velocity_ms = round(min(discharge_m3s / _CROSS_SECTION_M2, 5.0), 3)
+            else:
+                water_velocity_ms = None
+
             return {
                 "station_id": station_id,
                 "source": "Environment Canada Water Office",
                 "status": "fetched",
-                # Count lines in CSV response as a quick record count
-                "records": len(response.text.split("\n"))
+                "records": len(response.text.splitlines()),
+                "discharge_m3s": discharge_m3s,
+                "water_velocity_ms": water_velocity_ms,
             }
 
-        # Return unavailable status if the request didn't succeed
-        return {"station_id": station_id, "status": "unavailable"}
+        return {
+            "station_id": station_id,
+            "status": "unavailable",
+            "discharge_m3s": None,
+            "water_velocity_ms": None,
+        }
 
     except Exception as e:
-        # Log the error and return error status — caller handles missing data
         print(f"Water Office fetch error: {e}")
-        return {"station_id": station_id, "status": "error", "message": str(e)}
+        return {
+            "station_id": station_id,
+            "status": "error",
+            "message": str(e),
+            "discharge_m3s": None,
+            "water_velocity_ms": None,
+        }
