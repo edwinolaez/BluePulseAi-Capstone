@@ -1,4 +1,5 @@
 """Data query router — returns environmental layers from Supabase — Owner: Feven."""
+import os
 from datetime import datetime
 from typing import Optional
 
@@ -10,8 +11,9 @@ from database import get_supabase
 
 router = APIRouter()
 
-# Same API key setup as ingest.py — every protected endpoint checks this header
-API_KEY = "jasper-dev-api-key-2026"
+# Read API key from environment — avoids hardcoding secrets in source code
+# Falls back to dev key if env var is not set (local development only)
+API_KEY = os.getenv("NEXT_PUBLIC_API_KEY", "jasper-dev-api-key-2026")
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
@@ -131,3 +133,60 @@ async def get_layers(
         "layer_type": layer_type,
         "layers": layers
     }
+
+
+@router.get("/api/v1/sectors/{sector_id}/timeline", dependencies=[Depends(require_api_key)])
+async def get_sector_timeline(
+    sector_id: str,
+    layer_type: Optional[str] = Query(None)
+):
+    """Returns all timestamped scan records for a sector ordered by timestamp.
+
+    This endpoint is specifically for Reyta's timeline slider — it returns
+    all ingest records in chronological order so the frontend can blend
+    between scan dates for smooth map transitions.
+
+    Returns 404 if no records exist for the sector.
+    """
+    try:
+        supabase = get_supabase()
+
+        # Query ingest_records ordered by timestamp ascending (oldest first)
+        # Reyta's slider needs chronological order to interpolate between dates
+        query = (
+            supabase.table("ingest_records")
+            .select("id, sector_id, layer_type, timestamp, payload")
+            .eq("sector_id", sector_id)
+            .order("timestamp", desc=False)
+        )
+
+        # Filter by layer_type if provided
+        if layer_type:
+            query = query.eq("layer_type", layer_type)
+
+        result = query.execute()
+
+        # Return 404 if no records found for this sector
+        if not result.data:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No timeline records found for sector '{sector_id}'"
+            )
+
+        return {
+            "sector_id": sector_id,
+            "layer_type": layer_type,
+            # Total number of scan dates available for interpolation
+            "total_records": len(result.data),
+            "timeline": result.data
+        }
+
+    except HTTPException:
+        # Re-raise HTTP exceptions so FastAPI handles them correctly
+        raise
+    except Exception as e:
+        print(f"Timeline query error: {e}")
+        raise HTTPException(
+            status_code=503, detail=f"Database unavailable: {e}"
+        ) from e
+    
