@@ -13,6 +13,7 @@ import {
   MapPinIcon,
 } from "./icons";
 import { AppTab } from "./TopNav";
+import { ToggleSwitch } from "../Controls/ToggleSwitch";
 
 const PAGE_NAV: { id: AppTab; icon: typeof MapPinIcon; label: string }[] = [
   { id: "dashboard", icon: ChartLineIcon, label: "Dashboard" },
@@ -22,10 +23,16 @@ const PAGE_NAV: { id: AppTab; icon: typeof MapPinIcon; label: string }[] = [
   { id: "archives",  icon: FolderIcon,    label: "Archives" },
 ];
 
-const LEGEND_ITEMS = [
-  { color: "#a855f7", label: "Erosion Outlines" },
-  { color: "#0ea5e9", label: "Water Chemistry" },
-  { color: "#2563eb", label: "Vegetation Index" },
+const RISK_COLORS = [
+  { color: "#ef4444", label: "High" },
+  { color: "#f59e0b", label: "Med" },
+  { color: "#22c55e", label: "Low" },
+];
+
+const LAYER_LEGEND = [
+  { color: "#6D2077", label: "Soil Erosion"    },
+  { color: "#00A3E0", label: "Water Quality"   },
+  { color: "#005EB8", label: "Forest Regrowth" },
 ];
 
 const SECTORS = [
@@ -45,10 +52,19 @@ interface Props {
   onOpenSupport: () => void;
   mobileOpen: boolean;
   onCloseMobile: () => void;
+  is3D: boolean;
+  onToggle3D: (v: boolean) => void;
+  showErosion: boolean;
+  onToggleErosion: (v: boolean) => void;
+  showContaminant: boolean;
+  onToggleContaminant: (v: boolean) => void;
+  showBurnScar: boolean;
+  onToggleBurnScar: (v: boolean) => void;
 }
 
-export function Sidebar({ activeTab, onNavigate, onFocusSector, onOpenLogs, onOpenSupport, mobileOpen, onCloseMobile }: Props) {
+export function Sidebar({ activeTab, onNavigate, onFocusSector, onOpenLogs, onOpenSupport, mobileOpen, onCloseMobile, is3D, onToggle3D, showErosion, onToggleErosion, showContaminant, onToggleContaminant, showBurnScar, onToggleBurnScar }: Props) {
   const [expandedPanel, setExpandedPanel] = useState<ExpandedPanel>(null);
+  const [collapsed, setCollapsed] = useState(false);
 
   // Tool buttons — these are map utilities, not page navigation.
   // Page navigation is handled exclusively by the top nav tabs.
@@ -78,18 +94,39 @@ export function Sidebar({ activeTab, onNavigate, onFocusSector, onOpenLogs, onOp
           onClick={onCloseMobile}
         />
       )}
-      <aside className={`
-        fixed inset-y-0 left-0 z-[1100] w-64 shrink-0 flex flex-col
-        bg-surface border-r border-gray-200/60 dark:border-gray-800/60
-        px-4 py-5 overflow-y-auto
-        transition-transform duration-300
-        ${mobileOpen ? "translate-x-0" : "-translate-x-full"}
-        md:relative md:translate-x-0 md:z-auto
-      `}>
+      <aside className={[
+        "fixed inset-y-0 left-0 z-[1100] shrink-0 flex flex-col",
+        "bg-surface border-r border-gray-200/60 dark:border-gray-800/60",
+        "overflow-y-auto overflow-x-hidden",
+        "transition-[transform,width] duration-300",
+        // mobile: full width, slides in/out
+        mobileOpen ? "translate-x-0 w-64 px-4 py-5" : "-translate-x-full w-64 px-4 py-5",
+        // desktop: collapsible
+        collapsed
+          ? "md:translate-x-0 md:w-10 md:px-0 md:py-2"
+          : "md:translate-x-0 md:w-64 md:px-4 md:py-5",
+        "md:relative md:z-auto",
+      ].join(" ")}>
+      {/* Header row — collapse button only visible on desktop */}
       <div className="flex items-center gap-2 px-2 mb-0.5">
-        <MapPinIcon className="w-5 h-5 text-cyan-500" />
-        <h2 className="text-base font-bold text-cyan-500">Jasper Watch</h2>
+        {!collapsed && <MapPinIcon className="w-5 h-5 text-sait-sky shrink-0" />}
+        {!collapsed && <h2 className="text-base font-bold text-sait-sky truncate">Jasper Watch</h2>}
+        <button
+          onClick={() => setCollapsed((c) => !c)}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className="hidden md:flex items-center justify-center w-6 h-6 rounded-md text-gray-400 hover:text-sait-sky hover:bg-sait-sky/10 transition-colors ml-auto shrink-0"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            {collapsed
+              ? <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+              : <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+            }
+          </svg>
+        </button>
       </div>
+      {/* Everything below the header is hidden on desktop when collapsed, always shown on mobile */}
+      <div className={collapsed ? "md:hidden flex flex-col flex-1 min-h-0" : "flex flex-col flex-1 min-h-0"}>
+
       <p className="px-2 mb-4 text-[10px] font-semibold tracking-widest text-gray-500 dark:text-gray-500 uppercase">
         JASPER VALLEY AREA
       </p>
@@ -104,7 +141,7 @@ export function Sidebar({ activeTab, onNavigate, onFocusSector, onOpenLogs, onOp
               onClick={() => onNavigate(id)}
               className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-left transition-colors ${
                 activeTab === id
-                  ? "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-l-2 border-cyan-500"
+                  ? "bg-sait-red/10 text-sait-red border-l-2 border-sait-red"
                   : "text-gray-600 dark:text-gray-300 hover:bg-surface-alt border-l-2 border-transparent"
               }`}
             >
@@ -123,7 +160,7 @@ export function Sidebar({ activeTab, onNavigate, onFocusSector, onOpenLogs, onOp
             onClick={onClick}
             className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-left transition-colors ${
               isActive
-                ? "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-l-2 border-cyan-500"
+                ? "bg-sait-red/10 text-sait-red border-l-2 border-sait-red"
                 : "text-gray-600 dark:text-gray-300 hover:bg-surface-alt border-l-2 border-transparent"
             }`}
           >
@@ -133,14 +170,118 @@ export function Sidebar({ activeTab, onNavigate, onFocusSector, onOpenLogs, onOp
         ))}
       </nav>
 
+      {/* 2D / 3D toggle + layer switches — only shown on the Map tab */}
+      {activeTab === "map" && (
+        <div className="mt-3 space-y-3">
+          {/* View mode pill */}
+          <div className="flex items-center gap-1 p-0.5 rounded-lg bg-gray-100 dark:bg-gray-800">
+            <button
+              onClick={() => onToggle3D(false)}
+              className={[
+                "flex-1 text-xs font-semibold py-1.5 rounded-md transition-all",
+                !is3D
+                  ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300",
+              ].join(" ")}
+            >
+              2D Map
+            </button>
+            <button
+              onClick={() => onToggle3D(true)}
+              className={[
+                "flex-1 text-xs font-semibold py-1.5 rounded-md transition-all",
+                is3D
+                  ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300",
+              ].join(" ")}
+            >
+              3D Risk
+            </button>
+          </div>
+          {/* Layer toggles */}
+          <div className="px-1 space-y-2">
+            <ToggleSwitch
+              label="Soil Erosion Risk"
+              dotColor="#6D2077"
+              iconPath="m8 3 4 8 5-5 5 15H2L8 3z"
+              checked={showErosion}
+              onChange={onToggleErosion}
+            />
+            <ToggleSwitch
+              label="River Water Quality"
+              dotColor="#00A3E0"
+              iconPath="M9 20l-5.447-2.724A1 1 0 0 1 3 16.382V5.618a1 1 0 0 1 1.447-.894L9 7m0 13l6-3m-6-13l6 3m0 13l5.447 2.724A1 1 0 0 0 21 18.382V7.618a1 1 0 0 0-1.447-.894L15 9m0 11V9m0 0L9 7"
+              checked={showContaminant}
+              onChange={onToggleContaminant}
+            />
+            <ToggleSwitch
+              label="Forest Regrowth Status"
+              dotColor="#005EB8"
+              iconPath="M8.5 14.5A2.5 2.5 0 0 0 11 17a2.5 2.5 0 0 0 2.5-2.5c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2 1Z"
+              checked={showBurnScar}
+              onChange={onToggleBurnScar}
+            />
+          </div>
+        </div>
+      )}
+
       {expandedPanel === "legend" && (
         <div className="mt-2 mx-1 p-3 rounded-lg bg-surface-alt space-y-2">
-          {LEGEND_ITEMS.map(({ color, label }) => (
-            <div key={label} className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
-              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />
-              {label}
+          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2">
+            Sensors &amp; Risk
+          </p>
+          {/* Each row: sensor colour circle + name + High/Med/Low risk squares */}
+          {LAYER_LEGEND.map(({ color, label }) => (
+            <div key={label} className="flex items-center gap-2">
+              <span
+                className="w-2.5 h-2.5 rounded-full shrink-0 border border-white/60 dark:border-gray-700"
+                style={{ background: color }}
+              />
+              <span className="text-xs text-gray-600 dark:text-gray-300 flex-1 leading-none">{label}</span>
+              <div className="flex items-center gap-1">
+                {RISK_COLORS.map(({ color: rc, label: rl }) => (
+                  <span
+                    key={rl}
+                    title={rl === "High" ? "High Risk" : rl === "Med" ? "Medium Risk" : "Low Risk"}
+                    className="w-2 h-2 rounded-sm shrink-0"
+                    style={{ background: rc }}
+                  />
+                ))}
+              </div>
             </div>
           ))}
+          <div className="pt-2 border-t border-gray-200/60 dark:border-gray-700/40 space-y-0.5">
+            <p className="text-[10px] text-gray-400 dark:text-gray-500">Column height = risk score</p>
+            <p className="text-[10px] text-gray-400 dark:text-gray-500">Terrain = real Rocky Mtn elevation</p>
+          </div>
+          {/* Data provenance per layer */}
+          <div className="pt-2 border-t border-gray-200/60 dark:border-gray-700/40 space-y-2">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">Data Provenance</p>
+            {[
+              { color: "#6D2077", layer: "Soil Erosion",    source: "USGS SRTM + Env. Canada", quality: "Good", refresh: "Jul 18, 2026" },
+              { color: "#00A3E0", layer: "Water Quality",   source: "WSC Station 07AA001",      quality: "Good", refresh: "Jul 20, 2026" },
+              { color: "#005EB8", layer: "Forest Regrowth", source: "Sentinel-2 B4/B8A/B12",    quality: "Good", refresh: "Jul 18, 2026" },
+            ].map(({ color, layer, source, quality, refresh }) => (
+              <div key={layer} className="rounded-md bg-gray-50 dark:bg-gray-800/50 p-2 space-y-0.5">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+                  <span className="text-[10px] font-semibold text-gray-600 dark:text-gray-300">{layer}</span>
+                </div>
+                <div className="flex justify-between text-[10px]">
+                  <span className="text-gray-400">Source</span>
+                  <span className="text-gray-500 dark:text-gray-400 text-right">{source}</span>
+                </div>
+                <div className="flex justify-between text-[10px]">
+                  <span className="text-gray-400">Refreshed</span>
+                  <span className="text-gray-500 dark:text-gray-400">{refresh}</span>
+                </div>
+                <div className="flex justify-between text-[10px]">
+                  <span className="text-gray-400">Quality</span>
+                  <span className="text-green-600 dark:text-green-400 font-semibold">✓ {quality}</span>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -163,7 +304,7 @@ export function Sidebar({ activeTab, onNavigate, onFocusSector, onOpenLogs, onOp
               <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">{sector.subtitle}</p>
               <button
                 onClick={() => onFocusSector(sector.lat, sector.lng, sector.zoom)}
-                className="flex items-center gap-1 text-xs font-semibold text-blue-500 hover:text-blue-400 transition-colors"
+                className="flex items-center gap-1 text-xs font-semibold text-sait-sky hover:text-sait-blue transition-colors"
               >
                 <ArrowUpRightIcon className="w-3.5 h-3.5" />
                 Focus Map
@@ -191,7 +332,7 @@ export function Sidebar({ activeTab, onNavigate, onFocusSector, onOpenLogs, onOp
             a.click();
             URL.revokeObjectURL(url);
           }}
-          className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition-colors"
+          className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg bg-sait-red hover:bg-sait-red-deep text-white text-sm font-semibold transition-colors"
         >
           <DownloadIcon className="w-4 h-4" />
           Download Map Data
@@ -211,6 +352,8 @@ export function Sidebar({ activeTab, onNavigate, onFocusSector, onOpenLogs, onOp
           Diagnostic Logs
         </button>
       </div>
+
+      </div>{/* end collapsible content wrapper */}
     </aside>
     </>
   );

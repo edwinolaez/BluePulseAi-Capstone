@@ -1,21 +1,15 @@
-// ToggleSwitch is a reusable on/off switch used in the map's layer control panel.
-// Each switch has a coloured dot that matches the layer it controls,
-// a text label, and a sliding pill toggle.
-// It's a controlled component — the parent tells it what state to be in
-// and what to do when clicked.
-
 "use client";
 
 interface Props {
-  label: string;      // text shown next to the toggle (e.g. "Soil Erosion Risk")
-  dotColor: string;   // CSS colour for the small dot — matches the layer's map colour
-  checked: boolean;   // whether the toggle is currently on
-  onChange: (checked: boolean) => void;  // called when the user flips the switch
+  label: string;
+  dotColor: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  iconPath?: string;  // SVG path data — when provided renders a mini map badge instead of a plain dot
 }
 
-export function ToggleSwitch({ label, dotColor, checked, onChange }: Props) {
+export function ToggleSwitch({ label, dotColor, checked, onChange, iconPath }: Props) {
   return (
-    // Using a button with role="switch" makes this accessible to screen readers
     <button
       type="button"
       role="switch"
@@ -23,20 +17,49 @@ export function ToggleSwitch({ label, dotColor, checked, onChange }: Props) {
       onClick={() => onChange(!checked)}
       className="flex items-center justify-between w-full gap-3 text-sm font-medium text-gray-900 dark:text-white select-none"
     >
-      {/* Left side: coloured dot + label text */}
-      <span className="flex items-center gap-2">
-        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: dotColor }} />
+      <span className="flex items-center gap-2.5">
+        {iconPath ? (
+          // Mini badge — same structure as the HazardZone marker on the map:
+          // coloured border ring, SVG icon, small dot in the top-right corner
+          <span
+            className="relative w-6 h-6 rounded-full border-2 bg-white dark:bg-gray-900 flex items-center justify-center shrink-0 shadow-sm"
+            style={{ borderColor: dotColor }}
+          >
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke={dotColor}
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d={iconPath} />
+            </svg>
+            <span
+              className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full border-[1.5px] border-white dark:border-gray-900"
+              style={{ background: dotColor }}
+            />
+          </span>
+        ) : (
+          // Fallback plain dot with white ring (used when no icon is supplied)
+          <span
+            className="w-4 h-4 rounded-full shrink-0"
+            style={{
+              background: dotColor,
+              boxShadow: `0 0 0 2px #ffffff, 0 0 0 3.5px ${dotColor}99, 0 1px 4px rgba(0,0,0,0.25)`,
+            }}
+          />
+        )}
         {label}
       </span>
 
-      {/* Right side: the sliding pill toggle.
-          Turns cyan when on, grey when off. */}
       <span
         className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
-          checked ? "bg-cyan-500" : "bg-gray-300 dark:bg-gray-600"
+          checked ? "bg-sait-red" : "bg-gray-300 dark:bg-gray-600"
         }`}
       >
-        {/* The white circle that slides left (off) or right (on) */}
         <span
           className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
             checked ? "translate-x-[18px]" : "translate-x-[3px]"

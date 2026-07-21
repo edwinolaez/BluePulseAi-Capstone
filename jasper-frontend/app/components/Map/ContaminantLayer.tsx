@@ -10,7 +10,7 @@
 
 import { useEffect, useState } from "react";
 import L from "leaflet";
-import { Marker, Polyline, useMap } from "react-leaflet";
+import { CircleMarker, Marker, Polyline, Tooltip, useMap } from "react-leaflet";
 import { fetchContaminantSimulation, ModelOutput } from "../../../lib/api";
 import { HazardZone } from "./HazardZone";
 
@@ -30,8 +30,8 @@ const RIVER_BRANCH: [number, number][] = RIVER_MAIN.map(
   ([lat, lng]): [number, number] => [lat + 0.004, lng + 0.006]
 );
 
-// The GPS point where contamination risk is highest — centre of the hazard zone circle
-const CRITICAL_CENTER: [number, number] = [52.875, -118.060];
+// WSC station 07AA001 — Miette River at Jasper (Water Survey of Canada)
+const CRITICAL_CENTER: [number, number] = [52.8639, -118.1069];
 
 // Four evenly-spaced positions along the river where animated arrows are placed
 const ARROW_POSITIONS: [number, number][] = [
@@ -51,7 +51,7 @@ function arrowIcon(directionDeg: number, velocity: number): L.DivIcon {
     className: "",
     html: `
       <div style="transform:rotate(${directionDeg}deg);width:28px;height:28px;display:flex;align-items:center;justify-content:center;animation:jasper-arrow-pulse ${duration}s ease-in-out infinite;">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.9">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00A3E0" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.9">
           <path d="M5 12h14M13 6l6 6-6 6"/>
         </svg>
       </div>
@@ -93,36 +93,49 @@ export function ContaminantLayer() {
       <Polyline
         positions={RIVER_MAIN}
         interactive={false}
-        pathOptions={{ color: "#0ea5e9", weight: lineWeight, opacity: 0.8, lineCap: "round", lineJoin: "round" }}
+        pathOptions={{ color: "#00A3E0", weight: lineWeight, opacity: 0.8, lineCap: "round", lineJoin: "round" }}
       />
       <Polyline
         positions={RIVER_BRANCH}
         interactive={false}
-        pathOptions={{ color: "#38bdf8", weight: Math.max(1, lineWeight - 2), opacity: 0.7, lineCap: "round", lineJoin: "round" }}
+        pathOptions={{ color: "#55CAF0", weight: Math.max(1, lineWeight - 2), opacity: 0.7, lineCap: "round", lineJoin: "round" }}
       />
 
       {arrowPositions.map((pos, i) => (
         <Marker key={i} position={pos} icon={arrowIcon(directionDeg, velocity)} />
       ))}
 
+      {/* River Water Quality sensor dot — cyan #00A3E0, matches 3D map colour */}
+      <CircleMarker
+        center={CRITICAL_CENTER}
+        radius={7}
+        pathOptions={{ color: "#ffffff", fillColor: "#00A3E0", fillOpacity: 1, weight: 2 }}
+      >
+        <Tooltip direction="top" offset={[0, -8]} opacity={1}>
+          <div className="text-xs font-semibold">ATH-001-W</div>
+          <div className="text-xs text-gray-500">River Water Quality Sensor</div>
+          <div className="text-xs text-gray-400">52.8639°N, 118.1069°W</div>
+        </Tooltip>
+      </CircleMarker>
+
       {/* Hazard zone circle at the most critical contamination point */}
       <HazardZone
         center={CRITICAL_CENTER}
         radius={1500}
-        borderColor="#ef4444"
-        fillColor="#f87171"
-        fillOpacity={0.10}
+        borderColor="#00A3E0"
+        fillColor="#55CAF0"
+        fillOpacity={0.12}
         label="River Flow Warning"
         badgeIcon="map"
-        badgeBorderColor="#0ea5e9"
-        dotColor="#ef4444"
+        badgeBorderColor="#00A3E0"
+        dotColor={risk === "High" ? "#ef4444" : risk === "Low" ? "#22c55e" : "#f59e0b"}
         popupIcon="💧"
         popupTitle="River Water Quality"
         status="WARNING"
         name="Athabasca River — SEC-W2"
         fields={[
           { label: "Station ID",        value: "SEC-W2" },
-          { label: "Risk Level",        value: risk,                              valueColor: "text-red-600" },
+          { label: "Risk Level",        value: risk,                              valueColor: risk === "High" ? "text-red-600" : risk === "Low" ? "text-green-600" : "text-amber-600" },
           { label: "Plume Direction",   value: `${directionDeg.toFixed(0)}°`,    valueColor: "text-amber-600" },
           // Velocity is normalized 0–1 from the model, multiply by 5 to get m/s estimate
           { label: "Flow Velocity",     value: `${(velocity * 5).toFixed(1)} m/s` },

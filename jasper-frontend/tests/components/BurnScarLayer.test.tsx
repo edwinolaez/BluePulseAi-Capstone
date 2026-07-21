@@ -7,11 +7,12 @@ jest.mock("../../lib/api", () => ({
 }));
 
 jest.mock("react-leaflet", () => ({
-  Circle:  ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
-  Tooltip: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
-  Marker:  forwardRef<unknown, { children?: React.ReactNode }>(({ children }, _ref) => <div>{children}</div>),
-  Popup:   ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
-  useMap:  () => ({ getZoom: () => 12, on: () => {}, off: () => {} }),
+  Circle:       ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  CircleMarker: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  Tooltip:      ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  Marker:       forwardRef<unknown, { children?: React.ReactNode }>(({ children }, _ref) => <div>{children}</div>),
+  Popup:        ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  useMap:       () => ({ getZoom: () => 12, on: () => {}, off: () => {} }),
 }));
 
 jest.mock("leaflet", () => ({

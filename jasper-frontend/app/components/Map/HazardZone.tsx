@@ -80,8 +80,7 @@ export function HazardZone({
             dotPulse,
           })}
         >
-          {/* Permanent label below the badge — same pattern as TelemetryStation */}
-          <Tooltip permanent direction="bottom" offset={[0, 14]} className="jasper-zone-label" opacity={1}>
+          <Tooltip direction="bottom" offset={[0, 14]} className="jasper-zone-label" opacity={1}>
             <span style={{ color: borderColor }} className="font-semibold text-[11px] leading-none">
               {label}
             </span>

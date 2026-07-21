@@ -1,15 +1,14 @@
 """Multi-source data fusion endpoint — combines all data layers for a sector."""
-import os
+
 
 from fastapi import APIRouter, Depends, HTTPException, Security
 from fastapi.security.api_key import APIKeyHeader
 
 from database import get_supabase
+from config import API_KEY
 
 router = APIRouter()
 
-# Read API key from environment — must match data.py/ingest.py/timeline.py
-API_KEY = os.getenv("NEXT_PUBLIC_API_KEY", "jasper-dev-api-key-2026")
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 

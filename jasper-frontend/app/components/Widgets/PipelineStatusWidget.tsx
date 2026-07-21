@@ -84,7 +84,7 @@ export function PipelineStatusWidget() {
       {/* IoT sync row — spins the icon briefly each time new data arrives */}
       <div className="flex items-center justify-between text-xs">
         <span className="text-gray-700 dark:text-gray-200 font-medium">IoT Jasper-A1</span>
-        <span className={`flex items-center gap-1 font-medium transition-colors ${syncing ? "text-amber-400" : "text-cyan-500"}`}>
+        <span className={`flex items-center gap-1 font-medium transition-colors ${syncing ? "text-amber-400" : "text-sait-sky"}`}>
           <SyncIcon className={`w-3 h-3 ${syncing ? "animate-spin" : ""}`} />
           {syncing ? "Syncing..." : "Sync"}
         </span>

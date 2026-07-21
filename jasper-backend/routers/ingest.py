@@ -1,5 +1,5 @@
 """Ingest endpoints for GeoTIFF, DEM, and telemetry data — Owner: Feven."""
-import os
+
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
@@ -10,13 +10,12 @@ from fastapi.security.api_key import APIKeyHeader
 from pydantic import BaseModel, Field
 
 from database import get_supabase
+from config import API_KEY
 
 router = APIRouter()
 
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB in bytes
 
-# Read API key from environment — must match data.py/fusion.py/timeline.py
-API_KEY = os.getenv("NEXT_PUBLIC_API_KEY", "jasper-dev-api-key-2026")
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 

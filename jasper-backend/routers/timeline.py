@@ -1,5 +1,4 @@
 """Timeline endpoint — returns timestamped scan records for a sector — Owner: Feven."""
-import os
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -7,11 +6,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Security
 from fastapi.security.api_key import APIKeyHeader
 
 from database import get_supabase
+from config import API_KEY
 
 router = APIRouter()
 
-# Read API key from environment — must match data.py/ingest.py/fusion.py
-API_KEY = os.getenv("NEXT_PUBLIC_API_KEY", "jasper-dev-api-key-2026")
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 

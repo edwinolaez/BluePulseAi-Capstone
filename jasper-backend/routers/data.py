@@ -1,5 +1,4 @@
 """Data query router — returns environmental layers from Supabase — Owner: Feven."""
-import os
 from datetime import datetime
 from typing import Optional
 
@@ -7,12 +6,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Security
 from fastapi.security.api_key import APIKeyHeader
 
 from database import get_supabase
+from config import API_KEY
 
 router = APIRouter()
 
-# Read API key from environment — avoids hardcoding secrets in source code
-# Falls back to dev key if env var is not set (local development only)
-API_KEY = os.getenv("NEXT_PUBLIC_API_KEY", "jasper-dev-api-key-2026")
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
