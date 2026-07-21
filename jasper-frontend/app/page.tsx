@@ -72,7 +72,7 @@ export default function Home() {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-gray-950">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 border-2 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin" />
+          <div className="w-10 h-10 border-2 border-sait-sky/30 border-t-sait-sky rounded-full animate-spin" />
           <p className="text-sm text-gray-500">Loading…</p>
         </div>
       </div>

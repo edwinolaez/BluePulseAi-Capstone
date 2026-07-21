@@ -19,9 +19,9 @@ const CENTER: [number, number] = [52.848, -118.083];
 // Zone border/fill always uses Forest sensor blue (#2563eb) so the zone colour matches
 // the sensor dot. Risk level is shown via fill lightness and in the popup badge.
 const RISK_STYLE = {
-  High:   { borderColor: "#2563eb", fillColor: "#3b82f6", badge: "text-red-500",   dotColor: "#ef4444" },
-  Medium: { borderColor: "#2563eb", fillColor: "#60a5fa", badge: "text-amber-500", dotColor: "#f59e0b" },
-  Low:    { borderColor: "#1d4ed8", fillColor: "#93c5fd", badge: "text-green-500", dotColor: "#22c55e" },
+  High:   { borderColor: "#005EB8", fillColor: "#0076e0", badge: "text-red-500",   dotColor: "#ef4444" },
+  Medium: { borderColor: "#005EB8", fillColor: "#3387d0", badge: "text-amber-500", dotColor: "#f59e0b" },
+  Low:    { borderColor: "#004a92", fillColor: "#5aaee0", badge: "text-green-500", dotColor: "#22c55e" },
 } as const;
 
 export function BurnScarLayer() {
@@ -47,7 +47,7 @@ export function BurnScarLayer() {
     <CircleMarker
       center={CENTER}
       radius={7}
-      pathOptions={{ color: "#ffffff", fillColor: "#2563eb", fillOpacity: 1, weight: 2 }}
+      pathOptions={{ color: "#ffffff", fillColor: "#005EB8", fillOpacity: 1, weight: 2 }}
     >
       <Tooltip direction="top" offset={[0, -8]} opacity={1}>
         <div className="text-xs font-semibold">ATH-001-A</div>

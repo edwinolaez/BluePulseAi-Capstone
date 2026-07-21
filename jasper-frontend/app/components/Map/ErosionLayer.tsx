@@ -21,9 +21,9 @@ const ZONES = [
 
 // Colour and label for each risk level — purple tones to visually separate erosion from burn scar
 const STYLE_BY_LABEL = {
-  High:   { borderColor: "#a855f7", fillColor: "#c084fc", label: "Landslide & Soil Risk" },
-  Medium: { borderColor: "#8b5cf6", fillColor: "#a78bfa", label: "Landslide & Soil Risk" },
-  Low:    { borderColor: "#6d28d9", fillColor: "#7c3aed", label: "Soil Erosion Risk"     },
+  High:   { borderColor: "#6D2077", fillColor: "#8c31a2", label: "Landslide & Soil Risk" },
+  Medium: { borderColor: "#5c1570", fillColor: "#7a2590", label: "Landslide & Soil Risk" },
+  Low:    { borderColor: "#4D0B5C", fillColor: "#6D2077", label: "Soil Erosion Risk"     },
 } as const;
 
 // Default risk order if the API hasn't responded yet — High for the steepest zone, Low for the flattest
@@ -84,7 +84,7 @@ export function ErosionLayer() {
           key={`dot-${zone.sectorId}`}
           center={zone.center}
           radius={7}
-          pathOptions={{ color: "#ffffff", fillColor: "#a855f7", fillOpacity: 1, weight: 2 }}
+          pathOptions={{ color: "#ffffff", fillColor: "#6D2077", fillOpacity: 1, weight: 2 }}
         >
           <Tooltip direction="top" offset={[0, -8]} opacity={1}>
             <div className="text-xs font-semibold">{zone.sectorId}</div>

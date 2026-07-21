@@ -111,7 +111,7 @@ export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBur
               On desktop the Live Readings sidebar is always visible so this is hidden. */}
           <button
             onClick={() => setPanelOpen(true)}
-            className="md:hidden flex items-center gap-1.5 px-3 py-2 rounded-full bg-cyan-500 text-white text-xs font-semibold shadow-lg active:scale-95 transition-transform shrink-0"
+            className="md:hidden flex items-center gap-1.5 px-3 py-2 rounded-full bg-sait-red text-white text-xs font-semibold shadow-lg active:scale-95 transition-transform shrink-0"
           >
             <ChartLineIcon className="w-3.5 h-3.5" />
             Live
@@ -132,7 +132,7 @@ export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBur
             <button
               onClick={() => zoomIn?.()}
               title="Zoom in"
-              className="w-9 h-9 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 text-gray-800 dark:text-white shadow-lg hover:scale-105 hover:bg-cyan-50 dark:hover:bg-gray-700 transition-transform border border-gray-200/60 dark:border-gray-600"
+              className="w-9 h-9 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 text-gray-800 dark:text-white shadow-lg hover:scale-105 hover:bg-sait-sky/10 dark:hover:bg-gray-700 transition-transform border border-gray-200/60 dark:border-gray-600"
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                 <line x1="8" y1="2" x2="8" y2="14" />
@@ -142,7 +142,7 @@ export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBur
             <button
               onClick={() => zoomOut?.()}
               title="Zoom out"
-              className="w-9 h-9 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 text-gray-800 dark:text-white shadow-lg hover:scale-105 hover:bg-cyan-50 dark:hover:bg-gray-700 transition-transform border border-gray-200/60 dark:border-gray-600"
+              className="w-9 h-9 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 text-gray-800 dark:text-white shadow-lg hover:scale-105 hover:bg-sait-sky/10 dark:hover:bg-gray-700 transition-transform border border-gray-200/60 dark:border-gray-600"
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                 <line x1="2" y1="8" x2="14" y2="8" />
@@ -175,7 +175,7 @@ export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBur
         {/* Mobile-only header row with a close button */}
         <div className="flex items-center justify-between md:hidden">
           <div className="flex items-center gap-2">
-            <ChartLineIcon className="w-4 h-4 text-cyan-500" />
+            <ChartLineIcon className="w-4 h-4 text-sait-sky" />
             <span className="text-xs font-bold uppercase tracking-widest text-gray-700 dark:text-gray-200">
               Live Readings
             </span>
@@ -200,7 +200,7 @@ export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBur
 
         {/* Desktop-only section label */}
         <div className="hidden md:flex items-center gap-2 px-0.5 mt-1">
-          <ChartLineIcon className="w-4 h-4 text-cyan-500" />
+          <ChartLineIcon className="w-4 h-4 text-sait-sky" />
           <h2 className="text-xs font-bold uppercase tracking-widest text-gray-700 dark:text-gray-200">
             Live Readings
           </h2>

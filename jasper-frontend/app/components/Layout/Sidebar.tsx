@@ -30,9 +30,9 @@ const RISK_COLORS = [
 ];
 
 const LAYER_LEGEND = [
-  { color: "#a855f7", label: "Soil Erosion"    },
-  { color: "#0ea5e9", label: "Water Quality"   },
-  { color: "#2563eb", label: "Forest Regrowth" },
+  { color: "#6D2077", label: "Soil Erosion"    },
+  { color: "#00A3E0", label: "Water Quality"   },
+  { color: "#005EB8", label: "Forest Regrowth" },
 ];
 
 const SECTORS = [
@@ -102,8 +102,8 @@ export function Sidebar({ activeTab, onNavigate, onFocusSector, onOpenLogs, onOp
         md:relative md:translate-x-0 md:z-auto
       `}>
       <div className="flex items-center gap-2 px-2 mb-0.5">
-        <MapPinIcon className="w-5 h-5 text-cyan-500" />
-        <h2 className="text-base font-bold text-cyan-500">Jasper Watch</h2>
+        <MapPinIcon className="w-5 h-5 text-sait-sky" />
+        <h2 className="text-base font-bold text-sait-sky">Jasper Watch</h2>
       </div>
       <p className="px-2 mb-4 text-[10px] font-semibold tracking-widest text-gray-500 dark:text-gray-500 uppercase">
         JASPER VALLEY AREA
@@ -119,7 +119,7 @@ export function Sidebar({ activeTab, onNavigate, onFocusSector, onOpenLogs, onOp
               onClick={() => onNavigate(id)}
               className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-left transition-colors ${
                 activeTab === id
-                  ? "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-l-2 border-cyan-500"
+                  ? "bg-sait-red/10 text-sait-red border-l-2 border-sait-red"
                   : "text-gray-600 dark:text-gray-300 hover:bg-surface-alt border-l-2 border-transparent"
               }`}
             >
@@ -138,7 +138,7 @@ export function Sidebar({ activeTab, onNavigate, onFocusSector, onOpenLogs, onOp
             onClick={onClick}
             className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-left transition-colors ${
               isActive
-                ? "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-l-2 border-cyan-500"
+                ? "bg-sait-red/10 text-sait-red border-l-2 border-sait-red"
                 : "text-gray-600 dark:text-gray-300 hover:bg-surface-alt border-l-2 border-transparent"
             }`}
           >
@@ -180,21 +180,21 @@ export function Sidebar({ activeTab, onNavigate, onFocusSector, onOpenLogs, onOp
           <div className="px-1 space-y-2">
             <ToggleSwitch
               label="Soil Erosion Risk"
-              dotColor="#a855f7"
+              dotColor="#6D2077"
               iconPath="m8 3 4 8 5-5 5 15H2L8 3z"
               checked={showErosion}
               onChange={onToggleErosion}
             />
             <ToggleSwitch
               label="River Water Quality"
-              dotColor="#0ea5e9"
+              dotColor="#00A3E0"
               iconPath="M9 20l-5.447-2.724A1 1 0 0 1 3 16.382V5.618a1 1 0 0 1 1.447-.894L9 7m0 13l6-3m-6-13l6 3m0 13l5.447 2.724A1 1 0 0 0 21 18.382V7.618a1 1 0 0 0-1.447-.894L15 9m0 11V9m0 0L9 7"
               checked={showContaminant}
               onChange={onToggleContaminant}
             />
             <ToggleSwitch
               label="Forest Regrowth Status"
-              dotColor="#2563eb"
+              dotColor="#005EB8"
               iconPath="M8.5 14.5A2.5 2.5 0 0 0 11 17a2.5 2.5 0 0 0 2.5-2.5c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2 1Z"
               checked={showBurnScar}
               onChange={onToggleBurnScar}
@@ -236,9 +236,9 @@ export function Sidebar({ activeTab, onNavigate, onFocusSector, onOpenLogs, onOp
           <div className="pt-2 border-t border-gray-200/60 dark:border-gray-700/40 space-y-2">
             <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">Data Provenance</p>
             {[
-              { color: "#a855f7", layer: "Soil Erosion",    source: "USGS SRTM + Env. Canada", quality: "Good", refresh: "Jul 18, 2026" },
-              { color: "#0ea5e9", layer: "Water Quality",   source: "WSC Station 07AA001",      quality: "Good", refresh: "Jul 20, 2026" },
-              { color: "#2563eb", layer: "Forest Regrowth", source: "Sentinel-2 B4/B8A/B12",    quality: "Good", refresh: "Jul 18, 2026" },
+              { color: "#6D2077", layer: "Soil Erosion",    source: "USGS SRTM + Env. Canada", quality: "Good", refresh: "Jul 18, 2026" },
+              { color: "#00A3E0", layer: "Water Quality",   source: "WSC Station 07AA001",      quality: "Good", refresh: "Jul 20, 2026" },
+              { color: "#005EB8", layer: "Forest Regrowth", source: "Sentinel-2 B4/B8A/B12",    quality: "Good", refresh: "Jul 18, 2026" },
             ].map(({ color, layer, source, quality, refresh }) => (
               <div key={layer} className="rounded-md bg-gray-50 dark:bg-gray-800/50 p-2 space-y-0.5">
                 <div className="flex items-center gap-1.5 mb-1">
@@ -282,7 +282,7 @@ export function Sidebar({ activeTab, onNavigate, onFocusSector, onOpenLogs, onOp
               <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">{sector.subtitle}</p>
               <button
                 onClick={() => onFocusSector(sector.lat, sector.lng, sector.zoom)}
-                className="flex items-center gap-1 text-xs font-semibold text-blue-500 hover:text-blue-400 transition-colors"
+                className="flex items-center gap-1 text-xs font-semibold text-sait-sky hover:text-sait-blue transition-colors"
               >
                 <ArrowUpRightIcon className="w-3.5 h-3.5" />
                 Focus Map
@@ -310,7 +310,7 @@ export function Sidebar({ activeTab, onNavigate, onFocusSector, onOpenLogs, onOp
             a.click();
             URL.revokeObjectURL(url);
           }}
-          className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition-colors"
+          className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg bg-sait-red hover:bg-sait-red-deep text-white text-sm font-semibold transition-colors"
         >
           <DownloadIcon className="w-4 h-4" />
           Download Map Data

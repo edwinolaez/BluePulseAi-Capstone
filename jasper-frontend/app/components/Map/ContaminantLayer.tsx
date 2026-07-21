@@ -51,7 +51,7 @@ function arrowIcon(directionDeg: number, velocity: number): L.DivIcon {
     className: "",
     html: `
       <div style="transform:rotate(${directionDeg}deg);width:28px;height:28px;display:flex;align-items:center;justify-content:center;animation:jasper-arrow-pulse ${duration}s ease-in-out infinite;">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.9">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00A3E0" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.9">
           <path d="M5 12h14M13 6l6 6-6 6"/>
         </svg>
       </div>
@@ -93,23 +93,23 @@ export function ContaminantLayer() {
       <Polyline
         positions={RIVER_MAIN}
         interactive={false}
-        pathOptions={{ color: "#0ea5e9", weight: lineWeight, opacity: 0.8, lineCap: "round", lineJoin: "round" }}
+        pathOptions={{ color: "#00A3E0", weight: lineWeight, opacity: 0.8, lineCap: "round", lineJoin: "round" }}
       />
       <Polyline
         positions={RIVER_BRANCH}
         interactive={false}
-        pathOptions={{ color: "#38bdf8", weight: Math.max(1, lineWeight - 2), opacity: 0.7, lineCap: "round", lineJoin: "round" }}
+        pathOptions={{ color: "#55CAF0", weight: Math.max(1, lineWeight - 2), opacity: 0.7, lineCap: "round", lineJoin: "round" }}
       />
 
       {arrowPositions.map((pos, i) => (
         <Marker key={i} position={pos} icon={arrowIcon(directionDeg, velocity)} />
       ))}
 
-      {/* River Water Quality sensor dot — cyan #0ea5e9, matches 3D map colour */}
+      {/* River Water Quality sensor dot — cyan #00A3E0, matches 3D map colour */}
       <CircleMarker
         center={CRITICAL_CENTER}
         radius={7}
-        pathOptions={{ color: "#ffffff", fillColor: "#0ea5e9", fillOpacity: 1, weight: 2 }}
+        pathOptions={{ color: "#ffffff", fillColor: "#00A3E0", fillOpacity: 1, weight: 2 }}
       >
         <Tooltip direction="top" offset={[0, -8]} opacity={1}>
           <div className="text-xs font-semibold">ATH-001-W</div>
@@ -122,12 +122,12 @@ export function ContaminantLayer() {
       <HazardZone
         center={CRITICAL_CENTER}
         radius={1500}
-        borderColor="#0ea5e9"
-        fillColor="#38bdf8"
+        borderColor="#00A3E0"
+        fillColor="#55CAF0"
         fillOpacity={0.12}
         label="River Flow Warning"
         badgeIcon="map"
-        badgeBorderColor="#0ea5e9"
+        badgeBorderColor="#00A3E0"
         dotColor={risk === "High" ? "#ef4444" : risk === "Low" ? "#22c55e" : "#f59e0b"}
         popupIcon="💧"
         popupTitle="River Water Quality"

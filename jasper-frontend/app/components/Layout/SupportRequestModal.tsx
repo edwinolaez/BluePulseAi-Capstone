@@ -60,7 +60,7 @@ export function SupportRequestModal({ open, onClose }: Props) {
             <MailIcon className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
             <div>
               <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-0.5">Dispatch Desk</p>
-              <a href="mailto:gis@athabasca.org" className="text-xs text-blue-500 dark:text-blue-400 hover:underline">
+              <a href="mailto:gis@athabasca.org" className="text-xs text-sait-sky hover:underline">
                 gis@athabasca.org
               </a>
             </div>
@@ -69,7 +69,7 @@ export function SupportRequestModal({ open, onClose }: Props) {
             <PhoneIcon className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
             <div>
               <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-0.5">Incident Hotline</p>
-              <a href="tel:+18005550199" className="text-xs text-blue-500 dark:text-blue-400 hover:underline">
+              <a href="tel:+18005550199" className="text-xs text-sait-sky hover:underline">
                 +1 (800) 555-0199
               </a>
             </div>
@@ -85,7 +85,7 @@ export function SupportRequestModal({ open, onClose }: Props) {
             <select
               value={station}
               onChange={(e) => setStation(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-sm text-gray-800 dark:text-gray-100 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+              className="w-full px-3 py-2.5 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-sm text-gray-800 dark:text-gray-100 outline-none focus:border-sait-sky focus:ring-1 focus:ring-sait-sky transition-colors"
             >
               {STATIONS.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
@@ -100,7 +100,7 @@ export function SupportRequestModal({ open, onClose }: Props) {
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               placeholder="e.g., Sensor S-2 showing unusual readings"
-              className="w-full px-3 py-2.5 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-sm text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+              className="w-full px-3 py-2.5 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-sm text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none focus:border-sait-sky focus:ring-1 focus:ring-sait-sky transition-colors"
             />
           </div>
 
@@ -113,14 +113,14 @@ export function SupportRequestModal({ open, onClose }: Props) {
               onChange={(e) => setDescription(e.target.value)}
               rows={4}
               placeholder="Please describe what you noticed or what went wrong..."
-              className="w-full px-3 py-2.5 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-sm text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors resize-none"
+              className="w-full px-3 py-2.5 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-sm text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 outline-none focus:border-sait-sky focus:ring-1 focus:ring-sait-sky transition-colors resize-none"
             />
           </div>
 
           <button
             onClick={handleSubmit}
             disabled={!subject.trim() || submitted}
-            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white text-sm font-semibold transition-colors"
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-sait-red hover:bg-sait-red-deep disabled:opacity-60 text-white text-sm font-semibold transition-colors"
           >
             <SendIcon className="w-4 h-4" />
             {submitted ? "Submitted ✓" : "Submit Support Request"}
@@ -132,7 +132,7 @@ export function SupportRequestModal({ open, onClose }: Props) {
         {/* Footer */}
         <div className="px-6 py-3 border-t border-gray-200 dark:border-gray-800 flex items-center justify-between">
           <span className="text-xs text-gray-500 dark:text-gray-500">Provincial Water Standards</span>
-          <a href="#" className="text-xs text-blue-500 dark:text-blue-400 hover:underline flex items-center gap-1">
+          <a href="#" className="text-xs text-sait-sky hover:underline flex items-center gap-1">
             Provincial Registry ↗
           </a>
         </div>

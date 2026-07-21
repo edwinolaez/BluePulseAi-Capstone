@@ -132,7 +132,7 @@ export function ReportsPage() {
               onClick={() => setFilter(cat)}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
                 filter === cat
-                  ? "bg-blue-600 text-white shadow"
+                  ? "bg-sait-red text-white shadow"
                   : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
               }`}
             >
@@ -146,7 +146,7 @@ export function ReportsPage() {
         {visible.map((report) => (
           <div key={report.id} className="rounded-xl border border-gray-200/60 dark:border-gray-700/40 bg-surface p-5">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
+              <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded bg-sait-sky/10 text-sait-sky">
                 {report.category}
               </span>
               <span className="text-xs font-mono text-gray-400">{report.id}</span>
@@ -182,7 +182,7 @@ export function ReportsPage() {
               <button
                 onClick={() => handleDownload(report.id)}
                 disabled={downloadingId === report.id}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-70 text-white text-sm font-semibold transition-colors"
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-sait-red hover:bg-sait-red-deep disabled:opacity-70 text-white text-sm font-semibold transition-colors"
               >
                 <DownloadIcon className="w-4 h-4" />
                 {downloadingId === report.id ? "Preparing Download..." : "Download PDF Report"}
@@ -219,10 +219,10 @@ export function ReportsPage() {
             {auditLog.map((entry) => (
               <div key={entry.id} className="flex items-start gap-3 px-5 py-3">
                 <div className={`mt-0.5 w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${
-                  entry.action === "downloaded" ? "bg-blue-50 dark:bg-blue-900/20" : "bg-green-50 dark:bg-green-900/20"
+                  entry.action === "downloaded" ? "bg-sait-sky/10" : "bg-green-50 dark:bg-green-900/20"
                 }`}>
                   {entry.action === "downloaded"
-                    ? <DownloadIcon className="w-3.5 h-3.5 text-blue-500" />
+                    ? <DownloadIcon className="w-3.5 h-3.5 text-sait-sky" />
                     : <SendIcon className="w-3.5 h-3.5 text-green-500" />
                   }
                 </div>

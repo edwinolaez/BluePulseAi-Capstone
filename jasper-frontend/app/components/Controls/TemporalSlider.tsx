@@ -60,7 +60,7 @@ export function TemporalSlider({ onDateRangeChange }: Props) {
           <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">Time History</h2>
         </div>
         {/* On mobile only show the date; on sm+ show "Phase — Date" */}
-        <span className="text-[10px] sm:text-xs font-semibold px-2 py-0.5 sm:px-3 sm:py-1 rounded-full bg-blue-600 text-white whitespace-nowrap shrink-0">
+        <span className="text-[10px] sm:text-xs font-semibold px-2 py-0.5 sm:px-3 sm:py-1 rounded-full bg-sait-sky text-white whitespace-nowrap shrink-0">
           <span className="hidden sm:inline">{phase} — </span>{toFriendlyDate(center)}
         </span>
       </div>

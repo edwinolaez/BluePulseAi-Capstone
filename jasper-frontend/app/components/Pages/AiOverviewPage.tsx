@@ -54,9 +54,9 @@ const MODELS = [
     title: "Contaminant Plume Tracker",
     subtitle: "Flow model — hydrocarbon plume direction + velocity",
     sector: "ATH-001-W",
-    accentColor: "text-cyan-500",
-    accentBg: "bg-cyan-500/10",
-    borderActive: "border-cyan-500",
+    accentColor: "text-sait-sky",
+    accentBg: "bg-sait-sky/10",
+    borderActive: "border-sait-sky",
     provenance: {
       source: "WSC Station 07AA001 — Miette River at Jasper",
       qualityFlag: "Good",

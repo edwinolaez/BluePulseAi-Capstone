@@ -128,7 +128,7 @@ function TrendChart({ data, dangerValue, dangerLabel }: { data: number[]; danger
         <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-44" preserveAspectRatio="none">
           <line x1={0} y1={dangerY} x2={width} y2={dangerY} stroke="#f59e0b" strokeDasharray="6 4" strokeWidth={1.5} />
           <text x={8} y={dangerY - 6} fill="#f59e0b" fontSize="11" fontWeight={600}>{dangerLabel.toUpperCase()}</text>
-          <polyline points={points} fill="none" stroke="#60a5fa" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+          <polyline points={points} fill="none" stroke="#00A3E0" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
         </svg>
         {/* On mobile hide every other label so they don't overlap in narrow space */}
         <div className="flex justify-between text-[10px] text-gray-400 dark:text-gray-500 mt-1">
@@ -153,13 +153,13 @@ function StatCard({
     <button
       onClick={onClick}
       className={`text-left rounded-xl border bg-surface p-4 transition-colors ${
-        selected ? "border-blue-500 ring-1 ring-blue-500" : "border-gray-200/60 dark:border-gray-700/40 hover:border-blue-400/60"
+        selected ? "border-sait-red ring-1 ring-sait-red" : "border-gray-200/60 dark:border-gray-700/40 hover:border-sait-red/60"
       }`}
     >
       <div className="flex items-center justify-between mb-3">
         <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{label}</p>
-        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${selected ? "bg-blue-500/15" : "bg-surface-alt"}`}>
-          <Icon className={`w-4 h-4 ${selected ? "text-blue-500" : "text-gray-500 dark:text-gray-300"}`} />
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${selected ? "bg-sait-red/15" : "bg-surface-alt"}`}>
+          <Icon className={`w-4 h-4 ${selected ? "text-sait-red" : "text-gray-500 dark:text-gray-300"}`} />
         </div>
       </div>
       <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
@@ -206,7 +206,7 @@ export function DashboardPage() {
               onClick={() => setStation(st)}
               className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
                 station === st
-                  ? "bg-blue-600 text-white shadow"
+                  ? "bg-sait-red text-white shadow"
                   : "text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100"
               }`}
             >
@@ -226,14 +226,14 @@ export function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
         <div className="rounded-xl border border-gray-200/60 dark:border-gray-700/40 bg-surface p-5">
           <div className="flex items-center gap-2 mb-1">
-            <ChartLineIcon className="w-4 h-4 text-blue-500" />
+            <ChartLineIcon className="w-4 h-4 text-sait-sky" />
             <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">{metricConfig.label} Over Time</h2>
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
             Hourly readings from the past 12-hour sensor cycle.
           </p>
           <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400 mb-2">
-            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-400" /> Active Stream</span>
+            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-sait-sky" /> Active Stream</span>
             <span className="flex items-center gap-1.5"><span className="w-3 border-t border-dashed border-amber-500" /> Danger Baseline</span>
           </div>
           <TrendChart data={trendByMetric[metric]} dangerValue={metricConfig.dangerValue} dangerLabel={metricConfig.dangerLabel} />

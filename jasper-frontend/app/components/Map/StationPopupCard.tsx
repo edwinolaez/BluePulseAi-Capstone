@@ -26,7 +26,7 @@ export function StationPopupCard({ icon = "✨", title, status, name, fields }: 
   return (
     <div className="w-64 font-sans">
       <div className="flex items-center justify-between mb-1.5">
-        <div className="flex items-center gap-1.5 text-cyan-600 text-[10px] font-bold uppercase tracking-wide">
+        <div className="flex items-center gap-1.5 text-sait-sky text-[10px] font-bold uppercase tracking-wide">
           <span>{icon}</span>
           {title}
         </div>

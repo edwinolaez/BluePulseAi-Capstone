@@ -87,9 +87,9 @@ const RISK_RGBA: Record<string, [number, number, number, number]> = {
 
 // Sensor dot colours — match the toggle dotColor props in MapViewPage
 const SENSOR_COLOR: Record<"erosion" | "contaminant" | "burnScar", [number, number, number, number]> = {
-  erosion:     [168, 85,  247, 255],  // #a855f7 purple  — Soil Erosion
-  contaminant: [14,  165, 233, 255],  // #0ea5e9 sky     — River Water Quality
-  burnScar:    [37,  99,  235, 255],  // #2563eb blue    — Forest Regrowth
+  erosion:     [109, 32,  119, 255],  // #6D2077 SAIT Purple  — Soil Erosion
+  contaminant: [0,   163, 224, 255],  // #00A3E0 SAIT Sky    — River Water Quality
+  burnScar:    [0,   94,  184, 255],  // #005EB8 SAIT Blue   — Forest Regrowth
 };
 
 
@@ -392,8 +392,8 @@ export function ThreeDView({
                 <div>Terrain: <span style="color:#94a3b8">${object.elevation.toLocaleString()} m asl</span></div>
                 <div>ID: <span style="color:#94a3b8">${object.id}</span></div>
                 ${object.source      ? `<div style="color:#34d399;font-size:10px;margin-top:4px;">★ ${object.source}</div>` : '<div style="color:#94a3b8;font-size:10px;margin-top:4px;">○ Estimated position</div>'}
-                ${object.isEstimated ? '<div style="color:#60a5fa;font-size:10px;">● Timeline interpolated</div>' : ""}
-                ${object.isActive    ? '<div style="color:#a78bfa;font-size:10px;">★ Selected</div>' : ""}
+                ${object.isEstimated ? '<div style="color:#00A3E0;font-size:10px;">● Timeline interpolated</div>' : ""}
+                ${object.isActive    ? '<div style="color:#6D2077;font-size:10px;">★ Selected</div>' : ""}
               </div>`,
             style: { background: "none" },
           };
@@ -414,7 +414,7 @@ export function ThreeDView({
         <button
           onClick={handleZoomIn}
           title="Zoom in"
-          className="w-9 h-9 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 text-gray-800 dark:text-white shadow-lg hover:scale-105 hover:bg-cyan-50 dark:hover:bg-gray-700 transition-transform border border-gray-200/60 dark:border-gray-600"
+          className="w-9 h-9 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 text-gray-800 dark:text-white shadow-lg hover:scale-105 hover:bg-sait-sky/10 dark:hover:bg-gray-700 transition-transform border border-gray-200/60 dark:border-gray-600"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
             <line x1="8" y1="2" x2="8" y2="14" />
@@ -424,7 +424,7 @@ export function ThreeDView({
         <button
           onClick={handleZoomOut}
           title="Zoom out"
-          className="w-9 h-9 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 text-gray-800 dark:text-white shadow-lg hover:scale-105 hover:bg-cyan-50 dark:hover:bg-gray-700 transition-transform border border-gray-200/60 dark:border-gray-600"
+          className="w-9 h-9 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 text-gray-800 dark:text-white shadow-lg hover:scale-105 hover:bg-sait-sky/10 dark:hover:bg-gray-700 transition-transform border border-gray-200/60 dark:border-gray-600"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
             <line x1="2" y1="8" x2="14" y2="8" />

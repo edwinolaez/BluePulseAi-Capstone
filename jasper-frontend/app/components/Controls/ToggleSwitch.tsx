@@ -57,7 +57,7 @@ export function ToggleSwitch({ label, dotColor, checked, onChange, iconPath }: P
 
       <span
         className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
-          checked ? "bg-cyan-500" : "bg-gray-300 dark:bg-gray-600"
+          checked ? "bg-sait-red" : "bg-gray-300 dark:bg-gray-600"
         }`}
       >
         <span

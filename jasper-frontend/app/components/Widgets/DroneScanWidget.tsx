@@ -173,8 +173,8 @@ function LiveDroneScanWidget({ filterSector }: { filterSector: string }) {
       <div
         className={`relative border-2 border-dashed rounded-xl p-6 text-center transition-colors cursor-pointer ${
           dragOver
-            ? "border-blue-500 bg-blue-50 dark:bg-blue-900/10"
-            : "border-gray-200 dark:border-gray-700 hover:border-blue-400 dark:hover:border-blue-600"
+            ? "border-sait-red bg-sait-red/5"
+            : "border-gray-200 dark:border-gray-700 hover:border-sait-red/60"
         }`}
         onClick={() => fileInputRef.current?.click()}
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -197,7 +197,7 @@ function LiveDroneScanWidget({ filterSector }: { filterSector: string }) {
         {uploading && (
           <div className="absolute inset-x-4 bottom-3">
             <div className="h-1.5 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
-              <div className="h-full rounded-full bg-blue-500 transition-all duration-300" style={{ width: `${progress}%` }} />
+              <div className="h-full rounded-full bg-sait-sky transition-all duration-300" style={{ width: `${progress}%` }} />
             </div>
           </div>
         )}
@@ -208,7 +208,7 @@ function LiveDroneScanWidget({ filterSector }: { filterSector: string }) {
         <select
           value={sector}
           onChange={(e) => setSector(e.target.value)}
-          className="text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-surface px-3 py-2 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-surface px-3 py-2 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-sait-sky"
         >
           {SECTORS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
         </select>
@@ -217,7 +217,7 @@ function LiveDroneScanWidget({ filterSector }: { filterSector: string }) {
           placeholder="Notes (optional)"
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          className="text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-surface px-3 py-2 text-gray-800 dark:text-gray-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="text-sm rounded-lg border border-gray-200 dark:border-gray-700 bg-surface px-3 py-2 text-gray-800 dark:text-gray-100 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-sait-sky"
         />
       </div>
 
@@ -252,8 +252,8 @@ export function DroneScanWidget() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
-            <svg className="w-5 h-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+          <div className="w-9 h-9 rounded-lg bg-sait-sky/10 flex items-center justify-center shrink-0">
+            <svg className="w-5 h-5 text-sait-sky" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
               <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z" />
             </svg>
@@ -268,7 +268,7 @@ export function DroneScanWidget() {
         <div className="flex flex-wrap gap-1 p-1 rounded-lg bg-surface-alt self-start">
           <button
             onClick={() => setFilterSector("all")}
-            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${filterSector === "all" ? "bg-blue-600 text-white shadow" : "text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"}`}
+            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${filterSector === "all" ? "bg-sait-red text-white shadow" : "text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"}`}
           >
             All
           </button>
@@ -276,7 +276,7 @@ export function DroneScanWidget() {
             <button
               key={s.id}
               onClick={() => setFilterSector(s.id)}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${filterSector === s.id ? "bg-blue-600 text-white shadow" : "text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"}`}
+              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${filterSector === s.id ? "bg-sait-red text-white shadow" : "text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"}`}
             >
               {s.id}
             </button>
