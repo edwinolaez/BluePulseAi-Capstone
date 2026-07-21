@@ -34,7 +34,7 @@ from models.simulations.erosion_model import (
 from models.simulations.contaminant_model import (
     calculate_contaminant_vector as calc_contaminant,
 )
-from api.sensor_fetch import live_water_velocity, live_rainfall_mm
+from api.sensor_fetch import live_water_velocity, live_rainfall_mm, live_slope_deg, sector_coords
 
 
 # ============================================================================
@@ -138,7 +138,12 @@ class ErosionSimulationRequest(BaseModel):
     sector_id: str = Field(..., description="Grid sector ID")
     rainfall_mm: Optional[float] = Field(
         None, ge=0, le=500,
-        description="Rainfall intensity (0-500 mm). Omit to use live Environment Canada reading."
+        description="Rainfall intensity (0-500 mm). Omit to use live Environment Canada reading.",
+    )
+    coordinates: Optional[SourcePoint] = Field(
+        None,
+        description="Sector centre lat/lon for real terrain slope lookup via SRTM. "
+                    "Omit to use the known ATH sector centre or Jasper watershed default.",
     )
 
 
@@ -413,31 +418,35 @@ async def simulate_erosion(request: ErosionSimulationRequest):
       -d '{"sector_id": "ATH-001", "rainfall_mm": 45.0}'
     ```
     """
-    # Use live EC Climate data unless the caller explicitly provides rainfall_mm
+    # ── Live rainfall ──────────────────────────────────────────────────────────
     if request.rainfall_mm is not None:
         rainfall_mm = request.rainfall_mm
         rainfall_source = f"user-specified {rainfall_mm} mm"
     else:
         rainfall_mm, rainfall_source = live_rainfall_mm()
 
+    # ── Live terrain slope from SRTM 30m ───────────────────────────────────────
+    if request.coordinates:
+        lat, lon = request.coordinates.lat, request.coordinates.lon
+    else:
+        lat, lon = sector_coords(request.sector_id)
+
+    slope_deg, slope_source = live_slope_deg(lat, lon)
+
     try:
         logger.info(
-            "Processing erosion simulation for %s: rainfall=%.1fmm (%s)",
-            request.sector_id,
-            rainfall_mm,
-            rainfall_source,
+            "Processing erosion simulation for %s: rainfall=%.1fmm slope=%.1f° (%s / %s)",
+            request.sector_id, rainfall_mm, slope_deg, rainfall_source, slope_source,
         )
 
-        # Call erosion model with real or user-specified rainfall
         try:
-            model_result = calc_erosion(30.0, rainfall_mm, 1.0)
-            soil_loss = model_result.get("soil_loss_t_ha", rainfall_mm * 0.5)
+            model_result = calc_erosion(slope_deg, rainfall_mm, 1.0)
+            soil_loss  = model_result.get("soil_loss_t_ha", rainfall_mm * 0.5)
             risk_level = model_result.get("risk_label", "Medium")
         except Exception as model_err:
             logger.warning(
                 "Erosion model failed for %s: %s, using fallback",
-                request.sector_id,
-                str(model_err),
+                request.sector_id, str(model_err),
             )
             soil_loss = rainfall_mm * 0.5
             if soil_loss >= 35:
@@ -461,8 +470,9 @@ async def simulate_erosion(request: ErosionSimulationRequest):
             live_inputs={
                 "rainfall_mm": rainfall_mm,
                 "rainfall_source": rainfall_source,
-                "slope_deg": 30.0,
-                "slope_source": "Jasper terrain estimate (DEM wiring — Sprint 3)",
+                "slope_deg": slope_deg,
+                "slope_source": slope_source,
+                "coordinates": {"lat": lat, "lon": lon},
             },
         )
 
