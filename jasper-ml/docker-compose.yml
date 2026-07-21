@@ -1,0 +1,102 @@
+version: '3.8'
+
+services:
+  # Development environment
+  jasper-ml-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: jasper-ml-dev
+    environment:
+      - API_ENV=development
+      - API_HOST=0.0.0.0
+      - API_PORT=8001
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
+    ports:
+      - "8001:8001"
+    volumes:
+      - .:/app
+      - /app/ml-env
+    command: python -m uvicorn api.model_endpoint:app --host 0.0.0.0 --port 8001 --reload
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8001/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+  # Staging environment
+  jasper-ml-staging:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: jasper-ml-staging
+    environment:
+      - API_ENV=staging
+      - API_HOST=0.0.0.0
+      - API_PORT=8001
+      - ALLOWED_ORIGINS=https://staging.bluepulseai.ca
+    ports:
+      - "8002:8001"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8001/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Production environment (multiple replicas)
+  jasper-ml-prod-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: jasper-ml-prod-1
+    environment:
+      - API_ENV=production
+      - API_HOST=0.0.0.0
+      - API_PORT=8001
+      - ALLOWED_ORIGINS=https://bluepulseai.ca,https://map.bluepulseai.ca
+    ports:
+      - "8003:8001"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8001/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  jasper-ml-prod-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: jasper-ml-prod-2
+    environment:
+      - API_ENV=production
+      - API_HOST=0.0.0.0
+      - API_PORT=8001
+      - ALLOWED_ORIGINS=https://bluepulseai.ca,https://map.bluepulseai.ca
+    ports:
+      - "8004:8001"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8001/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Nginx reverse proxy & load balancer (optional)
+  nginx:
+    image: nginx:latest
+    container_name: jasper-ml-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - jasper-ml-prod-1
+      - jasper-ml-prod-2
+    restart: unless-stopped

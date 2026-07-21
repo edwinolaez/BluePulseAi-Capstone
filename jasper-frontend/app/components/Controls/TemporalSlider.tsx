@@ -18,7 +18,9 @@ function sliderToCenter(value: number) {
 
 
 interface Props {
-  onDateRangeChange: (dateFrom: string, dateTo: string) => void;
+  // centerDate is the exact slider position as an ISO date string — used by the
+  // interpolation engine to find the two nearest real scans and blend between them.
+  onDateRangeChange: (dateFrom: string, dateTo: string, centerDate: string) => void;
 }
 
 function toISODate(ms: number) {
@@ -36,6 +38,7 @@ export function TemporalSlider({ onDateRangeChange }: Props) {
     onDateRangeChange(
       toISODate(Math.max(c - WINDOW_MS / 2, PRE_EVENT)),
       toISODate(Math.min(c + WINDOW_MS / 2, RECOVERY)),
+      toISODate(c),
     );
   }
 

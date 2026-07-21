@@ -17,11 +17,14 @@ import { ModelPerformanceWidget } from "../Widgets/ModelPerformanceWidget";
 import { FieldPhotosWidget } from "../Widgets/FieldPhotosWidget";
 import type { FlyToTarget, SensorInfo } from "../Map/JasperMap";
 
-// The map is loaded dynamically with ssr:false because Leaflet uses browser APIs
-// that don't exist on the server — this tells Next.js to only load it in the browser.
-const JasperMap = dynamic(() => import("../Map/JasperMap"), {
-  ssr: false,
-});
+// Both map components are loaded dynamically with ssr:false — Leaflet and deck.gl
+// both use browser/WebGL APIs that don't exist on the server.
+const JasperMap = dynamic(() => import("../Map/JasperMap"), { ssr: false });
+
+const ThreeDView = dynamic(
+  () => import("../Map/ThreeDView").then((m) => ({ default: m.ThreeDView })),
+  { ssr: false }
+);
 
 interface Props {
   flyTo?: FlyToTarget | null;
@@ -33,9 +36,13 @@ export function MapViewPage({ flyTo, mapFullscreen = false, onSetFullscreen }: P
   // Tracks which specific sensor was clicked — populates the Selected Area panel
   const [sensorInfo, setSensorInfo] = useState<SensorInfo | null>(null);
 
-  // Date range controlled by the temporal slider at the bottom of the map
-  const [dateFrom, setDateFrom]               = useState("2024-06-01");
-  const [dateTo, setDateTo]                   = useState("2024-07-24");
+  // sectorId is used by the 3D view to highlight the selected column
+  const [sectorId, setSectorId] = useState<string | null>(null);
+
+  // Date range controlled by the temporal slider
+  const [dateFrom, setDateFrom]     = useState("2024-06-01");
+  const [dateTo, setDateTo]         = useState("2024-07-24");
+  const [centerDate, setCenterDate] = useState("2024-06-24");
 
   // These booleans control which layers are visible on the map
   const [showBurnScar, setShowBurnScar]       = useState(true);
@@ -49,6 +56,9 @@ export function MapViewPage({ flyTo, mapFullscreen = false, onSetFullscreen }: P
 
   // Controls whether the Live Readings drawer is open on mobile
   const [panelOpen, setPanelOpen] = useState(false);
+
+  // Toggles between the 2D Leaflet map and the 3D deck.gl risk view
+  const [is3D, setIs3D] = useState(false);
 
   // Called by JasperMap once it's ready — captures zoom + resize controls
   const handleMapInit = useCallback((zi: () => void, zo: () => void, inv: () => void) => {
@@ -71,25 +81,33 @@ export function MapViewPage({ flyTo, mapFullscreen = false, onSetFullscreen }: P
       {/* ── Map area — takes up all available space ── */}
       <div className="relative flex-1 overflow-hidden">
         <div className="absolute inset-0">
-          {/* The Leaflet map — passes layer visibility and date range as props */}
-          <JasperMap
-            onSensorSelect={(info) => setSensorInfo(info)}
-            showBurnScar={showBurnScar}
-            showErosion={showErosion}
-            showContaminant={showContaminant}
-            onMapInit={handleMapInit}
-            flyTo={flyTo}
-            onMapClick={onSetFullscreen ? () => onSetFullscreen(!mapFullscreen) : undefined}
-            onMarkerClick={onSetFullscreen ? () => onSetFullscreen(false) : undefined}
-          />
+          {/* Toggle between 2D Leaflet and 3D deck.gl view */}
+          {is3D ? (
+            <ThreeDView
+              interpolated={null}
+              activeSectorId={sectorId}
+              onSectorClick={(id) => setSectorId(id)}
+            />
+          ) : (
+            <JasperMap
+              onSensorSelect={(info) => setSensorInfo(info)}
+              showBurnScar={showBurnScar}
+              showErosion={showErosion}
+              showContaminant={showContaminant}
+              onMapInit={handleMapInit}
+              flyTo={flyTo}
+              onMapClick={onSetFullscreen ? () => onSetFullscreen(!mapFullscreen) : undefined}
+              onMarkerClick={onSetFullscreen ? () => onSetFullscreen(false) : undefined}
+            />
+          )}
         </div>
 
-        {/* Fullscreen toggle button — always visible, collapses or restores both side panels */}
+        {/* Fullscreen toggle button — always visible, collapses or restores the side panel */}
         {onSetFullscreen && (
           <button
             onClick={() => onSetFullscreen(!mapFullscreen)}
             title={mapFullscreen ? "Show panels" : "Expand map"}
-            className="absolute top-4 right-16 z-[1001] w-8 h-8 flex items-center justify-center rounded-full bg-white/90 dark:bg-gray-800/90 text-gray-700 dark:text-gray-100 shadow-lg border border-gray-200/60 dark:border-gray-600 hover:bg-white dark:hover:bg-gray-700 transition-colors backdrop-blur-sm"
+            className="absolute top-4 right-4 z-[1002] w-8 h-8 flex items-center justify-center rounded-full bg-white/90 dark:bg-gray-800/90 text-gray-700 dark:text-gray-100 shadow-lg border border-gray-200/60 dark:border-gray-600 hover:bg-white dark:hover:bg-gray-700 transition-colors backdrop-blur-sm"
           >
             {mapFullscreen ? (
               <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -103,7 +121,52 @@ export function MapViewPage({ flyTo, mapFullscreen = false, onSetFullscreen }: P
           </button>
         )}
 
-        {/* Bottom bar: mobile Live button + zoom buttons */}
+        {/* 2D / 3D toggle + layer toggles — floating panel in the top-right of the map */}
+        <div className="absolute top-14 right-4 z-[1001]">
+          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 p-3 md:p-4 min-w-[180px] md:min-w-[230px] shadow-xl space-y-3">
+            <div className="flex items-center gap-1 p-0.5 rounded-lg bg-gray-100 dark:bg-gray-800">
+              <button
+                onClick={() => setIs3D(false)}
+                className={[
+                  "flex-1 text-xs font-semibold py-1.5 rounded-md transition-all",
+                  !is3D
+                    ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                    : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300",
+                ].join(" ")}
+              >
+                2D Map
+              </button>
+              <button
+                onClick={() => setIs3D(true)}
+                className={[
+                  "flex-1 text-xs font-semibold py-1.5 rounded-md transition-all",
+                  is3D
+                    ? "bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm"
+                    : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300",
+                ].join(" ")}
+              >
+                3D Risk
+              </button>
+            </div>
+
+            {!is3D && (
+              <div className="space-y-2 md:space-y-3">
+                <ToggleSwitch label="Soil Erosion Risk"      dotColor="#a855f7" checked={showErosion}     onChange={setShowErosion} />
+                <ToggleSwitch label="River Water Quality"    dotColor="#0ea5e9" checked={showContaminant} onChange={setShowContaminant} />
+                <ToggleSwitch label="Forest Regrowth Status" dotColor="#2563eb" checked={showBurnScar}    onChange={setShowBurnScar} />
+              </div>
+            )}
+
+            {is3D && (
+              <p className="text-[10px] text-gray-400 dark:text-gray-500 leading-tight">
+                Column height = erosion risk score.<br />
+                Drag to orbit · scroll to zoom.
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Bottom bar: mobile Live button + temporal slider + zoom buttons */}
         <div className="absolute bottom-4 left-4 right-4 z-[1001] flex items-end justify-between gap-3">
 
           {/* Live button — mobile only to open the side panel */}
@@ -115,8 +178,18 @@ export function MapViewPage({ flyTo, mapFullscreen = false, onSetFullscreen }: P
             Live
           </button>
 
-          {/* Zoom buttons */}
-          <div className="flex flex-col gap-2 shrink-0 ml-auto">
+          <div className="flex-1 min-w-0">
+            <TemporalSlider
+              onDateRangeChange={(from, to, center) => {
+                setDateFrom(from);
+                setDateTo(to);
+                setCenterDate(center);
+              }}
+            />
+          </div>
+
+          {/* Zoom buttons — desktop only */}
+          <div className="hidden md:flex flex-col gap-2 shrink-0">
             <button
               onClick={() => zoomIn?.()}
               title="Zoom in"
@@ -179,24 +252,6 @@ export function MapViewPage({ flyTo, mapFullscreen = false, onSetFullscreen }: P
 
         {/* Shows sensor-specific ML data when a badge is clicked, placeholder otherwise */}
         <SectorPanel sensorInfo={sensorInfo} />
-
-        {/* Map layer toggles — moved here from the map so everything is in one place */}
-        <div className="rounded-xl border border-gray-200/60 dark:border-gray-700/40 bg-surface p-3">
-          <p className="text-xs font-bold uppercase tracking-widest text-gray-500 dark:text-gray-400 mb-3">Map Layers</p>
-          <div className="space-y-2">
-            <ToggleSwitch label="Soil Erosion Risk"      dotColor="#a855f7" checked={showErosion}     onChange={setShowErosion} />
-            <ToggleSwitch label="River Water Quality"    dotColor="#0ea5e9" checked={showContaminant} onChange={setShowContaminant} />
-            <ToggleSwitch label="Forest Regrowth Status" dotColor="#2563eb" checked={showBurnScar}    onChange={setShowBurnScar} />
-          </div>
-        </div>
-
-        {/* Time History slider — moved here from the bottom of the map */}
-        <TemporalSlider
-          onDateRangeChange={(from, to) => {
-            setDateFrom(from);
-            setDateTo(to);
-          }}
-        />
 
         {/* Live Readings section label */}
         <div className="flex items-center gap-2 px-0.5 mt-1">
