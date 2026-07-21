@@ -34,6 +34,7 @@ from models.simulations.erosion_model import (
 from models.simulations.contaminant_model import (
     calculate_contaminant_vector as calc_contaminant,
 )
+from api.sensor_fetch import live_water_velocity, live_rainfall_mm
 
 
 # ============================================================================
@@ -133,9 +134,12 @@ class ErosionSimulationRequest(BaseModel):
             }
         }
     )
-    
+
     sector_id: str = Field(..., description="Grid sector ID")
-    rainfall_mm: float = Field(..., ge=0, le=500, description="Rainfall intensity (0-500 mm)")
+    rainfall_mm: Optional[float] = Field(
+        None, ge=0, le=500,
+        description="Rainfall intensity (0-500 mm). Omit to use live Environment Canada reading."
+    )
 
 
 class SourcePoint(BaseModel):
@@ -193,11 +197,12 @@ class ModelOutput(BaseModel):
                 "risk_label": "High",
                 "contaminant_vector": {"direction_deg": 0.0, "velocity": 0.0},
                 "timestamp": "2026-06-26T14:30:00Z",
-                "confidence": 0.92
+                "confidence": 0.92,
+                "live_inputs": None
             }
         }
     )
-    
+
     sector_id: str
     model_version: str
     simulation_type: str
@@ -206,6 +211,7 @@ class ModelOutput(BaseModel):
     contaminant_vector: Optional[Union[Dict[str, float], List[List[float]]]]
     timestamp: str
     confidence: float
+    live_inputs: Optional[Dict[str, Any]] = None
 
 
 # ============================================================================
@@ -407,17 +413,25 @@ async def simulate_erosion(request: ErosionSimulationRequest):
       -d '{"sector_id": "ATH-001", "rainfall_mm": 45.0}'
     ```
     """
+    # Use live EC Climate data unless the caller explicitly provides rainfall_mm
+    if request.rainfall_mm is not None:
+        rainfall_mm = request.rainfall_mm
+        rainfall_source = f"user-specified {rainfall_mm} mm"
+    else:
+        rainfall_mm, rainfall_source = live_rainfall_mm()
+
     try:
         logger.info(
-            "Processing erosion simulation for %s: rainfall=%smm",
+            "Processing erosion simulation for %s: rainfall=%.1fmm (%s)",
             request.sector_id,
-            request.rainfall_mm,
+            rainfall_mm,
+            rainfall_source,
         )
 
-        # Call erosion model
+        # Call erosion model with real or user-specified rainfall
         try:
-            model_result = calc_erosion(30.0, request.rainfall_mm, 1.0)
-            soil_loss = model_result.get("soil_loss_t_ha", request.rainfall_mm * 0.5)
+            model_result = calc_erosion(30.0, rainfall_mm, 1.0)
+            soil_loss = model_result.get("soil_loss_t_ha", rainfall_mm * 0.5)
             risk_level = model_result.get("risk_label", "Medium")
         except Exception as model_err:
             logger.warning(
@@ -425,8 +439,7 @@ async def simulate_erosion(request: ErosionSimulationRequest):
                 request.sector_id,
                 str(model_err),
             )
-            # Fallback if model not available
-            soil_loss = request.rainfall_mm * 0.5
+            soil_loss = rainfall_mm * 0.5
             if soil_loss >= 35:
                 risk_level = "High"
             elif soil_loss >= 15:
@@ -434,9 +447,8 @@ async def simulate_erosion(request: ErosionSimulationRequest):
             else:
                 risk_level = "Low"
 
-        # Calculate risk score from soil loss
-        risk_score = min(soil_loss / 50.0, 1.0)  # Normalize to [0, 1]
-        
+        risk_score = min(soil_loss / 50.0, 1.0)
+
         result = ModelOutput(
             sector_id=request.sector_id,
             model_version="v1.0",
@@ -445,7 +457,13 @@ async def simulate_erosion(request: ErosionSimulationRequest):
             risk_label=risk_level,
             contaminant_vector=None,
             timestamp=datetime.now(timezone.utc).isoformat(),
-            confidence=0.85
+            confidence=0.85,
+            live_inputs={
+                "rainfall_mm": rainfall_mm,
+                "rainfall_source": rainfall_source,
+                "slope_deg": 30.0,
+                "slope_source": "Jasper terrain estimate (DEM wiring — Sprint 3)",
+            },
         )
 
         logger.info("✓ Erosion simulation complete for %s", request.sector_id)
@@ -511,18 +529,25 @@ async def simulate_contaminant(request: ContaminantSimulationRequest):
             detail=f"Source point ({request.source_point.lat}, {request.source_point.lon}) is outside Athabasca watershed bounds. Valid range: lat {athabasca_lat_min}-{athabasca_lat_max}°N, lon {athabasca_lon_min}-{athabasca_lon_max}°W"
         )
     
+    # Always fetch live discharge from Environment Canada Water Office
+    water_velocity_ms, velocity_source = live_water_velocity()
+
     try:
         logger.info(
-            "Processing contaminant simulation for %s: source=%s",
+            "Processing contaminant simulation for %s: source=%s velocity=%.2f m/s (%s)",
             request.sector_id,
             request.source_point,
+            water_velocity_ms,
+            velocity_source,
         )
 
-        # Calculate spread based on coordinates
         try:
-            # Try to use the contaminant model if available
-            model_result = calc_contaminant(45.0, 1.5, 0.5)
-            spread_radius = model_result.get("spread_radius_km", 2.5)
+            model_result = calc_contaminant(
+                flow_direction_deg=45.0,       # Athabasca flows NE from Jasper
+                water_velocity_ms=water_velocity_ms,  # live EC Water Office value
+                contamination_level=0.5,
+            )
+            spread_radius    = model_result.get("spread_radius_km", 2.5)
             peak_concentration = model_result.get("peak_concentration", 0.65)
         except Exception as model_err:
             logger.warning(
@@ -530,11 +555,10 @@ async def simulate_contaminant(request: ContaminantSimulationRequest):
                 request.sector_id,
                 str(model_err),
             )
-            # Fallback calculation
-            spread_radius = 2.5
+            spread_radius      = 2.5
             peak_concentration = 0.65
 
-        risk_score = float(peak_concentration)  # Calculate from concentration
+        risk_score = float(peak_concentration)
         if risk_score >= 0.7:
             risk_label = "High"
         elif risk_score >= 0.4:
@@ -550,7 +574,13 @@ async def simulate_contaminant(request: ContaminantSimulationRequest):
             risk_label=risk_label,
             contaminant_vector=[[request.source_point.lat, request.source_point.lon]],
             timestamp=datetime.now(timezone.utc).isoformat(),
-            confidence=0.80
+            confidence=0.80,
+            live_inputs={
+                "water_velocity_ms": water_velocity_ms,
+                "velocity_source": velocity_source,
+                "flow_direction_deg": 45.0,
+                "flow_direction_source": "Athabasca NE channel estimate",
+            },
         )
 
         logger.info("✓ Contaminant simulation complete for %s", request.sector_id)
