@@ -3,7 +3,6 @@ import os
 from datetime import datetime
 from typing import Optional
 
-# Depends and Security are needed for the API key authentication dependency
 from fastapi import APIRouter, Depends, HTTPException, Query, Security
 from fastapi.security.api_key import APIKeyHeader
 
@@ -31,9 +30,8 @@ async def get_layers(
     layer_type: Optional[str] = Query(None)
 ):
     """Returns all environmental layers for a sector — used by Reyta's map frontend.
-    Queries both ingest_records and water_quality_readings tables.
+    Queries ingest_records, water_quality_readings, and environmental_layers tables.
     Returns 404 if no data exists for the requested sector."""
-    # Only these layer types are valid — reject anything else with 422
     valid_layer_types = ["geotiff", "dem", "telemetry", "water_quality", "burn_scar"]
     if layer_type and layer_type not in valid_layer_types:
         raise HTTPException(
@@ -41,7 +39,6 @@ async def get_layers(
             detail=f"Invalid layer_type. Must be one of: {valid_layer_types}"
         )
 
-    # Validate date format if provided — fromisoformat() raises ValueError if wrong
     if date_from:
         try:
             datetime.fromisoformat(date_from)
@@ -58,21 +55,17 @@ async def get_layers(
                 status_code=422, detail="Invalid date_to format. Use ISO 8601."
             ) from exc
 
-    # Start with empty list — filled by Supabase queries below
     layers = []
 
     try:
         supabase = get_supabase()
 
-        # Query 1 — ingest_records table (stores base ingest records from /api/v1/ingest)
-        # This is what Edwin's E2E tests check after calling the base ingest endpoint
+        # Query 1 — ingest_records table (base ingest endpoint, migration 008)
         ingest_query = (
             supabase.table("ingest_records")
             .select("*")
             .eq("sector_id", sector_id)
         )
-
-        # Apply optional filters on ingest_records
         if date_from:
             ingest_query = ingest_query.gte("timestamp", date_from)
         if date_to:
@@ -81,33 +74,39 @@ async def get_layers(
             ingest_query = ingest_query.eq("layer_type", layer_type)
 
         ingest_result = ingest_query.execute()
-
-        # Format each ingest_record row as a layer object
         for row in ingest_result.data:
+            coords = row.get("coordinates") or {}
+            lat = lon = None
+            if isinstance(coords, dict):
+                if coords.get("type") == "Point" and isinstance(coords.get("coordinates"), list):
+                    coord_list = coords["coordinates"]
+                    lon = coord_list[0] if len(coord_list) >= 1 else None
+                    lat = coord_list[1] if len(coord_list) >= 2 else None
+                else:
+                    lat = coords.get("lat")
+                    lon = coords.get("lon")
             layers.append({
                 "layer_type": row.get("layer_type", "unknown"),
                 "sector_id": sector_id,
                 "source": "ingest_records",
-                "data": row
+                "coordinates": {"lat": lat, "lon": lon},
+                "timestamp": row.get("timestamp"),
+                "data": row,
             })
 
-        # Query 2 — water_quality_readings table (stores telemetry sensor data)
-        # Only query if no layer_type filter or filter is water_quality/telemetry
+        # Query 2 — water_quality_readings table (telemetry sensor data)
         if not layer_type or layer_type in ["water_quality", "telemetry"]:
             wq_query = (
                 supabase.table("water_quality_readings")
                 .select("*")
                 .eq("sector_id", sector_id)
             )
-
             if date_from:
                 wq_query = wq_query.gte("recorded_at", date_from)
             if date_to:
                 wq_query = wq_query.lte("recorded_at", date_to)
 
             wq_result = wq_query.execute()
-
-            # Format each water_quality row as a layer object
             for row in wq_result.data:
                 layers.append({
                     "layer_type": "water_quality",
@@ -116,11 +115,37 @@ async def get_layers(
                     "data": row
                 })
 
+        # Query 3 — environmental_layers table (legacy Sprint 2 records)
+        el_query = (
+            supabase.table("environmental_layers")
+            .select("*")
+            .eq("sector_id", sector_id)
+        )
+        if date_from:
+            el_query = el_query.gte("timestamp", date_from)
+        if date_to:
+            el_query = el_query.lte("timestamp", date_to)
+        if layer_type:
+            el_query = el_query.eq("layer_type", layer_type)
+
+        el_result = el_query.execute()
+        for row in el_result.data:
+            payload = row.get("payload") or {}
+            layers.append({
+                "layer_type": row.get("layer_type", "unknown"),
+                "sector_id": sector_id,
+                "source": "environmental_layers",
+                "coordinates": {
+                    "lat": payload.get("lat"),
+                    "lon": payload.get("lon"),
+                },
+                "timestamp": row.get("timestamp"),
+                "data": payload,
+            })
+
     except Exception as e:
-        # Log the error but don't crash — layers stays empty and 404 triggers below
         print(f"Supabase query error: {e}")
 
-    # Return 404 if no layers found — Edwin's tests expect this for unknown sectors
     if not layers:
         raise HTTPException(
             status_code=404, detail=f"No data found for sector '{sector_id}'"
@@ -143,46 +168,96 @@ async def get_sector_timeline(
     """Returns all timestamped scan records for a sector ordered by timestamp.
 
     This endpoint is specifically for Reyta's timeline slider — it returns
-    all ingest records in chronological order so the frontend can blend
-    between scan dates for smooth map transitions.
+    all ingest, water quality, and legacy environmental_layers records in
+    chronological order so the frontend can blend between scan dates for
+    smooth map transitions.
 
     Returns 404 if no records exist for the sector.
     """
+    valid_layer_types = ["geotiff", "dem", "telemetry", "water_quality", "burn_scar"]
+    if layer_type and layer_type not in valid_layer_types:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid layer_type. Must be one of: {valid_layer_types}"
+        )
+
     try:
         supabase = get_supabase()
+        timeline = []
 
-        # Query ingest_records ordered by timestamp ascending (oldest first)
-        # Reyta's slider needs chronological order to interpolate between dates
-        query = (
+        # Query 1 — ingest_records
+        ingest_query = (
             supabase.table("ingest_records")
             .select("id, sector_id, layer_type, timestamp, payload")
             .eq("sector_id", sector_id)
-            .order("timestamp", desc=False)
         )
-
-        # Filter by layer_type if provided
         if layer_type:
-            query = query.eq("layer_type", layer_type)
+            ingest_query = ingest_query.eq("layer_type", layer_type)
 
-        result = query.execute()
+        ingest_result = ingest_query.execute()
+        for row in ingest_result.data:
+            timeline.append({
+                "layer_type": row.get("layer_type", "unknown"),
+                "timestamp": row.get("timestamp"),
+                "source": "ingest_records",
+                "data": row.get("payload"),
+            })
 
-        # Return 404 if no records found for this sector
-        if not result.data:
+        # Query 2 — water_quality_readings
+        if not layer_type or layer_type in ["water_quality", "telemetry"]:
+            wq_query = (
+                supabase.table("water_quality_readings")
+                .select("*")
+                .eq("sector_id", sector_id)
+            )
+            wq_result = wq_query.execute()
+            for row in wq_result.data:
+                timeline.append({
+                    "layer_type": "water_quality",
+                    "timestamp": row.get("recorded_at"),
+                    "source": "water_quality_readings",
+                    "data": row,
+                })
+
+        # Query 3 — environmental_layers (legacy Sprint 2 records)
+        # Added because get_layers already treats this table as a real data
+        # source — worth checking whether erosion/regrowth scores live here.
+        el_query = (
+            supabase.table("environmental_layers")
+            .select("*")
+            .eq("sector_id", sector_id)
+        )
+        if layer_type:
+            el_query = el_query.eq("layer_type", layer_type)
+
+        el_result = el_query.execute()
+        for row in el_result.data:
+            timeline.append({
+                "layer_type": row.get("layer_type", "unknown"),
+                "timestamp": row.get("timestamp"),
+                "source": "environmental_layers",
+                "data": row.get("payload"),
+            })
+
+        if not timeline:
             raise HTTPException(
                 status_code=404,
                 detail=f"No timeline records found for sector '{sector_id}'"
             )
 
+        # Sort combined results chronologically — required for the frontend
+        # to interpolate between the two nearest dates correctly. Records
+        # with a missing/null timestamp are pushed to the end.
+        timeline.sort(key=lambda r: r["timestamp"] or "")
+
         return {
             "sector_id": sector_id,
             "layer_type": layer_type,
-            # Total number of scan dates available for interpolation
-            "total_records": len(result.data),
-            "timeline": result.data
+            "total_records": len(timeline),
+            "timeline": timeline
         }
 
     except HTTPException:
-        # Re-raise HTTP exceptions so FastAPI handles them correctly
         raise
     except Exception as e:
         print(f"Timeline query error: {e}")

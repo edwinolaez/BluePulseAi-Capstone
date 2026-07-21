@@ -12,14 +12,9 @@ from database import get_supabase
 
 router = APIRouter()
 
-# Maximum allowed file size for uploads — prevents large files from crashing the server
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB in bytes
 
-# The API key all protected endpoints require in the X-API-Key header
 API_KEY = "jasper-dev-api-key-2026"
-
-# Tells FastAPI to look for "X-API-Key" in the request headers
-# auto_error=False lets us handle the error ourselves with a custom message
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
@@ -31,7 +26,6 @@ async def require_api_key(api_key: str = Security(api_key_header)):
 
 class Coordinates(BaseModel):
     """Validates lat/lon ranges — automatically rejects values like lat=999."""
-    # ge = greater than or equal, le = less than or equal
     lat: float = Field(..., ge=-90, le=90)
     lon: float = Field(..., ge=-180, le=180)
 
@@ -50,19 +44,21 @@ class IngestRecord(BaseModel):
 async def ingest_base(record: IngestRecord):
     """Accept a generic JSON ingest record and save it to Supabase ingest_records table.
     Returns 201 Created with the Supabase-generated UUID that Edwin's E2E tests check for."""
-    timestamp = datetime.now(timezone.utc).isoformat()
+    timestamp = record.timestamp
 
     try:
         supabase = get_supabase()
-        # Save to ingest_records table — matches Rahil's migration 008
         db_record = {
             "sector_id": record.sector_id,
             "layer_type": record.layer_type,
+            "coordinates": {
+                "type": "Point",
+                "coordinates": [record.coordinates.lon, record.coordinates.lat],
+            },
             "payload": record.payload or {},
             "timestamp": timestamp,
         }
         result = supabase.table("ingest_records").insert(db_record).execute()
-        # Use the UUID Supabase generated — fallback to uuid4 if insert fails
         record_id = result.data[0]["id"] if result.data else str(uuid.uuid4())
     except Exception as e:
         raise HTTPException(
@@ -85,7 +81,6 @@ async def ingest_geotiff(
 ):
     """Accepts Sentinel-2 satellite imagery files from Copernicus.
     Only .tif/.tiff files under 50MB are accepted."""
-    # Check size before reading to avoid loading huge files into memory
     if file.size and file.size > MAX_FILE_SIZE:
         raise HTTPException(status_code=413, detail="File too large. Max size is 50MB.")
 
@@ -93,7 +88,6 @@ async def ingest_geotiff(
     if len(contents) > MAX_FILE_SIZE:
         raise HTTPException(status_code=413, detail="File too large. Max size is 50MB.")
 
-    # Reject non-GeoTIFF files — rasterio can only parse .tif/.tiff format
     if not file.filename.endswith(".tif") and not file.filename.endswith(".tiff"):
         raise HTTPException(
             status_code=422, detail="Invalid file format. Only GeoTIFF files accepted."
@@ -121,7 +115,6 @@ async def ingest_dem(
 ):
     """Accepts terrain elevation files from Altalis provincial open data.
     Richard's ML models use DEM data to calculate erosion and landslide risk."""
-    # Same size and format checks as GeoTIFF above
     if file.size and file.size > MAX_FILE_SIZE:
         raise HTTPException(status_code=413, detail="File too large. Max size is 50MB.")
 
@@ -168,10 +161,8 @@ async def ingest_telemetry(
             # flow_rate stored in payload JSONB — no dedicated column yet (agreed with Rahil)
             "payload": {"flow_rate": flow_rate, "data_source": data_source},
         }
-        # Insert the record — .execute() runs the actual database query
         supabase.table("water_quality_readings").insert(record).execute()
     except Exception as e:
-        # Return 503 if database is down so the caller knows to retry
         raise HTTPException(
             status_code=503, detail=f"Database unavailable: {e}"
         ) from e

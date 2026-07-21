@@ -1,3 +1,8 @@
+// Archives Page — stores historical GIS survey records of the Jasper watershed.
+// Users can search by name or ID, and click "View Snapshot" to expand a record.
+// The snapshot preview currently shows a placeholder message — it would display
+// the actual map data once connected to the archive storage backend.
+
 "use client";
 
 import { useState } from "react";
@@ -11,6 +16,8 @@ interface Snapshot {
   size: string;
 }
 
+// Historical survey records — each one represents a point-in-time snapshot of the watershed.
+// In production these would be loaded from the backend storage service.
 const SNAPSHOTS: Snapshot[] = [
   { id: "ARC-014", name: "Pre-Fire Baseline Survey",      date: "2023-05-01", type: "Full Survey",     size: "212 MB" },
   { id: "ARC-021", name: "Post-Fire Initial Assessment",  date: "2023-08-10", type: "Full Survey",     size: "248 MB" },
@@ -27,15 +34,18 @@ const TYPE_BADGE: Record<Snapshot["type"], string> = {
 };
 
 export function ArchivesPage() {
+  // Text typed into the search box
   const [query, setQuery] = useState("");
+  // Tracks which archive row is currently expanded (only one at a time)
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
+  // Filter the list to only show records matching what the user searched for
   const visible = SNAPSHOTS.filter((s) =>
     s.name.toLowerCase().includes(query.toLowerCase()) || s.id.toLowerCase().includes(query.toLowerCase())
   );
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 bg-background">
+    <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-background">
       <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1">
@@ -72,11 +82,11 @@ export function ArchivesPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 shrink-0">
+              <div className="flex items-center gap-2 sm:gap-3 shrink-0 flex-wrap justify-end">
                 <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-1 rounded ${TYPE_BADGE[snap.type]}`}>
                   {snap.type}
                 </span>
-                <span className="text-xs text-gray-400 w-16 text-right">{snap.size}</span>
+                <span className="hidden sm:inline text-xs text-gray-400 w-16 text-right">{snap.size}</span>
                 <button
                   onClick={() => setExpandedId((id) => (id === snap.id ? null : snap.id))}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition-colors"
@@ -88,9 +98,21 @@ export function ArchivesPage() {
             </div>
 
             {expandedId === snap.id && (
-              <div className="mt-3 pt-3 border-t border-gray-200/60 dark:border-gray-700/40 flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                <HistoryIcon className="w-3.5 h-3.5" />
-                Snapshot preview unavailable in this build &mdash; archived layer data would render here.
+              <div className="mt-4 pt-4 border-t border-gray-200/60 dark:border-gray-700/40">
+                <div className="rounded-lg bg-surface-alt border border-gray-200/60 dark:border-gray-700/40 p-4 flex flex-col items-center gap-3 text-center">
+                  <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                    <HistoryIcon className="w-5 h-5 text-blue-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">{snap.name}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      {snap.type} &middot; {snap.date} &middot; {snap.size}
+                    </p>
+                  </div>
+                  <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-lg px-3 py-2 w-full">
+                    Map layer preview is not available in this build — archived GIS data for <strong>{snap.id}</strong> would render here when connected to the archive storage service.
+                  </p>
+                </div>
               </div>
             )}
           </div>

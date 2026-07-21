@@ -28,6 +28,8 @@ load_dotenv(dotenv_path=".env.local")
 BASE_API_URL = os.getenv("RAILWAY_API_URL", "http://localhost:8000")
 KONG_API_KEY = os.getenv("NEXT_PUBLIC_API_KEY", "")
 
+BACKEND_CONFIGURED = bool(BASE_API_URL and BASE_API_URL != "http://localhost:8000")
+
 # The performance budget: 95th percentile must be under this value (milliseconds)
 P95_BUDGET_MS = 500
 
@@ -78,6 +80,10 @@ def calculate_p95(times: list) -> float:
 
 # ─── Health Endpoint Benchmark ────────────────────────────────────────────────
 
+@pytest.mark.skipif(
+    not BACKEND_CONFIGURED,
+    reason="RAILWAY_API_URL not set — backend not deployed. Set it in CI env or .env.local to run benchmarks."
+)
 class TestHealthEndpointPerformance:
     """
     The /health endpoint should be the fastest in the system.
@@ -111,6 +117,10 @@ class TestHealthEndpointPerformance:
 
 # ─── Map Query Endpoint Benchmark ─────────────────────────────────────────────
 
+@pytest.mark.skipif(
+    not BACKEND_CONFIGURED,
+    reason="RAILWAY_API_URL not set — backend not deployed. Set it in CI env or .env.local to run benchmarks."
+)
 class TestMapQueryPerformance:
     """
     The map query endpoint (GET /api/v1/layers/{sector_id}) hits the PostGIS
@@ -144,6 +154,10 @@ class TestMapQueryPerformance:
 
 # ─── ML Inference Benchmark ───────────────────────────────────────────────────
 
+@pytest.mark.skipif(
+    not BACKEND_CONFIGURED,
+    reason="RAILWAY_API_URL not set — backend not deployed. Set it in CI env or .env.local to run benchmarks."
+)
 class TestMLInferencePerformance:
     """
     ML inference (running the model) is the slowest operation in the system.

@@ -99,9 +99,9 @@ class TestConvexMutations:
             json={
                 "path": "pipeline:updatePipelineStatus",
                 "args": {
-                    "sector_id": "ATH-001",
+                    "ingestType": "geotiff",
                     "status": "completed",
-                    "timestamp": datetime.now(timezone.utc).isoformat()
+                    "recordCount": 1
                 }
             },
             headers=convex_query_headers()
@@ -126,13 +126,10 @@ class TestConvexMutations:
             json={
                 "path": "waterQuality:updateWaterQuality",
                 "args": {
-                    "sector_id": "ATH-001",
-                    "readings": {
-                        "ph": 7.1,
-                        "turbidity_ntu": 3.8,
-                        "hydrocarbon_ppb": 1.2
-                    },
-                    "timestamp": datetime.now(timezone.utc).isoformat()
+                    "sectorId": "ATH-001",
+                    "ph": 7.1,
+                    "turbidity": 3.8,
+                    "hydrocarbonLevel": 1.2
                 }
             },
             headers=convex_query_headers()
@@ -157,12 +154,9 @@ class TestConvexMutations:
             json={
                 "path": "models:updateModelMetadata",
                 "args": {
-                    "model_version": "1.0.0",
-                    "run_id": "test-run-001",
-                    "metrics": {
-                        "f1_score": 0.87,
-                        "inference_time_ms": 312
-                    }
+                    "modelVersion": "1.0.0",
+                    "runId": "test-run-001",
+                    "f1Score": 0.87
                 }
             },
             headers=convex_query_headers()
@@ -225,16 +219,17 @@ class TestConvexQueries:
         value = body.get("value")  # Convex wraps results in {"value": ...}
 
         # getPipelineStatus returns a list of records; check the first one if present
+        # Rahil's pipeline.ts stores time as "lastIngestTime" (epoch ms), not "timestamp"
         if isinstance(value, list) and value:
             record = value[0]
-            for field in ["status", "timestamp"]:
+            for field in ["status", "lastIngestTime"]:
                 assert field in record, (
                     f"getPipelineStatus response is missing '{field}'. "
                     f"Full record: {record}. "
                     "Reyta's dashboard will show 'undefined' for this field."
                 )
         elif isinstance(value, dict) and value:
-            for field in ["status", "timestamp"]:
+            for field in ["status", "lastIngestTime"]:
                 assert field in value, (
                     f"getPipelineStatus response is missing '{field}'. "
                     f"Full response: {value}. "
@@ -348,9 +343,9 @@ class TestConvexMutationQueryRoundTrip:
             json={
                 "path": "pipeline:updatePipelineStatus",
                 "args": {
-                    "sector_id": "ATH-001",
+                    "ingestType": "geotiff",
                     "status": test_status,
-                    "timestamp": datetime.now(timezone.utc).isoformat()
+                    "recordCount": 1
                 }
             },
             headers=convex_query_headers()
@@ -408,9 +403,9 @@ class TestConvexMutationQueryRoundTrip:
             json={
                 "path": "models:updateModelMetadata",
                 "args": {
-                    "model_version": test_version,
-                    "run_id": test_run_id,
-                    "metrics": {"f1_score": 0.91, "inference_time_ms": 287}
+                    "modelVersion": test_version,
+                    "runId": test_run_id,
+                    "f1Score": 0.91
                 }
             },
             headers=convex_query_headers()

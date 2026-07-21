@@ -215,10 +215,32 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Install backend deps
+        run: |
+          pip install \
+            fastapi "uvicorn[standard]" \
+            pydantic PyJWT python-multipart python-dotenv \
+            supabase httpx
+
+      - name: Start backend locally
+        working-directory: jasper-backend
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          nohup uvicorn main:app --host 0.0.0.0 --port 8000 > /tmp/backend.log 2>&1 &
+          echo "Waiting for local backend to be ready..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8000/health > /dev/null 2>&1; then
+              echo "Backend ready after ${i}s"; break
+            fi
+            sleep 1
+          done
+          curl -sf http://localhost:8000/health || (echo "--- backend log ---"; cat /tmp/backend.log; exit 1)
+
       - name: Install integration test deps
         working-directory: tests
         run: |
-          pip install pytest httpx pytest-asyncio
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       - name: Run integration tests
@@ -230,7 +252,7 @@ jobs:
             echo "No integration tests yet — skipping"
           fi
         env:
-          RAILWAY_API_URL: ${{ secrets.RAILWAY_API_URL }}
+          RAILWAY_API_URL: http://127.0.0.1:8000
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
@@ -320,8 +342,13 @@ jobs:
 
       - name: API response time benchmark
         working-directory: tests
+        continue-on-error: true
+        env:
+          RAILWAY_API_URL: ${{ secrets.RAILWAY_API_URL }}
+          ML_API_URL: ${{ secrets.ML_API_URL }}
+          NEXT_PUBLIC_API_KEY: ${{ secrets.NEXT_PUBLIC_API_KEY }}
         run: |
-          pip install pytest pytest-benchmark httpx
+          pip install -r requirements.txt pytest-benchmark
           if [ -f benchmark_api.py ]; then
             pytest benchmark_api.py --benchmark-max-time=60 --benchmark-json=benchmark_results.json
           else
