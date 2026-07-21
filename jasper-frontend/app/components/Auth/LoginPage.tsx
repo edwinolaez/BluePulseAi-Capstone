@@ -52,8 +52,8 @@ export function LoginPage({ onLoginSuccess, onSuperadminPending }: Props) {
       <div className="relative w-full max-w-sm">
         {/* Logo / branding */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-cyan-500/15 border border-cyan-500/30 mb-4">
-            <svg viewBox="0 0 24 24" className="w-7 h-7 stroke-cyan-500 dark:stroke-cyan-400 fill-none" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-sait-sky/15 border border-sait-sky/30 mb-4">
+            <svg viewBox="0 0 24 24" className="w-7 h-7 stroke-sait-sky fill-none" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="9" />
               <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
               <circle cx="12" cy="12" r="2" />
@@ -76,7 +76,7 @@ export function LoginPage({ onLoginSuccess, onSuperadminPending }: Props) {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@jasper.ca"
                 autoComplete="email"
-                className="w-full px-4 py-2.5 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 text-sm outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-colors"
+                className="w-full px-4 py-2.5 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 text-sm outline-none focus:border-sait-sky focus:ring-1 focus:ring-sait-sky transition-colors"
               />
             </div>
 
@@ -91,7 +91,7 @@ export function LoginPage({ onLoginSuccess, onSuperadminPending }: Props) {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   autoComplete="current-password"
-                  className="w-full px-4 py-2.5 pr-11 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 text-sm outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-colors"
+                  className="w-full px-4 py-2.5 pr-11 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-600 text-sm outline-none focus:border-sait-sky focus:ring-1 focus:ring-sait-sky transition-colors"
                 />
                 <button
                   type="button"
@@ -112,7 +112,7 @@ export function LoginPage({ onLoginSuccess, onSuperadminPending }: Props) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:opacity-60 text-white text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+              className="w-full py-3 rounded-xl bg-sait-red hover:bg-sait-red-deep disabled:opacity-60 text-white text-sm font-semibold transition-colors flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>

@@ -5,7 +5,7 @@
 
 import { useEffect, useState } from "react";
 import L from "leaflet";
-import { Marker, Polyline, useMap } from "react-leaflet";
+import { CircleMarker, Marker, Polyline, Tooltip, useMap } from "react-leaflet";
 import { fetchContaminantSimulation, ModelOutput } from "../../../lib/api";
 import { HazardZone } from "./HazardZone";
 import type { SensorInfo } from "./JasperMap";
@@ -24,15 +24,16 @@ const RIVER_BRANCH: [number, number][] = RIVER_MAIN.map(
   ([lat, lng]): [number, number] => [lat + 0.004, lng + 0.006]
 );
 
-const CRITICAL_CENTER: [number, number] = [52.875, -118.060];
+// WSC station 07AA001 — Miette River at Jasper (Water Survey of Canada)
+const CRITICAL_CENTER: [number, number] = [52.8639, -118.1069];
 
 // Positions chosen to sit between river nodes AND away from all badge markers:
 // ATH-001-H=[52.858,-118.092], ATH-001-M=[52.870,-118.070], ATH-001-L=[52.884,-118.045],
-// Contaminant badge=CRITICAL_CENTER=[52.875,-118.060], TelemetryStation=[52.875,-118.08].
+// Contaminant badge=CRITICAL_CENTER=[52.8639,-118.1069], TelemetryStation=[52.875,-118.08].
 const ARROW_POSITIONS: [number, number][] = [
   [52.830, -118.178], // upstream — no badges nearby
   [52.848, -118.130], // moved north-west away from ATH-001-H badge at [52.858,-118.092]
-  [52.893, -118.010], // moved downstream away from CRITICAL_CENTER at [52.875,-118.060]
+  [52.893, -118.010], // moved downstream away from CRITICAL_CENTER
   [52.920, -117.950], // far downstream — no badges nearby
 ];
 
@@ -42,7 +43,7 @@ function arrowIcon(directionDeg: number, velocity: number): L.DivIcon {
     className: "",
     html: `
       <div style="transform:rotate(${directionDeg}deg);width:28px;height:28px;display:flex;align-items:center;justify-content:center;animation:jasper-arrow-pulse ${duration}s ease-in-out infinite;">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0ea5e9" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.9">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00A3E0" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.9">
           <path d="M5 12h14M13 6l6 6-6 6"/>
         </svg>
       </div>
@@ -111,12 +112,12 @@ export function ContaminantLayer({ onSectorClick, onSensorSelect, onMarkerClick 
       <Polyline
         positions={RIVER_MAIN}
         interactive={false}
-        pathOptions={{ color: "#0ea5e9", weight: lineWeight, opacity: 0.8, lineCap: "round", lineJoin: "round" }}
+        pathOptions={{ color: "#00A3E0", weight: lineWeight, opacity: 0.8, lineCap: "round", lineJoin: "round" }}
       />
       <Polyline
         positions={RIVER_BRANCH}
         interactive={false}
-        pathOptions={{ color: "#38bdf8", weight: Math.max(1, lineWeight - 2), opacity: 0.7, lineCap: "round", lineJoin: "round" }}
+        pathOptions={{ color: "#55CAF0", weight: Math.max(1, lineWeight - 2), opacity: 0.7, lineCap: "round", lineJoin: "round" }}
       />
 
       {arrowPositions.map((pos, i) => (
@@ -127,6 +128,19 @@ export function ContaminantLayer({ onSectorClick, onSensorSelect, onMarkerClick 
           eventHandlers={{ click: () => { onSensorSelect?.(sensorInfo); onMarkerClick?.(); } }}
         />
       ))}
+
+      {/* River Water Quality sensor dot — cyan #00A3E0, matches 3D map colour */}
+      <CircleMarker
+        center={CRITICAL_CENTER}
+        radius={7}
+        pathOptions={{ color: "#ffffff", fillColor: "#00A3E0", fillOpacity: 1, weight: 2 }}
+      >
+        <Tooltip direction="top" offset={[0, -8]} opacity={1}>
+          <div className="text-xs font-semibold">ATH-001-W</div>
+          <div className="text-xs text-gray-500">River Water Quality Sensor</div>
+          <div className="text-xs text-gray-400">52.8639°N, 118.1069°W</div>
+        </Tooltip>
+      </CircleMarker>
 
       <HazardZone
         center={CRITICAL_CENTER}

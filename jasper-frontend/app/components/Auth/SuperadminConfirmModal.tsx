@@ -38,7 +38,7 @@ export function SuperadminConfirmModal({ onConfirmed }: Props) {
         <div className="bg-gray-800 border border-gray-700 rounded-xl p-4 mb-6 text-left">
           <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Signing in as</p>
           <p className="text-base font-semibold text-white">{pendingSuperadmin.name}</p>
-          <p className="text-sm text-cyan-400">{pendingSuperadmin.email}</p>
+          <p className="text-sm text-sait-sky">{pendingSuperadmin.email}</p>
           <span className="inline-block mt-2 text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/30">
             Superadmin
           </span>

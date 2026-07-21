@@ -11,6 +11,7 @@
     "test:coverage": "node --max-old-space-size=4096 node_modules/jest/bin/jest.js --coverage --forceExit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.112.4",
     "@deck.gl/geo-layers": "^9.3.7",
     "@deck.gl/layers": "^9.3.7",
     "@deck.gl/react": "^9.3.7",

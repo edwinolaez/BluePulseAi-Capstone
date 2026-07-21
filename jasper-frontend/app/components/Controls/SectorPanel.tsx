@@ -31,7 +31,6 @@ export function SectorPanel({ sensorInfo }: Props) {
   return (
     <div className="rounded-xl border border-gray-200/60 dark:border-gray-700/40 bg-surface p-3.5">
 
-      {/* Header — always "Selected Area"; badge appears when a sensor is selected */}
       <div className="flex items-center justify-between mb-2">
         <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
           Selected Area
@@ -43,7 +42,6 @@ export function SectorPanel({ sensorInfo }: Props) {
         )}
       </div>
 
-      {/* Sensor badge clicked — show that sensor's ML model data */}
       {sensorInfo && (() => {
         const iconColor = SENSOR_ICON_COLOR[sensorInfo.icon];
         return (
@@ -83,7 +81,6 @@ export function SectorPanel({ sensorInfo }: Props) {
         );
       })()}
 
-      {/* Nothing selected yet */}
       {!sensorInfo && (
         <p className="text-sm text-gray-500 dark:text-gray-400">
           Click a sensor badge on the map to view environmental data for that area.

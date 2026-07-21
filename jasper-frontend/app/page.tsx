@@ -72,7 +72,7 @@ export default function Home() {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-gray-950">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-10 h-10 border-2 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin" />
+          <div className="w-10 h-10 border-2 border-sait-sky/30 border-t-sait-sky rounded-full animate-spin" />
           <p className="text-sm text-gray-500">Loading…</p>
         </div>
       </div>
@@ -116,9 +116,8 @@ export default function Home() {
       {/* Main content area — sidebar on the left, active page on the right */}
       <div className="flex flex-1 min-h-0 relative overflow-hidden">
 
-        {/* Sidebar — shows sector navigation and quick links.
-            On mobile, it slides in as a drawer when the hamburger icon is tapped. */}
-        <Sidebar
+        {/* Sidebar — map-only; hidden on all other tabs */}
+        {activeTab === "map" && <Sidebar
           activeTab={activeTab}
           onNavigate={handleTabChange}
           onFocusSector={focusSector}
@@ -126,8 +125,7 @@ export default function Home() {
           onOpenSupport={() => setSupportOpen(true)}
           mobileOpen={sidebarOpen}
           onCloseMobile={() => setSidebarOpen(false)}
-          collapsed={activeTab === "map" && mapFullscreen}
-        />
+        />}
 
         {/* Only one of these pages renders at a time depending on the active tab */}
         {activeTab === "map"       && <MapViewPage flyTo={flyTo} mapFullscreen={mapFullscreen} onSetFullscreen={setMapFullscreen} />}

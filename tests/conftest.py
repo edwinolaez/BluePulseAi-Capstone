@@ -7,6 +7,8 @@
 # it prepares the stage (database connections, API URLs, test users)
 # so that each individual test can focus on what it's actually testing.
 
+import base64
+import json
 import os
 import pytest
 import httpx
@@ -126,6 +128,56 @@ def viewer_headers():
         "apikey": SUPABASE_ANON_KEY,
         "Authorization": f"Bearer {SUPABASE_ANON_KEY}",
     }
+
+
+# ─── Ingest Profile Seeder ────────────────────────────────────────────────────
+
+def _decode_jwt_email(token: str) -> str:
+    """Decode a JWT payload (base64) and return the email claim, or empty string."""
+    try:
+        parts = token.split(".")
+        if len(parts) != 3:
+            return ""
+        padded = parts[1] + "=" * (4 - len(parts[1]) % 4)
+        claims = json.loads(base64.b64decode(padded))
+        return claims.get("email", "")
+    except Exception:
+        return ""
+
+
+@pytest.fixture(scope="session", autouse=True)
+def seed_ingest_profile():
+    """
+    Seeds a profiles row for the ingest service account before the test session.
+
+    The RLS policy on environmental_layers checks profiles.email = JWT email.
+    The ingest role is a machine account with no real Supabase auth user, so
+    we decode the JWT to get its email and upsert the row using the service
+    role key (which bypasses RLS). Runs once per session, silently skips if
+    secrets are missing.
+    """
+    if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
+        return
+
+    ingest_token = os.getenv("TEST_INGEST_JWT", "")
+    if not ingest_token:
+        return
+
+    email = _decode_jwt_email(ingest_token)
+    if not email:
+        return
+
+    with httpx.Client(base_url=SUPABASE_URL, timeout=10.0) as client:
+        client.post(
+            "/rest/v1/profiles",
+            json={"full_name": "Ingest Service Account", "email": email, "role": "ingest"},
+            headers={
+                "apikey": SUPABASE_SERVICE_KEY,
+                "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+                "Content-Type": "application/json",
+                "Prefer": "resolution=ignore-duplicates",
+            },
+        )
 
 
 # ─── Shared Test Data ─────────────────────────────────────────────────────────

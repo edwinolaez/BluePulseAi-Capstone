@@ -35,7 +35,7 @@ it("shows the Jasper Environmental Twin branding", () => {
 it("highlights the active Map View tab", () => {
   render(<TopNav {...BASE_PROPS} />);
   const mapTab = screen.getByText("Map View");
-  expect(mapTab.className).toContain("cyan");
+  expect(mapTab.className).toContain("sait-red");
 });
 
 it("calls onTabChange when a tab is clicked", () => {

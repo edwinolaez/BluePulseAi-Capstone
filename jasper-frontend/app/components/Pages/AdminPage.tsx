@@ -70,14 +70,14 @@ export function AdminPage() {
             {users.map((user) => (
               <div key={user.id} className="flex items-center justify-between px-6 py-4 flex-wrap gap-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center shrink-0 text-white text-sm font-bold">
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-sait-plum to-sait-purple flex items-center justify-center shrink-0 text-white text-sm font-bold">
                     {user.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate flex items-center gap-2">
                       {user.name}
                       {user.id === currentUser?.id && (
-                        <span className="text-[10px] text-cyan-500 font-normal">(you)</span>
+                        <span className="text-[10px] text-sait-sky font-normal">(you)</span>
                       )}
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user.email}</p>
@@ -119,7 +119,7 @@ export function AdminPage() {
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="Dr. Jane Smith"
-                className="w-full px-3 py-2.5 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-sm text-gray-800 dark:text-gray-100 placeholder:text-gray-400 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+                className="w-full px-3 py-2.5 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-sm text-gray-800 dark:text-gray-100 placeholder:text-gray-400 outline-none focus:border-sait-sky focus:ring-1 focus:ring-sait-sky transition-colors"
               />
             </div>
 
@@ -130,7 +130,7 @@ export function AdminPage() {
                 value={newEmail}
                 onChange={(e) => setNewEmail(e.target.value)}
                 placeholder="jane@jasper.ca"
-                className="w-full px-3 py-2.5 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-sm text-gray-800 dark:text-gray-100 placeholder:text-gray-400 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+                className="w-full px-3 py-2.5 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-sm text-gray-800 dark:text-gray-100 placeholder:text-gray-400 outline-none focus:border-sait-sky focus:ring-1 focus:ring-sait-sky transition-colors"
               />
             </div>
 
@@ -141,7 +141,7 @@ export function AdminPage() {
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="Min. 8 characters"
-                className="w-full px-3 py-2.5 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-sm text-gray-800 dark:text-gray-100 placeholder:text-gray-400 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+                className="w-full px-3 py-2.5 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-sm text-gray-800 dark:text-gray-100 placeholder:text-gray-400 outline-none focus:border-sait-sky focus:ring-1 focus:ring-sait-sky transition-colors"
               />
             </div>
 
@@ -150,7 +150,7 @@ export function AdminPage() {
               <select
                 value={newRole}
                 onChange={(e) => setNewRole(e.target.value as UserRole)}
-                className="w-full px-3 py-2.5 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-sm text-gray-800 dark:text-gray-100 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
+                className="w-full px-3 py-2.5 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 text-sm text-gray-800 dark:text-gray-100 outline-none focus:border-sait-sky focus:ring-1 focus:ring-sait-sky transition-colors"
               >
                 <option value="researcher">Researcher / Staff</option>
                 <option value="admin">Administrator</option>
@@ -172,7 +172,7 @@ export function AdminPage() {
             <div className="sm:col-span-2">
               <button
                 type="submit"
-                className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold transition-colors"
+                className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-sait-red hover:bg-sait-red-deep text-white text-sm font-semibold transition-colors"
               >
                 <DownloadIcon className="w-4 h-4 rotate-180" />
                 Create Account

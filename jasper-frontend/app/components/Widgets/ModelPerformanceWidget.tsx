@@ -85,7 +85,7 @@ export function ModelPerformanceWidget() {
 
       {/* F1 Score — a number from 0 to 1 measuring how accurate the model's predictions are.
           Closer to 1 is better. Our model targets above 0.84. */}
-      <p className="text-2xl font-bold text-cyan-500 leading-none mb-0.5 tabular-nums transition-all duration-500">
+      <p className="text-2xl font-bold text-sait-sky leading-none mb-0.5 tabular-nums transition-all duration-500">
         {f1Score.toFixed(3)}
       </p>
       <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-3">Accuracy Score</p>

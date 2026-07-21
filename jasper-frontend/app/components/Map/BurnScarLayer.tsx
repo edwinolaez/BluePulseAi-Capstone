@@ -5,12 +5,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CircleMarker, Tooltip } from "react-leaflet";
 import { fetchChangeDetection, ModelOutput } from "../../../lib/api";
 import { HazardZone } from "./HazardZone";
 import type { SensorInfo } from "./JasperMap";
 
 const DEFAULT_SECTOR = "ATH-001-A";
-const CENTER: [number, number] = [52.882, -118.065];
+// GPS centre from 2024 Jasper Wildfire centroid (Alberta Wildfire open data / NFDB fire polygon)
+const CENTER: [number, number] = [52.848, -118.083];
 
 const RISK_STYLE = {
   High:   { borderColor: "#ef4444", fillColor: "#f43f5e", badge: "CRITICAL" as const, badgeVariant: "red"   as const, valueColor: "#ef4444", dotColor: "#ef4444" },
@@ -43,14 +45,28 @@ export function BurnScarLayer({ onSectorClick, onSensorSelect, onMarkerClick }: 
     badgeVariant: style.badgeVariant,
     name: `Burn Scar Zone ${DEFAULT_SECTOR}`,
     fields: [
-      { label: "SECTOR ID",   value: DEFAULT_SECTOR },
-      { label: "RISK LEVEL",  value: risk,             valueColor: style.valueColor },
-      { label: "RISK SCORE",  value: result?.risk_score != null ? result.risk_score.toFixed(2) : "—" },
-      { label: "STATUS",      value: "Active Monitoring", valueColor: "#0ea5e9" },
+      { label: "SECTOR ID",  value: DEFAULT_SECTOR },
+      { label: "RISK LEVEL", value: risk,             valueColor: style.valueColor },
+      { label: "RISK SCORE", value: result?.risk_score != null ? result.risk_score.toFixed(2) : "—" },
+      { label: "STATUS",     value: "Active Monitoring", valueColor: "#0ea5e9" },
     ],
   };
 
-  return (
+  const dot = (
+    <CircleMarker
+      center={CENTER}
+      radius={7}
+      pathOptions={{ color: "#ffffff", fillColor: "#005EB8", fillOpacity: 1, weight: 2 }}
+    >
+      <Tooltip direction="top" offset={[0, -8]} opacity={1}>
+        <div className="text-xs font-semibold">ATH-001-A</div>
+        <div className="text-xs text-gray-500">Forest Regrowth Sensor</div>
+        <div className="text-xs text-gray-400">52.8480°N, 118.0830°W</div>
+      </Tooltip>
+    </CircleMarker>
+  );
+
+  const zone = (
     <HazardZone
       center={CENTER}
       radius={2400}
@@ -67,4 +83,6 @@ export function BurnScarLayer({ onSectorClick, onSensorSelect, onMarkerClick }: 
       onMarkerClick={onMarkerClick}
     />
   );
+
+  return <>{dot}{zone}</>;
 }

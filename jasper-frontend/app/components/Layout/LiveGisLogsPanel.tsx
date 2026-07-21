@@ -116,7 +116,7 @@ export function LiveGisLogsPanel({ open, onClose }: Props) {
         </div>
         <button
           onClick={handleExport}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sait-red hover:bg-sait-red-deep text-white text-xs font-semibold transition-colors"
         >
           <DownloadIcon className="w-3.5 h-3.5" />
           {exported ? "Saved ✓" : "Export"}

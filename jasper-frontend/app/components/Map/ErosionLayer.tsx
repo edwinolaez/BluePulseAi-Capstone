@@ -7,6 +7,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CircleMarker, Tooltip } from "react-leaflet";
 import { fetchErosionSimulation, ModelOutput } from "../../../lib/api";
 import { HazardZone } from "./HazardZone";
 import type { SensorInfo } from "./JasperMap";
@@ -81,6 +82,22 @@ export function ErosionLayer({ onSectorClick, onSensorSelect, onMarkerClick }: P
           />
         );
       })}
+
+      {/* Soil Erosion sensor dots — purple #6D2077, matches 3D map colour */}
+      {ZONES.map((zone) => (
+        <CircleMarker
+          key={`dot-${zone.sectorId}`}
+          center={zone.center}
+          radius={7}
+          pathOptions={{ color: "#ffffff", fillColor: "#6D2077", fillOpacity: 1, weight: 2 }}
+        >
+          <Tooltip direction="top" offset={[0, -8]} opacity={1}>
+            <div className="text-xs font-semibold">{zone.sectorId}</div>
+            <div className="text-xs text-gray-500">Soil Erosion Sensor</div>
+            <div className="text-xs text-gray-400">{zone.center[0].toFixed(4)}°N, {Math.abs(zone.center[1]).toFixed(4)}°W</div>
+          </Tooltip>
+        </CircleMarker>
+      ))}
     </>
   );
 }
