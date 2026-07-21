@@ -124,35 +124,35 @@ describe("fetchChangeDetection", () => {
 // ─── fetchErosionSimulation ──────────────────────────────────────────────────
 
 describe("fetchErosionSimulation", () => {
-  it("calls the erosion endpoint with the correct query params", async () => {
+  it("sends a POST request to the erosion endpoint with a JSON body", async () => {
     (global.fetch as jest.Mock).mockResolvedValue(mockResponse(MOCK_MODEL_OUTPUT));
-    await fetchErosionSimulation("ATH-001-H", 42, 95);
-    const [url] = (global.fetch as jest.Mock).mock.calls[0];
+    await fetchErosionSimulation("ATH-001-H", 95, { lat: 52.858, lon: -118.092 });
+    const [url, options] = (global.fetch as jest.Mock).mock.calls[0];
     expect(url).toContain("/simulate/erosion");
-    expect(url).toContain("sector_id=ATH-001-H");
-    expect(url).toContain("slope_deg=42");
-    expect(url).toContain("rainfall_mm=95");
+    expect(options.method).toBe("POST");
+    expect(JSON.parse(options.body)).toEqual({
+      sector_id: "ATH-001-H",
+      rainfall_mm: 95,
+      coordinates: { lat: 52.858, lon: -118.092 },
+    });
   });
 
-  it("uses default slope and rainfall values when not provided", async () => {
+  it("omits rainfall_mm and coordinates when not provided", async () => {
     (global.fetch as jest.Mock).mockResolvedValue(mockResponse(MOCK_MODEL_OUTPUT));
     await fetchErosionSimulation("ATH-001-H");
-    const [url] = (global.fetch as jest.Mock).mock.calls[0];
-    // Default slope_deg = 38.5, rainfall_mm = 82.0
-    expect(url).toContain("slope_deg=38.5");
-    expect(url).toContain("rainfall_mm=82");
+    const [, options] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(JSON.parse(options.body)).toEqual({ sector_id: "ATH-001-H" });
   });
 
   it("returns the model output on success", async () => {
     (global.fetch as jest.Mock).mockResolvedValue(mockResponse(MOCK_MODEL_OUTPUT));
-    const result = await fetchErosionSimulation("ATH-001-H", 42, 95);
-    expect(result.simulation_type).toBe("change_detection");
+    const result = await fetchErosionSimulation("ATH-001-H", 95);
     expect(result.risk_score).toBe(0.82);
   });
 
   it("throws when the server returns an error status", async () => {
     (global.fetch as jest.Mock).mockResolvedValue(mockResponse({}, 503));
-    await expect(fetchErosionSimulation("ATH-001-H", 42, 95)).rejects.toThrow(
+    await expect(fetchErosionSimulation("ATH-001-H", 95)).rejects.toThrow(
       "Erosion simulation failed: 503"
     );
   });
@@ -161,36 +161,29 @@ describe("fetchErosionSimulation", () => {
 // ─── fetchContaminantSimulation ──────────────────────────────────────────────
 
 describe("fetchContaminantSimulation", () => {
-  it("calls the contaminant endpoint with the correct query params", async () => {
-    (global.fetch as jest.Mock).mockResolvedValue(mockResponse(MOCK_MODEL_OUTPUT));
-    await fetchContaminantSimulation("ATH-001-W", 180, 2.1, 0.72);
-    const [url] = (global.fetch as jest.Mock).mock.calls[0];
-    expect(url).toContain("/simulate/contaminant");
-    expect(url).toContain("sector_id=ATH-001-W");
-    expect(url).toContain("flow_direction_deg=180");
-    expect(url).toContain("water_velocity_ms=2.1");
-    expect(url).toContain("contamination_level=0.72");
-  });
+  const SOURCE_POINT = { lat: 52.8639, lon: -118.1069 };
 
-  it("uses default flow, velocity, and contamination values when not provided", async () => {
+  it("sends a POST request to the contaminant endpoint with a JSON body", async () => {
     (global.fetch as jest.Mock).mockResolvedValue(mockResponse(MOCK_MODEL_OUTPUT));
-    await fetchContaminantSimulation("ATH-001-W");
-    const [url] = (global.fetch as jest.Mock).mock.calls[0];
-    expect(url).toContain("flow_direction_deg=180");
-    expect(url).toContain("water_velocity_ms=2.1");
-    expect(url).toContain("contamination_level=0.72");
+    await fetchContaminantSimulation("ATH-001-W", SOURCE_POINT);
+    const [url, options] = (global.fetch as jest.Mock).mock.calls[0];
+    expect(url).toContain("/simulate/contaminant");
+    expect(options.method).toBe("POST");
+    expect(JSON.parse(options.body)).toEqual({
+      sector_id: "ATH-001-W",
+      source_point: SOURCE_POINT,
+    });
   });
 
   it("returns the model output on success", async () => {
     (global.fetch as jest.Mock).mockResolvedValue(mockResponse(MOCK_MODEL_OUTPUT));
-    const result = await fetchContaminantSimulation("ATH-001-W");
-    expect(result.sector_id).toBe("ATH-001-A");
+    const result = await fetchContaminantSimulation("ATH-001-W", SOURCE_POINT);
     expect(result.risk_label).toBe("High");
   });
 
   it("throws when the server returns an error status", async () => {
     (global.fetch as jest.Mock).mockResolvedValue(mockResponse({}, 404));
-    await expect(fetchContaminantSimulation("ATH-001-W")).rejects.toThrow(
+    await expect(fetchContaminantSimulation("ATH-001-W", SOURCE_POINT)).rejects.toThrow(
       "Contaminant simulation failed: 404"
     );
   });

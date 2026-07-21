@@ -104,8 +104,8 @@ export function AiOverviewPage() {
   useEffect(() => {
     Promise.allSettled([
       fetchChangeDetection("ATH-001-A"),
-      fetchErosionSimulation("ATH-001-H", 42, 95),
-      fetchContaminantSimulation("ATH-001-W", 180, 2.1, 0.72),
+      fetchErosionSimulation("ATH-001-H", 95, { lat: 52.858, lon: -118.092 }),
+      fetchContaminantSimulation("ATH-001-W", { lat: 52.8639, lon: -118.1069 }),
     ]).then(([burn, erosion, contaminant]) => {
       setResults({
         burn:        burn.status        === "fulfilled" ? burn.value        : null,

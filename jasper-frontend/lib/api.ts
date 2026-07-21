@@ -107,10 +107,12 @@ export async function fetchLayerData(
 // ─── Functions that call Richard's ML backend ─────────────────────────────────
 
 // Asks Richard's model to predict the burn scar / forest damage risk for a sector.
+// No /api/v1 prefix — Richard's FastAPI app mounts these routes at the root
+// (see jasper-ml/api/model_endpoint.py), unlike Feven's backend above.
 export async function fetchChangeDetection(
   sectorId: string
 ): Promise<ModelOutput> {
-  const res = await fetchWithTimeout(`${ML_API}/api/v1/predict/change-detection`, {
+  const res = await fetchWithTimeout(`${ML_API}/predict/change-detection`, {
     method:  "POST",
     headers: { ...apiHeaders(), "Content-Type": "application/json" },
     body:    JSON.stringify({ sector_id: sectorId }),
@@ -119,41 +121,37 @@ export async function fetchChangeDetection(
   return res.json();
 }
 
-// Asks Richard's model to simulate erosion risk based on terrain and rainfall.
-// slope_deg and rainfall_mm are the terrain conditions — defaults reflect
-// typical Jasper Valley watershed measurements.
+// Asks Richard's model to simulate erosion risk based on rainfall and terrain.
+// rainfall_mm and coordinates are optional — the API falls back to live
+// Environment Canada rainfall and SRTM-derived slope when omitted.
 export async function fetchErosionSimulation(
-  sectorId:   string,
-  slopeDeg:   number = 38.5,
-  rainfallMm: number = 82.0
+  sectorId:     string,
+  rainfallMm?:  number,
+  coordinates?: { lat: number; lon: number }
 ): Promise<ModelOutput> {
-  const params = new URLSearchParams({
-    sector_id:   sectorId,
-    slope_deg:   String(slopeDeg),
-    rainfall_mm: String(rainfallMm),
-  });
-  const res = await fetchWithTimeout(`${ML_API}/api/v1/simulate/erosion?${params}`, {
-    headers: apiHeaders(),
+  const res = await fetchWithTimeout(`${ML_API}/simulate/erosion`, {
+    method:  "POST",
+    headers: { ...apiHeaders(), "Content-Type": "application/json" },
+    body:    JSON.stringify({
+      sector_id: sectorId,
+      ...(rainfallMm !== undefined ? { rainfall_mm: rainfallMm } : {}),
+      ...(coordinates ? { coordinates } : {}),
+    }),
   });
   if (!res.ok) throw new Error(`Erosion simulation failed: ${res.status}`);
   return res.json();
 }
 
-// Asks Richard's model to simulate where the contaminant plume is heading.
+// Asks Richard's model to simulate where the contaminant plume is heading,
+// starting from a real source point in the Athabasca watershed.
 export async function fetchContaminantSimulation(
-  sectorId:           string,
-  flowDirectionDeg:   number = 180,
-  waterVelocityMs:    number = 2.1,
-  contaminationLevel: number = 0.72
+  sectorId:    string,
+  sourcePoint: { lat: number; lon: number }
 ): Promise<ModelOutput> {
-  const params = new URLSearchParams({
-    sector_id:           sectorId,
-    flow_direction_deg:  String(flowDirectionDeg),
-    water_velocity_ms:   String(waterVelocityMs),
-    contamination_level: String(contaminationLevel),
-  });
-  const res = await fetchWithTimeout(`${ML_API}/api/v1/simulate/contaminant?${params}`, {
-    headers: apiHeaders(),
+  const res = await fetchWithTimeout(`${ML_API}/simulate/contaminant`, {
+    method:  "POST",
+    headers: { ...apiHeaders(), "Content-Type": "application/json" },
+    body:    JSON.stringify({ sector_id: sectorId, source_point: sourcePoint }),
   });
   if (!res.ok) throw new Error(`Contaminant simulation failed: ${res.status}`);
   return res.json();

@@ -73,7 +73,7 @@ export function ContaminantLayer() {
   }, [map]);
 
   useEffect(() => {
-    fetchContaminantSimulation("ATH-001-W", 180, 2.1, 0.72)
+    fetchContaminantSimulation("ATH-001-W", { lat: CRITICAL_CENTER[0], lon: CRITICAL_CENTER[1] })
       .then(setResult)
       .catch(() => setResult(null));
   }, []);

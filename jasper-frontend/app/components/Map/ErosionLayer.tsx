@@ -37,7 +37,9 @@ export function ErosionLayer() {
   // Promise.allSettled means a failure in one zone doesn't affect the other two.
   useEffect(() => {
     Promise.allSettled(
-      ZONES.map((z) => fetchErosionSimulation(z.sectorId, z.slopeDeg, z.rainfallMm))
+      ZONES.map((z) =>
+        fetchErosionSimulation(z.sectorId, z.rainfallMm, { lat: z.center[0], lon: z.center[1] })
+      )
     ).then((settled) => {
       // If a call failed, store null for that zone so we fall back to the default risk
       setResults(

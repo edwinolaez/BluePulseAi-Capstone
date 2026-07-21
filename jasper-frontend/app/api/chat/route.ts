@@ -58,34 +58,33 @@ async function executeTool(name: string, input: Record<string, unknown>): Promis
   const timer = setTimeout(() => ctrl.abort(), 12_000);
   try {
     if (name === "run_erosion_simulation") {
-      const params = new URLSearchParams({
-        sector_id: String(input.sector_id),
-        slope_deg: input.slope_deg ? String(input.slope_deg) : "38.5",
-        rainfall_mm: input.rainfall_mm ? String(input.rainfall_mm) : "82.0",
-      });
-      const res = await fetch(`${ML_API}/api/v1/simulate/erosion?${params}`, {
+      const res = await fetch(`${ML_API}/simulate/erosion`, {
+        method: "POST",
         headers: mlHeaders(),
+        body: JSON.stringify({
+          sector_id: String(input.sector_id),
+          ...(input.rainfall_mm !== undefined ? { rainfall_mm: Number(input.rainfall_mm) } : {}),
+        }),
         signal: ctrl.signal,
       });
       if (!res.ok) return JSON.stringify({ error: `ML service returned ${res.status}` });
       return JSON.stringify(await res.json());
     }
     if (name === "run_contaminant_simulation") {
-      const params = new URLSearchParams({
-        sector_id: String(input.sector_id),
-        flow_direction_deg: input.flow_direction_deg ? String(input.flow_direction_deg) : "180",
-        water_velocity_ms: input.water_velocity_ms ? String(input.water_velocity_ms) : "2.1",
-        contamination_level: "0.72",
-      });
-      const res = await fetch(`${ML_API}/api/v1/simulate/contaminant?${params}`, {
+      const res = await fetch(`${ML_API}/simulate/contaminant`, {
+        method: "POST",
         headers: mlHeaders(),
+        body: JSON.stringify({
+          sector_id: String(input.sector_id),
+          source_point: input.source_point,
+        }),
         signal: ctrl.signal,
       });
       if (!res.ok) return JSON.stringify({ error: `ML service returned ${res.status}` });
       return JSON.stringify(await res.json());
     }
     if (name === "run_change_detection") {
-      const res = await fetch(`${ML_API}/api/v1/predict/change-detection`, {
+      const res = await fetch(`${ML_API}/predict/change-detection`, {
         method: "POST",
         headers: mlHeaders(),
         body: JSON.stringify({ sector_id: String(input.sector_id) }),
