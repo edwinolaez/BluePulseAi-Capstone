@@ -132,17 +132,16 @@ def viewer_headers():
 
 # ─── Ingest Profile Seeder ────────────────────────────────────────────────────
 
-def _decode_jwt_email(token: str) -> str:
-    """Decode a JWT payload (base64) and return the email claim, or empty string."""
+def _decode_jwt_claims(token: str) -> dict:
+    """Decode a JWT payload (base64) and return all claims as a dict."""
     try:
         parts = token.split(".")
         if len(parts) != 3:
-            return ""
+            return {}
         padded = parts[1] + "=" * (4 - len(parts[1]) % 4)
-        claims = json.loads(base64.b64decode(padded))
-        return claims.get("email", "")
+        return json.loads(base64.b64decode(padded))
     except Exception:
-        return ""
+        return {}
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -150,11 +149,11 @@ def seed_ingest_profile():
     """
     Seeds a profiles row for the ingest service account before the test session.
 
-    The RLS policy on environmental_layers checks profiles.email = JWT email.
-    The ingest role is a machine account with no real Supabase auth user, so
-    we decode the JWT to get its email and upsert the row using the service
-    role key (which bypasses RLS). Runs once per session, silently skips if
-    secrets are missing.
+    Strategy:
+    1. Decode the JWT to find the email (top-level or user_metadata).
+    2. If no email claim, use the sub (UUID) to look up the user via the
+       Supabase Auth Admin API — this always works for real Supabase auth users.
+    3. Upsert the profiles row with service role key (bypasses RLS).
     """
     if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
         return
@@ -163,7 +162,33 @@ def seed_ingest_profile():
     if not ingest_token:
         return
 
-    email = _decode_jwt_email(ingest_token)
+    claims = _decode_jwt_claims(ingest_token)
+
+    # Try email from multiple possible JWT locations
+    email = (
+        claims.get("email")
+        or claims.get("user_metadata", {}).get("email", "")
+        or ""
+    )
+
+    # If no email in JWT, look up the user via Auth Admin API using sub (UUID)
+    if not email:
+        sub = claims.get("sub", "")
+        if sub:
+            try:
+                with httpx.Client(base_url=SUPABASE_URL, timeout=10.0) as client:
+                    resp = client.get(
+                        f"/auth/v1/admin/users/{sub}",
+                        headers={
+                            "apikey": SUPABASE_SERVICE_KEY,
+                            "Authorization": f"Bearer {SUPABASE_SERVICE_KEY}",
+                        },
+                    )
+                    if resp.status_code == 200:
+                        email = resp.json().get("email", "")
+            except Exception:
+                pass
+
     if not email:
         return
 

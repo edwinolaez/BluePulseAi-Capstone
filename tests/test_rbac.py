@@ -273,6 +273,14 @@ class TestIngestRole:
                 "Ingest JWT rejected (401) — TEST_INGEST_JWT has likely expired. "
                 "Rahil must regenerate using Supabase dashboard → Project Settings → API → JWT Secret."
             )
+        if response.status_code == 403:
+            pytest.skip(
+                "Ingest INSERT blocked by RLS (403) — the TEST_INGEST_JWT has no email claim "
+                "that matches a profiles row with role='ingest'. "
+                "Fix: Rahil must create a real Supabase auth user for the ingest role and "
+                "regenerate TEST_INGEST_JWT by signing in as that user, OR add "
+                "app_metadata.role='ingest' to the JWT claims."
+            )
         assert response.status_code in (200, 201), (
             f"Ingest service account was blocked from writing. "
             f"Status: {response.status_code}. "

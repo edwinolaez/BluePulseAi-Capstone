@@ -9,7 +9,7 @@ import { useEffect, useState, useContext, useCallback } from "react";
 import { useQuery } from "convex/react";
 import { anyApi } from "convex/server";
 import { SyncIcon } from "../Layout/icons";
-import { ConvexAvailableContext } from "../Providers/ConvexClientProvider";
+import { ConvexAvailableContext, ConvexErrorBoundary } from "../Providers/ConvexClientProvider";
 
 // Inner component that calls useQuery — only mounted when ConvexProvider is active
 function LivePipelineData({
@@ -55,7 +55,11 @@ export function PipelineStatusWidget() {
 
   return (
     <div className="rounded-xl border border-gray-200/60 dark:border-gray-700/40 bg-surface p-3.5">
-      {isConvexReady && <LivePipelineData onData={handleLiveData} />}
+      {isConvexReady && (
+        <ConvexErrorBoundary>
+          <LivePipelineData onData={handleLiveData} />
+        </ConvexErrorBoundary>
+      )}
 
       <div className="flex items-center justify-between mb-3.5">
         <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
