@@ -5,17 +5,18 @@ on:
     workflows: ["CI"]
     types: [completed]
     branches: [develop]
+  workflow_dispatch:
 
 jobs:
   deploy-staging:
     name: "Auto-deploy to Vercel Staging"
     runs-on: ubuntu-latest
-    # Only deploy when CI passed — never deploy a broken build
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    # Deploy when CI passed, or when triggered manually via workflow_dispatch
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -27,15 +28,11 @@ jobs:
 
       - name: Deploy frontend to Vercel (staging)
         working-directory: jasper-frontend
-        run: vercel --token=${{ secrets.VERCEL_TOKEN }} --yes
+        timeout-minutes: 10
+        run: vercel deploy --token=${{ secrets.VERCEL_TOKEN }} --yes --build-env NEXT_PUBLIC_API_BASE_URL=${{ secrets.RAILWAY_API_URL }} --build-env NEXT_PUBLIC_ML_API_BASE_URL=${{ secrets.ML_API_URL }} --build-env NEXT_PUBLIC_CONVEX_URL=${{ secrets.NEXT_PUBLIC_CONVEX_URL }} --build-env NEXT_PUBLIC_API_KEY=${{ secrets.NEXT_PUBLIC_API_KEY }} --build-env ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          NEXT_PUBLIC_API_BASE_URL: ${{ secrets.RAILWAY_API_URL }}
-          NEXT_PUBLIC_ML_API_BASE_URL: ${{ secrets.ML_API_URL }}
-          NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
-          NEXT_PUBLIC_API_KEY: ${{ secrets.NEXT_PUBLIC_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
       - name: Deploy backend to Railway (staging)
         run: |
