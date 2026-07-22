@@ -7,7 +7,13 @@
 // so the app still works with the animated fallback data.
 
 import { ConvexProvider, ConvexReactClient } from "convex/react";
-import { ReactNode, createContext } from "react";
+import { ReactNode, createContext, Component } from "react";
+
+export class ConvexErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false };
+  static getDerivedStateFromError() { return { hasError: true }; }
+  render() { return this.state.hasError ? null : this.props.children; }
+}
 
 const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL ?? "";
 

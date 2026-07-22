@@ -8,7 +8,7 @@
 import { useEffect, useState, useContext, useCallback } from "react";
 import { useQuery } from "convex/react";
 import { anyApi } from "convex/server";
-import { ConvexAvailableContext } from "../Providers/ConvexClientProvider";
+import { ConvexAvailableContext, ConvexErrorBoundary } from "../Providers/ConvexClientProvider";
 
 const SPARKLINE_BASE = [38, 52, 30, 70, 48, 55, 42];
 
@@ -36,8 +36,8 @@ function LiveWaterData({
   });
 
   useEffect(() => {
-    if (data) {
-      onData(data.turbidity as number, data.ph as number);
+    if (data && typeof data.turbidity === "number" && typeof data.ph === "number") {
+      onData(data.turbidity, data.ph);
     }
   }, [data, onData]);
 
@@ -80,7 +80,11 @@ export function WaterQualityWidget() {
   return (
     <div className="rounded-xl border border-gray-200/60 dark:border-gray-700/40 bg-surface p-3.5">
       {/* When Convex URL is set, this sub-component fetches live sensor data */}
-      {isConvexReady && <LiveWaterData onData={handleLiveData} />}
+      {isConvexReady && (
+        <ConvexErrorBoundary>
+          <LiveWaterData onData={handleLiveData} />
+        </ConvexErrorBoundary>
+      )}
 
       <div className="flex items-center justify-between mb-3">
         <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
@@ -96,14 +100,14 @@ export function WaterQualityWidget() {
         <div>
           <p className="text-[10px] uppercase text-gray-500 dark:text-gray-400 tracking-wide mb-0.5">Water Cloudiness</p>
           <p className="text-xl font-bold text-gray-900 dark:text-gray-100 tabular-nums">
-            {turbidity.toFixed(1)}
+            {(turbidity ?? 3.6).toFixed(1)}
             <span className="text-xs font-sans font-normal text-gray-400 ml-1">NTU</span>
           </p>
         </div>
         <div>
           <p className="text-[10px] uppercase text-gray-500 dark:text-gray-400 tracking-wide mb-0.5">Acidity (pH)</p>
           <p className="text-xl font-bold text-gray-900 dark:text-gray-100 tabular-nums">
-            {ph.toFixed(2)}
+            {(ph ?? 7.21).toFixed(2)}
             <span className="text-xs font-sans font-normal text-gray-400 ml-1">pH</span>
           </p>
         </div>

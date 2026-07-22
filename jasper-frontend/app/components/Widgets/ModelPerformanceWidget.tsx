@@ -9,7 +9,7 @@ import { useEffect, useState, useContext, useCallback } from "react";
 import { useQuery } from "convex/react";
 import { anyApi } from "convex/server";
 import { SettingsIcon } from "../Layout/icons";
-import { ConvexAvailableContext } from "../Providers/ConvexClientProvider";
+import { ConvexAvailableContext, ConvexErrorBoundary } from "../Providers/ConvexClientProvider";
 
 function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));
@@ -72,7 +72,11 @@ export function ModelPerformanceWidget() {
 
   return (
     <div className="rounded-xl border border-gray-200/60 dark:border-gray-700/40 bg-surface p-3.5">
-      {isConvexReady && <LiveModelData onData={handleLiveData} />}
+      {isConvexReady && (
+        <ConvexErrorBoundary>
+          <LiveModelData onData={handleLiveData} />
+        </ConvexErrorBoundary>
+      )}
 
       <div className="flex items-center justify-between mb-3">
         <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
