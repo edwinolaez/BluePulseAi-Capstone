@@ -23,17 +23,24 @@ jobs:
         with:
           node-version: "20"
 
+      - name: Install Vercel CLI
+        run: npm install -g vercel
+
+      - name: Pull Vercel project settings
+        working-directory: jasper-frontend
+        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
       - name: Install dependencies
         working-directory: jasper-frontend
         run: npm install
 
-      - name: Install Vercel CLI
-        run: npm install -g vercel
-
       - name: Build for Vercel (locally in CI)
         working-directory: jasper-frontend
         timeout-minutes: 15
-        run: vercel build --token=${{ secrets.VERCEL_TOKEN }} --yes
+        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
@@ -45,8 +52,8 @@ jobs:
 
       - name: Deploy prebuilt output to Vercel (staging)
         working-directory: jasper-frontend
-        timeout-minutes: 5
-        run: vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }} --yes
+        timeout-minutes: 10
+        run: vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
