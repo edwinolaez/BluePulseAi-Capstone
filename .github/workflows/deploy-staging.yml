@@ -7,27 +7,34 @@ on:
     branches: [develop]
   workflow_dispatch:
 
+# Prevent two staging deploys from racing. Cancel any queued run when a
+# newer one starts (we always want the latest commit deployed, not queued old ones).
+concurrency:
+  group: staging-deploy
+  cancel-in-progress: true
+
 jobs:
   deploy-staging:
     name: "Auto-deploy to Vercel Staging"
     runs-on: ubuntu-latest
-    # Deploy when CI passed, or when triggered manually via workflow_dispatch
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: "20"
+          # Node 22 blocked pending Vercel dashboard confirmation — see PR description
 
       - name: Install Vercel CLI
-        run: npm install -g vercel
+        run: npm install -g vercel@56.5.0
 
+      # Pull from repo root — Vercel resolves rootDirectory ("jasper-frontend") itself
+      # and changes into that subdirectory during vercel build.
       - name: Pull Vercel project settings
-        working-directory: jasper-frontend
         run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -35,10 +42,12 @@ jobs:
 
       - name: Install dependencies
         working-directory: jasper-frontend
-        run: npm install
+        run: npm ci
 
-      - name: Build for Vercel (locally in CI)
-        working-directory: jasper-frontend
+      # Run from repo root — Vercel cds into jasper-frontend/ via rootDirectory,
+      # builds Next.js, and writes .vercel/output/ at repo root.
+      # Single pass: no separate npm run build step (that was doubling build time).
+      - name: Package for Vercel (Build Output API format)
         timeout-minutes: 15
         run: vercel build --yes --token=${{ secrets.VERCEL_TOKEN }}
         env:
@@ -51,34 +60,76 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
       - name: Verify build output
-        working-directory: jasper-frontend
         run: |
           echo "=== .vercel/output size ==="
-          du -sh .vercel/output/ 2>/dev/null || echo "ERROR: .vercel/output does not exist"
+          du -sh .vercel/output/ 2>/dev/null || { echo "ERROR: .vercel/output does not exist"; exit 1; }
           echo "=== .vercel/output top-level ==="
-          ls -la .vercel/output/ 2>/dev/null || echo "no output directory"
+          ls -la .vercel/output/
+          echo "=== functions ==="
+          ls -la .vercel/output/functions/ 2>/dev/null || echo "(no functions dir)"
+          echo "=== static ==="
+          du -sh .vercel/output/static/ 2>/dev/null || echo "(no static dir)"
+          SIZE=$(du -sk .vercel/output/ 2>/dev/null | cut -f1)
+          echo "Total output: ${SIZE}KB"
+          if [ "$SIZE" -lt 500 ]; then
+            echo "ERROR: Build output is only ${SIZE}KB — packaging failed. Aborting deploy."
+            exit 1
+          fi
+          echo "=== resolved runtime ==="
+          cat .vercel/output/functions/*/.vc-config.json 2>/dev/null | grep -i runtime || echo "(no functions)"
+          echo "=== runner node ==="
+          node -v
 
+      # --archive=tgz bundles .vercel/output/ into a single tarball upload.
+      # Without this, deck.gl's hundreds of small JS chunks cause the upload to
+      # stall mid-stream and hit the step timeout before Vercel finishes processing.
       - name: Deploy prebuilt output to Vercel (staging)
-        working-directory: jasper-frontend
-        timeout-minutes: 10
-        run: vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
+        id: deploy
+        timeout-minutes: 20
+        run: |
+          URL=$(vercel deploy --prebuilt --archive=tgz --yes --token=${{ secrets.VERCEL_TOKEN }})
+          echo "url=$URL" >> $GITHUB_OUTPUT
+          echo "Staging URL: $URL"
+          echo "### Staging deploy" >> $GITHUB_STEP_SUMMARY
+          echo "$URL" >> $GITHUB_STEP_SUMMARY
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
-      - name: Deploy backend to Railway (staging)
+      # Railway auto-deploys from develop via push webhook.
+      # Wait before probing so the service has time to restart.
+      - name: Wait for Railway deploy
         run: |
-          echo "Railway deployment triggered via push to develop"
-          echo "Railway auto-deploys from this branch via webhook — no CLI step needed here"
-          echo "Staging backend URL: ${{ secrets.RAILWAY_STAGING_URL }}"
+          echo "Railway picks up develop push via webhook. Waiting 30s before health check..."
+          sleep 30
 
-      - name: Smoke test staging
+      - name: Smoke test — backend
         run: |
           STAGING_URL="${{ secrets.RAILWAY_STAGING_URL }}"
-          if [ -n "$STAGING_URL" ]; then
-            curl --fail --retry 3 --retry-delay 5 "$STAGING_URL/health" \
-              && echo "Staging backend health check passed" \
-              || echo "WARNING: Staging health check failed — investigate before M4 sign-off"
-          else
-            echo "RAILWAY_STAGING_URL not set yet — skipping smoke test"
+          if [ -z "$STAGING_URL" ]; then
+            echo "ERROR: RAILWAY_STAGING_URL secret is not set — cannot verify backend health."
+            exit 1
           fi
+          echo "Probing $STAGING_URL/health (6 attempts, 10s apart)..."
+          for i in $(seq 1 6); do
+            if curl -sf "$STAGING_URL/health" > /dev/null; then
+              echo "Backend health check passed on attempt $i"
+              exit 0
+            fi
+            echo "Attempt $i/6: not ready, retrying in 10s..."
+            sleep 10
+          done
+          echo "ERROR: Backend failed health check after 60s. Check Railway logs."
+          exit 1
+
+      - name: Smoke test — frontend
+        run: |
+          DEPLOY_URL="${{ steps.deploy.outputs.url }}"
+          if [ -z "$DEPLOY_URL" ]; then
+            echo "ERROR: No deployment URL captured from deploy step."
+            exit 1
+          fi
+          echo "Probing frontend at $DEPLOY_URL..."
+          curl --fail --retry 3 --retry-delay 5 --max-time 30 "$DEPLOY_URL" \
+            && echo "Frontend smoke test passed: $DEPLOY_URL" \
+            || { echo "ERROR: Frontend not responding at $DEPLOY_URL"; exit 1; }
