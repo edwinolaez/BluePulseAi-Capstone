@@ -26,8 +26,10 @@ jobs:
       - name: Install Vercel CLI
         run: npm install -g vercel
 
+      # Run vercel pull from REPO ROOT so Vercel can resolve its own rootDirectory
+      # setting ("jasper-frontend") and change into it correctly during vercel build.
+      # Running from the subdirectory causes double-nesting and produces 4.8KB dummy output.
       - name: Pull Vercel project settings
-        working-directory: jasper-frontend
         run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -37,8 +39,20 @@ jobs:
         working-directory: jasper-frontend
         run: npm install
 
-      - name: Build for Vercel (locally in CI)
+      # Hard-failing step: surfaces the real next build error before Vercel wraps it.
+      - name: Build Next.js (fail fast — shows real errors)
         working-directory: jasper-frontend
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_BASE_URL: ${{ secrets.RAILWAY_API_URL }}
+          NEXT_PUBLIC_ML_API_BASE_URL: ${{ secrets.ML_API_URL }}
+          NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
+          NEXT_PUBLIC_API_KEY: ${{ secrets.NEXT_PUBLIC_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+      # Run vercel build from REPO ROOT — Vercel changes into jasper-frontend/ itself.
+      # Output lands at <repo-root>/.vercel/output/ which vercel deploy --prebuilt expects.
+      - name: Package for Vercel (Build Output API format)
         timeout-minutes: 15
         run: vercel build --yes --token=${{ secrets.VERCEL_TOKEN }}
         env:
@@ -51,15 +65,21 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
       - name: Verify build output
-        working-directory: jasper-frontend
         run: |
           echo "=== .vercel/output size ==="
-          du -sh .vercel/output/ 2>/dev/null || echo "ERROR: .vercel/output does not exist"
+          du -sh .vercel/output/ 2>/dev/null || { echo "ERROR: .vercel/output does not exist"; exit 1; }
           echo "=== .vercel/output top-level ==="
-          ls -la .vercel/output/ 2>/dev/null || echo "no output directory"
+          ls -la .vercel/output/
+          echo "=== functions ==="
+          ls -la .vercel/output/functions/ 2>/dev/null || echo "(no functions dir)"
+          SIZE=$(du -sk .vercel/output/ 2>/dev/null | cut -f1)
+          echo "Total output: ${SIZE}KB"
+          if [ "$SIZE" -lt 500 ]; then
+            echo "ERROR: Build output is only ${SIZE}KB — packaging failed. Aborting deploy."
+            exit 1
+          fi
 
       - name: Deploy prebuilt output to Vercel (staging)
-        working-directory: jasper-frontend
         timeout-minutes: 10
         run: vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
         env:
