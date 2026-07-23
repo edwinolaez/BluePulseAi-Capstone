@@ -42,7 +42,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: jasper-frontend
-        run: npm ci
+        run: npm install
 
       # Run from repo root — Vercel cds into jasper-frontend/ via rootDirectory,
       # builds Next.js, and writes .vercel/output/ at repo root.
