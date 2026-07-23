@@ -40,7 +40,7 @@ jobs:
       - name: Build for Vercel (locally in CI)
         working-directory: jasper-frontend
         timeout-minutes: 15
-        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
+        run: vercel build --yes --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
@@ -49,6 +49,14 @@ jobs:
           NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
           NEXT_PUBLIC_API_KEY: ${{ secrets.NEXT_PUBLIC_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+      - name: Verify build output
+        working-directory: jasper-frontend
+        run: |
+          echo "=== .vercel/output size ==="
+          du -sh .vercel/output/ 2>/dev/null || echo "ERROR: .vercel/output does not exist"
+          echo "=== .vercel/output top-level ==="
+          ls -la .vercel/output/ 2>/dev/null || echo "no output directory"
 
       - name: Deploy prebuilt output to Vercel (staging)
         working-directory: jasper-frontend
