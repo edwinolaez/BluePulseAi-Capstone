@@ -32,21 +32,32 @@ jobs:
       - name: Install Vercel CLI
         run: npm install -g vercel@56.5.0
 
-      # Pull from repo root — Vercel resolves rootDirectory ("jasper-frontend") itself
-      # and changes into that subdirectory during vercel build.
       - name: Pull Vercel project settings
         run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
+      # Vercel dashboard rootDirectory can be accidentally cleared (e.g. when toggling
+      # auth settings), which causes vercel build to target the repo root instead of
+      # jasper-frontend/ and complete in ~1s with no Next.js output.
+      # This step pins rootDirectory to jasper-frontend regardless of dashboard state.
+      - name: Pin rootDirectory to jasper-frontend
+        run: |
+          node -e "
+            const fs = require('fs');
+            const p = JSON.parse(fs.readFileSync('.vercel/project.json', 'utf8'));
+            const prev = (p.settings || {}).rootDirectory;
+            p.settings = p.settings || {};
+            p.settings.rootDirectory = 'jasper-frontend';
+            fs.writeFileSync('.vercel/project.json', JSON.stringify(p, null, 2));
+            console.log('rootDirectory: ' + JSON.stringify(prev) + ' → jasper-frontend');
+          "
+
       - name: Install dependencies
         working-directory: jasper-frontend
-        run: npm ci
+        run: npm install
 
-      # Run from repo root — Vercel cds into jasper-frontend/ via rootDirectory,
-      # builds Next.js, and writes .vercel/output/ at repo root.
-      # Single pass: no separate npm run build step (that was doubling build time).
       - name: Package for Vercel (Build Output API format)
         timeout-minutes: 15
         run: vercel build --yes --token=${{ secrets.VERCEL_TOKEN }}
@@ -73,6 +84,10 @@ jobs:
           echo "Total output: ${SIZE}KB"
           if [ "$SIZE" -lt 500 ]; then
             echo "ERROR: Build output is only ${SIZE}KB — packaging failed. Aborting deploy."
+            exit 1
+          fi
+          if ! ls .vercel/output/functions/ 2>/dev/null | grep -qE '.'; then
+            echo "ERROR: No functions in build output — Next.js was not built (wrong rootDirectory or build failure)."
             exit 1
           fi
           echo "=== resolved runtime ==="
