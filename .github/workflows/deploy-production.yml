@@ -27,7 +27,7 @@ jobs:
     needs: gate-check
     environment: production   # requires Edwin's manual approval in GitHub Environments
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: main
 
