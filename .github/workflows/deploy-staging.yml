@@ -38,6 +38,35 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
+      - name: Sync ANTHROPIC_API_KEY to Vercel env store
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          echo "::add-mask::$ANTHROPIC_API_KEY"
+          PAYLOAD=$(jq -cn --arg v "$ANTHROPIC_API_KEY" \
+            '{"key":"ANTHROPIC_API_KEY","value":$v,"type":"encrypted","target":["production","preview","development"]}')
+          EID=$(curl -sf \
+            "https://api.vercel.com/v9/projects/${VERCEL_PROJECT_ID}/env" \
+            -H "Authorization: Bearer ${VERCEL_TOKEN}" \
+            | jq -r '.envs[]? | select(.key=="ANTHROPIC_API_KEY") | .id' | head -1)
+          if [ -n "$EID" ]; then
+            curl -sf -X PATCH \
+              "https://api.vercel.com/v9/projects/${VERCEL_PROJECT_ID}/env/${EID}" \
+              -H "Authorization: Bearer ${VERCEL_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d "$PAYLOAD" > /dev/null
+            echo "Updated ANTHROPIC_API_KEY in Vercel env store (id=$EID)"
+          else
+            curl -sf -X POST \
+              "https://api.vercel.com/v10/projects/${VERCEL_PROJECT_ID}/env" \
+              -H "Authorization: Bearer ${VERCEL_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d "$PAYLOAD" > /dev/null
+            echo "Created ANTHROPIC_API_KEY in Vercel env store"
+          fi
+
       # Vercel dashboard rootDirectory can be accidentally cleared (e.g. when toggling
       # auth settings), which causes vercel build to target the repo root instead of
       # jasper-frontend/ and complete in ~1s with no Next.js output.
