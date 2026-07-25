@@ -77,17 +77,15 @@ async def simulate_contaminant(
     if not ML_API_URL:
         raise _ml_unavailable()
 
-    params = {
-        "sector_id":           sector_id,
-        "flow_direction_deg":  flow_direction_deg,
-        "water_velocity_ms":   water_velocity_ms,
-        "contamination_level": contamination_level,
+    body = {
+        "sector_id":   sector_id,
+        "source_point": {"lat": 56.7267, "lon": -111.3790},
     }
     try:
         async with httpx.AsyncClient(timeout=TIMEOUT_S) as client:
             resp = await client.post(
                 f"{ML_API_URL}/simulate/contaminant",
-                json=params,
+                json=body,
                 headers={"X-API-Key": API_KEY},
             )
         if not resp.is_success:
