@@ -16,7 +16,7 @@ import { ModelPerformanceWidget } from "../Widgets/ModelPerformanceWidget";
 import { FieldPhotosWidget } from "../Widgets/FieldPhotosWidget";
 import type { FlyToTarget } from "../Map/JasperMap";
 import { fetchTimeline } from "../../../lib/api";
-import type { TimelineScan, SimulationResults } from "../../../lib/api";
+import type { TimelineScan, SimulationResults, FieldPhoto } from "../../../lib/api";
 import { interpolateScans } from "../../../lib/interpolation";
 import type { InterpolatedState } from "../../../lib/interpolation";
 
@@ -36,9 +36,10 @@ interface Props {
   showContaminant:    boolean;
   showBurnScar:       boolean;
   simulationResults?: SimulationResults | null;
+  photos?:            FieldPhoto[];
 }
 
-export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBurnScar, simulationResults }: Props) {
+export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBurnScar, simulationResults, photos }: Props) {
   const [sectorId, setSectorId]               = useState<string | null>(null);
   const [dateFrom, setDateFrom]               = useState("2024-06-01");
   const [dateTo, setDateTo]                   = useState("2024-07-24");
@@ -213,7 +214,7 @@ export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBur
         <WaterQualityWidget />
         <PipelineStatusWidget />
         <ModelPerformanceWidget />
-        <FieldPhotosWidget />
+        <FieldPhotosWidget photos={photos} />
       </aside>
 
     </div>
