@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Circle, Marker, Popup, Tooltip, useMap } from "react-leaflet";
+import { Marker, Popup, Tooltip, useMap } from "react-leaflet";
 import { createBadgeIcon, BadgeIconType } from "./badgeIcon";
 import { PopupField, StationPopupCard, StationStatus } from "./StationPopupCard";
 
@@ -56,19 +56,6 @@ export function HazardZone({
 
   return (
     <>
-      <Circle
-        center={center}
-        radius={radius}
-        interactive={false}
-        pathOptions={{
-          color: borderColor,
-          fillColor,
-          fillOpacity: showDetail ? fillOpacity : fillOpacity * 0.4,
-          weight: showDetail ? 1.5 : 0.8,
-          dashArray: "6 5",
-        }}
-      />
-
       {showDetail && (
         <Marker
           position={center}

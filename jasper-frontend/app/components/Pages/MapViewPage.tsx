@@ -16,7 +16,7 @@ import { ModelPerformanceWidget } from "../Widgets/ModelPerformanceWidget";
 import { FieldPhotosWidget } from "../Widgets/FieldPhotosWidget";
 import type { FlyToTarget } from "../Map/JasperMap";
 import { fetchTimeline } from "../../../lib/api";
-import type { TimelineScan } from "../../../lib/api";
+import type { TimelineScan, SimulationResults } from "../../../lib/api";
 import { interpolateScans } from "../../../lib/interpolation";
 import type { InterpolatedState } from "../../../lib/interpolation";
 
@@ -30,14 +30,15 @@ const ThreeDView = dynamic(
 );
 
 interface Props {
-  flyTo?:          FlyToTarget | null;
-  is3D:            boolean;
-  showErosion:     boolean;
-  showContaminant: boolean;
-  showBurnScar:    boolean;
+  flyTo?:             FlyToTarget | null;
+  is3D:               boolean;
+  showErosion:        boolean;
+  showContaminant:    boolean;
+  showBurnScar:       boolean;
+  simulationResults?: SimulationResults | null;
 }
 
-export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBurnScar }: Props) {
+export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBurnScar, simulationResults }: Props) {
   const [sectorId, setSectorId]               = useState<string | null>(null);
   const [dateFrom, setDateFrom]               = useState("2024-06-01");
   const [dateTo, setDateTo]                   = useState("2024-07-24");
@@ -88,6 +89,7 @@ export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBur
               showErosion={showErosion}
               showContaminant={showContaminant}
               showBurnScar={showBurnScar}
+              simulationResults={simulationResults ?? null}
             />
           ) : (
             <JasperMap

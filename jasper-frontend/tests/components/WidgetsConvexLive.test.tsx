@@ -24,7 +24,7 @@ jest.mock("convex/server", () => ({
   anyApi: {
     waterQuality:  { getLiveWaterQuality: "mock-water" },
     pipeline:      { getPipelineStatus:   "mock-pipeline" },
-    modelMetadata: { getModelMetadata:    "mock-model" },
+    models:        { getModelMetadata:    "mock-model" },
   },
 }));
 
@@ -158,7 +158,7 @@ describe("PipelineStatusWidget — Convex live path", () => {
 
 describe("ModelPerformanceWidget — Convex live path", () => {
   it("renders when ConvexAvailableContext is true", () => {
-    mockUseQuery.mockReturnValue({ f1Score: 0.921, trainingLoss: 0.0025 });
+    mockUseQuery.mockReturnValue({ value: { f1Score: 0.921, trainingLoss: 0.0025 } });
     render(
       <ConvexAvailableContext.Provider value={true}>
         <ModelPerformanceWidget />
@@ -168,7 +168,7 @@ describe("ModelPerformanceWidget — Convex live path", () => {
   });
 
   it("displays the Convex F1 score value", () => {
-    mockUseQuery.mockReturnValue({ f1Score: 0.921, trainingLoss: 0.0025 });
+    mockUseQuery.mockReturnValue({ value: { f1Score: 0.921, trainingLoss: 0.0025 } });
     act(() => {
       render(
         <ConvexAvailableContext.Provider value={true}>

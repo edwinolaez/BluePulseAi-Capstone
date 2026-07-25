@@ -79,6 +79,12 @@ export interface ModelOutput {
   confidence:  number;
 }
 
+export interface SimulationResults {
+  burn:        ModelOutput | null;
+  erosion:     ModelOutput | null;
+  contaminant: ModelOutput | null;
+}
+
 // ─── Functions that call Feven's backend ─────────────────────────────────────
 
 // Fetches all timestamped scan records for a sector — used by the timeline slider
