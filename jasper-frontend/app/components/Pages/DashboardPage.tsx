@@ -198,6 +198,10 @@ export function DashboardPage() {
           <p className="text-sm text-gray-500 dark:text-gray-400">
             Live environmental readings and risk indicators for the Jasper area.
           </p>
+          <span className="inline-flex items-center gap-1.5 mt-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-sait-sky/10 text-sait-sky border border-sait-sky/20">
+            <span className="w-1.5 h-1.5 rounded-full bg-sait-sky animate-pulse" />
+            Observed data · IoT &amp; satellite sensors
+          </span>
         </div>
         <div className="flex flex-wrap items-center gap-1 p-1 rounded-lg bg-surface-alt self-start">
           {STATIONS.map((st) => (
@@ -225,9 +229,15 @@ export function DashboardPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-4">
         <div className="rounded-xl border border-gray-200/60 dark:border-gray-700/40 bg-surface p-5">
-          <div className="flex items-center gap-2 mb-1">
-            <ChartLineIcon className="w-4 h-4 text-sait-sky" />
-            <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">{metricConfig.label} Over Time</h2>
+          <div className="flex items-start justify-between gap-2 mb-1">
+            <div className="flex items-center gap-2">
+              <ChartLineIcon className="w-4 h-4 text-sait-sky" />
+              <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100">{metricConfig.label} Over Time</h2>
+            </div>
+            <span className="shrink-0 flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-sait-sky/10 text-sait-sky border border-sait-sky/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-sait-sky animate-pulse" />
+              Observed · IoT Sensors
+            </span>
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
             Hourly readings from the past 12-hour sensor cycle.

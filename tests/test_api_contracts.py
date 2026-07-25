@@ -261,10 +261,11 @@ class TestMLOutputContract:
         Internal helper: validates shape and field types for any ML response.
         Called by each endpoint-specific test below.
         """
-        if response.status_code in (404, 502, 503):
+        if response.status_code in (502, 503, 504):
             pytest.skip(
                 f"{endpoint_name} returned {response.status_code} — "
-                "ML service endpoint not available yet. Waiting for Richard's redeploy."
+                "ML service (Richard's Railway deployment) is not reachable. "
+                "Check ML_API_URL secret and Richard's Railway service status."
             )
         assert response.status_code == 200, (
             f"{endpoint_name} returned {response.status_code}. "
@@ -288,18 +289,18 @@ class TestMLOutputContract:
 
     def test_change_detection_endpoint(self, http_client, auth_headers):
         """
-        POST /predict/change-detection
+        POST /api/v1/change-detection/predict
         Detects burn scars from before/after satellite imagery.
         """
         payload = {"sector_id": "ATH-001", "imagery_date": "2026-06-25"}
 
         response = http_client.post(
-            "/predict/change-detection",
+            "/api/v1/change-detection/predict",
             json=payload,
             headers=auth_headers
         )
 
-        self._validate_ml_response(response, "POST /predict/change-detection")
+        self._validate_ml_response(response, "POST /api/v1/change-detection/predict")
 
         body = response.json()
         assert body["simulation_type"] == "change_detection", (
@@ -308,18 +309,16 @@ class TestMLOutputContract:
 
     def test_erosion_simulation_endpoint(self, http_client, auth_headers):
         """
-        POST /simulate/erosion
+        GET /api/v1/simulate/erosion
         Predicts erosion risk in post-fire terrain.
         """
-        payload = {"sector_id": "ATH-001", "rainfall_mm": 45.0}
-
-        response = http_client.post(
-            "/simulate/erosion",
-            json=payload,
+        response = http_client.get(
+            "/api/v1/simulate/erosion",
+            params={"sector_id": "ATH-001", "rainfall_mm": 45.0},
             headers=auth_headers
         )
 
-        self._validate_ml_response(response, "POST /simulate/erosion")
+        self._validate_ml_response(response, "GET /api/v1/simulate/erosion")
 
         body = response.json()
         assert body["simulation_type"] == "erosion", (
@@ -328,15 +327,13 @@ class TestMLOutputContract:
 
     def test_contaminant_simulation_endpoint(self, http_client, auth_headers):
         """
-        POST /simulate/contaminant
+        GET /api/v1/simulate/contaminant
         Simulates how hydrocarbons spread through the watershed.
         contaminant_vector should be a list of numbers (NOT None) for this endpoint.
         """
-        payload = {"sector_id": "ATH-001", "source_point": {"lat": 56.72, "lon": -111.37}}
-
-        response = http_client.post(
-            "/simulate/contaminant",
-            json=payload,
+        response = http_client.get(
+            "/api/v1/simulate/contaminant",
+            params={"sector_id": "ATH-001", "flow_direction_deg": 180.0, "water_velocity_ms": 2.1, "contamination_level": 0.72},
             headers=auth_headers
         )
 

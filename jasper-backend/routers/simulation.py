@@ -52,9 +52,9 @@ async def simulate_erosion(
     params = {"sector_id": sector_id, "slope_deg": slope_deg, "rainfall_mm": rainfall_mm}
     try:
         async with httpx.AsyncClient(timeout=TIMEOUT_S) as client:
-            resp = await client.get(
-                f"{ML_API_URL}/api/v1/simulate/erosion",
-                params=params,
+            resp = await client.post(
+                f"{ML_API_URL}/simulate/erosion",
+                json=params,
                 headers={"X-API-Key": API_KEY},
             )
         if not resp.is_success:
@@ -85,9 +85,9 @@ async def simulate_contaminant(
     }
     try:
         async with httpx.AsyncClient(timeout=TIMEOUT_S) as client:
-            resp = await client.get(
-                f"{ML_API_URL}/api/v1/simulate/contaminant",
-                params=params,
+            resp = await client.post(
+                f"{ML_API_URL}/simulate/contaminant",
+                json=params,
                 headers={"X-API-Key": API_KEY},
             )
         if not resp.is_success:
