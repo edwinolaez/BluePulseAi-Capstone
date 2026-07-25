@@ -41,7 +41,7 @@ SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY", "")
 
 # The Kong API key is required on every request to protected endpoints.
 # If this is missing, the API should reject the request with a 401 error.
-KONG_API_KEY = os.getenv("NEXT_PUBLIC_API_KEY", "")
+KONG_API_KEY = os.getenv("ML_API_KEY") or os.getenv("NEXT_PUBLIC_API_KEY", "")
 
 
 # ─── Fixtures ─────────────────────────────────────────────────────────────────

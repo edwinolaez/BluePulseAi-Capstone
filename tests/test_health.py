@@ -136,5 +136,5 @@ class TestKongGateway:
         # 401 or 403 here means Kong rejected a valid key — that's a bug
         assert response.status_code not in (401, 403), (
             f"Valid API key was rejected. Got {response.status_code}. "
-            "The NEXT_PUBLIC_API_KEY may be wrong or Kong auth is misconfigured."
+            "The ML_API_KEY may be wrong or Kong auth is misconfigured."
         )

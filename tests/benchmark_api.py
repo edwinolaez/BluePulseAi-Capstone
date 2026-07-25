@@ -26,7 +26,7 @@ from dotenv import load_dotenv
 load_dotenv(dotenv_path=".env.local")
 
 BASE_API_URL = os.getenv("RAILWAY_API_URL", "http://localhost:8000")
-KONG_API_KEY = os.getenv("NEXT_PUBLIC_API_KEY", "")
+KONG_API_KEY = os.getenv("ML_API_KEY") or os.getenv("NEXT_PUBLIC_API_KEY", "")
 
 BACKEND_CONFIGURED = bool(BASE_API_URL and BASE_API_URL != "http://localhost:8000")
 
