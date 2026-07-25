@@ -57,7 +57,7 @@ async def predict_change(body: ChangeDetectionRequest):
     try:
         async with httpx.AsyncClient(timeout=TIMEOUT_S) as client:
             response = await client.post(
-                f"{ML_API_URL}/api/v1/predict/change-detection",
+                f"{ML_API_URL}/predict/change-detection",
                 json={"sector_id": body.sector_id},
                 headers={"X-API-Key": API_KEY},
             )

@@ -23,11 +23,12 @@ function LiveModelData({
 }) {
   // Subscribes to Rahil's getModelMetadata function.
   // Returns the deployed model's current accuracy score and training loss.
-  const data = useQuery(anyApi.modelMetadata.getModelMetadata, {});
+  const data = useQuery(anyApi.models.getModelMetadata, {});
 
   useEffect(() => {
-    if (data) {
-      onData(data.f1Score as number, data.trainingLoss as number);
+    const value = data?.value as Record<string, unknown> | undefined;
+    if (value?.f1Score !== undefined) {
+      onData(value.f1Score as number, (value.trainingLoss as number) ?? 0.0032);
     }
   }, [data, onData]);
 

@@ -104,10 +104,10 @@ export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBur
           )}
         </div>
 
-        {/* Bottom bar: [mobile: live data button] + slider + [desktop: zoom buttons] */}
+        {/* Bottom bar: [mobile: live data button] + [desktop: zoom buttons] */}
         <div className="absolute bottom-4 left-4 right-4 z-[1001] flex items-end gap-3">
 
-          {/* Live Data button — mobile only, sits to the left of the slider.
+          {/* Live Data button — mobile only.
               On desktop the Live Readings sidebar is always visible so this is hidden. */}
           <button
             onClick={() => setPanelOpen(true)}
@@ -117,15 +117,7 @@ export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBur
             Live
           </button>
 
-          <div className="flex-1 min-w-0">
-            <TemporalSlider
-              onDateRangeChange={(from, to, center) => {
-                setDateFrom(from);
-                setDateTo(to);
-                setCenterDate(center);
-              }}
-            />
-          </div>
+          <div className="flex-1" />
 
           {/* Zoom buttons — desktop only, 2D mode only (3D uses deck.gl orbit controls). */}
           <div className={["hidden md:flex flex-col gap-2 shrink-0", is3D ? "invisible" : ""].join(" ")}>
@@ -187,6 +179,15 @@ export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBur
             ✕
           </button>
         </div>
+
+        {/* Time History slider — controls the date range shown on the map and in SectorPanel */}
+        <TemporalSlider
+          onDateRangeChange={(from, to, center) => {
+            setDateFrom(from);
+            setDateTo(to);
+            setCenterDate(center);
+          }}
+        />
 
         {/* Shows data for the sector the user clicked on the map.
             interpolated carries blended values from the timeline slider — null

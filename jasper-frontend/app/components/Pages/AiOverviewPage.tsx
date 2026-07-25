@@ -200,12 +200,15 @@ export function AiOverviewPage() {
                 <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-400">AI-generated · Pending expert review</span>
               </div>
 
-              {/* Risk + confidence */}
-              <div className="flex items-center gap-2">
-                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${RISK_BADGE[risk] ?? "bg-gray-100 dark:bg-gray-800 text-gray-500"}`}>
-                  {risk} Risk
-                </span>
-                <span className="text-xs text-gray-400">{Math.round(confidence * 100)}% confidence</span>
+              {/* AI Prediction output — risk + confidence */}
+              <div>
+                <p className="text-[9px] font-bold uppercase tracking-widest text-purple-500 dark:text-purple-400 mb-1.5">AI Prediction</p>
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${RISK_BADGE[risk] ?? "bg-gray-100 dark:bg-gray-800 text-gray-500"}`}>
+                    {risk} Risk
+                  </span>
+                  <span className="text-xs text-gray-400">{Math.round(confidence * 100)}% confidence</span>
+                </div>
               </div>
 
               <ScoreBar value={score} />
@@ -219,7 +222,8 @@ export function AiOverviewPage() {
                   <svg className={`w-3 h-3 transition-transform ${showInputs ? "rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
                   </svg>
-                  Contributing inputs
+                  <span>Observed sensor inputs</span>
+                  <span className="ml-1 px-1 py-0.5 rounded text-[8px] font-bold uppercase bg-sait-sky/10 text-sait-sky border border-sait-sky/20">Real data</span>
                 </button>
                 {showInputs && (
                   <div className="mt-2 rounded-lg bg-gray-50 dark:bg-gray-800/50 p-2.5 space-y-1.5">
@@ -270,8 +274,18 @@ export function AiOverviewPage() {
               <tr className="border-b border-gray-200/60 dark:border-gray-700/40 text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                 <th className="text-left px-5 py-3">Model</th>
                 <th className="text-left px-5 py-3">Sector</th>
-                <th className="text-left px-5 py-3">Risk Level</th>
-                <th className="text-left px-5 py-3">Score</th>
+                <th className="text-left px-5 py-3">
+                  <span className="flex items-center gap-1">
+                    Predicted Risk
+                    <span className="px-1 py-0.5 rounded text-[8px] font-bold normal-case bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-700/40">AI</span>
+                  </span>
+                </th>
+                <th className="text-left px-5 py-3">
+                  <span className="flex items-center gap-1">
+                    Score
+                    <span className="px-1 py-0.5 rounded text-[8px] font-bold normal-case bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-700/40">AI</span>
+                  </span>
+                </th>
                 <th className="text-left px-5 py-3">Confidence</th>
                 <th className="text-left px-5 py-3">Review Status</th>
               </tr>

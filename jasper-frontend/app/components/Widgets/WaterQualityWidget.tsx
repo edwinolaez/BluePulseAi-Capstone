@@ -90,10 +90,10 @@ export function WaterQualityWidget() {
         <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
           Water Cloudiness
         </p>
-        <span className="flex items-center gap-1.5 text-[10px] font-semibold text-green-500">
-          <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-          Live
-        </span>
+        {isConvexReady
+          ? <span className="flex items-center gap-1.5 text-[10px] font-semibold text-green-500"><span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />Live · Observed</span>
+          : <span className="flex items-center gap-1.5 text-[10px] font-semibold text-amber-500"><span className="w-1.5 h-1.5 rounded-full bg-amber-500" />Simulated</span>
+        }
       </div>
 
       <div className="grid grid-cols-2 gap-3 mb-3.5">
