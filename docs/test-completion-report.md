@@ -19,7 +19,7 @@
 
 | Metric | Target | Actual | Status |
 |---|---|---|---|
-| Backend test coverage | ≥ 80% | measured in CI | `[ ] MET  [ ] NOT MET` |
+| Backend test coverage | ≥ 80% | 69% (631 stmts, 194 missed) | `[ ] MET  [x] NOT MET` |
 | Frontend test coverage | ≥ 75% | 81.75% (lines) | `[x] MET  [ ] NOT MET` |
 | API endpoints contract-tested | 100% | 100% (6/6 contracts) | `[x] MET  [ ] NOT MET` |
 | Semgrep HIGH findings | 0 | 0 | `[x] MET  [ ] NOT MET` |
@@ -77,22 +77,28 @@ pytest --tb=short -v --cov=../jasper-backend --cov-report=html > test-run-output
 
 **Tool:** pytest-cov | **Target:** ≥ 80%
 
-| Module | Lines | Covered | Coverage% |
+| Module | Stmts | Miss | Coverage% |
 |---|---|---|---|
-| `main.py` (FastAPI app) | | | |
-| `routes/ingest.py` | | | |
-| `routes/layers.py` | | | |
-| `models/ingest_record.py` | | | |
-| `services/db_client.py` | | | |
-| **Total** | | | |
+| `main.py` | 14 | 0 | 100% |
+| `config.py` | 5 | 0 | 100% |
+| `database.py` | 14 | 1 | 93% |
+| `routers/health.py` | 5 | 0 | 100% |
+| `routers/timeline.py` | 60 | 2 | 97% |
+| `routers/ingest.py` | 67 | 15 | 78% |
+| `routers/admin.py` | 35 | 14 | 60% |
+| `routers/alerts.py` | 46 | 20 | 57% |
+| `routers/data.py` | 73 | 36 | 51% |
+| `routers/auth.py` | 42 | 23 | 45% |
+| `routers/change_detection.py` | 41 | 22 | 46% |
+| `routers/simulation.py` | 45 | 29 | 36% |
+| `routers/fusion.py` | 41 | 32 | 22% |
+| **Total** | **631** | **194** | **69%** |
 
-**Coverage report:** Attach `htmlcov/index.html` or paste summary below.
+**Coverage run:** `pytest tests/ --cov=. --cov-report=term-missing` — July 25, 2026 — 22 passed, 0 failed
 
-```
-_________________________________________________________________
-```
+**Result:** `[ ] ≥ 80% — TARGET MET  [x] < 80% — DOES NOT MEET TARGET`
 
-**Result:** `[ ] ≥ 80% — TARGET MET  [ ] < 80% — DOES NOT MEET TARGET`
+> **Note:** Covered modules: main, config, health, timeline all at ≥93%. Gap is in routers with no dedicated unit tests (admin, alerts, auth, change_detection, simulation, fusion). These are exercised via integration tests in Stage 4 but not counted here.
 
 ### 3.2 Frontend Coverage (jasper-frontend)
 
