@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const ML_API = process.env.NEXT_PUBLIC_ML_API_BASE_URL ?? "";
-const ML_KEY = process.env.NEXT_PUBLIC_API_KEY ?? "";
+const ML_KEY = process.env.ML_API_KEY ?? "";
 
 function mlHeaders() {
   return { "X-API-Key": ML_KEY, "Content-Type": "application/json" };
