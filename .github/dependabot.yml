@@ -1,24 +1,43 @@
+# dependabot.yml — Automated Dependency Update Configuration
+#
+# Dependabot opens PRs automatically when a dependency has a newer version
+# or a known CVE (Common Vulnerabilities and Exposures).
+#
+# All Dependabot PRs are routed to Edwin for review (as QA/Security lead).
+# They are labelled "security" + "dependencies" so they're easy to filter.
+#
+# Schedule: Monday 08:00 MT — start of the work week so Edwin can review
+# and merge security updates before the team starts new feature work.
+#
+# `open-pull-requests-limit: 5` caps how many open Dependabot PRs can exist
+# at once per ecosystem. This prevents Dependabot from flooding the PR list
+# when many packages update simultaneously (e.g. after a React major release).
+
 version: 2
 updates:
   # ─── npm (frontend) ─────────────────────────────────────────────────────────
+  # Monitors Reyta's Next.js/React dependencies in jasper-frontend/package.json.
+  # Most critical to watch: next, react, @anthropic-ai/sdk, and leaflet.
   - package-ecosystem: "npm"
     directory: "/jasper-frontend"
     schedule:
       interval: "weekly"
       day: "monday"
       time: "08:00"
-      timezone: "America/Edmonton"
+      timezone: "America/Edmonton"  # SAIT / team timezone
     open-pull-requests-limit: 5
     labels:
       - "security"
       - "dependencies"
     reviewers:
-      - "edwinolaez"
+      - "edwinolaez"  # Edwin reviews all dependency updates as security lead
     commit-message:
-      prefix: "chore"
-      include: "scope"
+      prefix: "chore"   # follows Conventional Commits — keeps git log clean
+      include: "scope"  # adds the package scope, e.g. "chore(next): bump 14.1→14.2"
 
   # ─── pip (backend) ──────────────────────────────────────────────────────────
+  # Monitors Feven's FastAPI dependencies in jasper-backend/requirements.txt.
+  # Most critical to watch: fastapi, uvicorn, pydantic, and supabase.
   - package-ecosystem: "pip"
     directory: "/jasper-backend"
     schedule:
@@ -37,6 +56,9 @@ updates:
       include: "scope"
 
   # ─── pip (ML) ───────────────────────────────────────────────────────────────
+  # Monitors Richard's ML dependencies in jasper-ml/requirements.txt.
+  # Most critical to watch: scikit-learn, scipy, numpy, and torch (if added).
+  # ML packages often have CVEs in older versions — keep these current.
   - package-ecosystem: "pip"
     directory: "/jasper-ml"
     schedule:
@@ -55,6 +77,10 @@ updates:
       include: "scope"
 
   # ─── GitHub Actions ─────────────────────────────────────────────────────────
+  # Monitors action versions in .github/workflows/*.yml (e.g. actions/checkout@v4).
+  # Pinning actions to a version (v4) is good practice; Dependabot keeps them
+  # updated so we get security patches in the action runners themselves.
+  # Labelled "ci" (not "security") since action updates rarely have CVEs.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -66,4 +92,4 @@ updates:
     reviewers:
       - "edwinolaez"
     commit-message:
-      prefix: "ci"
+      prefix: "ci"  # e.g. "ci: bump actions/checkout from 4.1.0 to 4.1.1"

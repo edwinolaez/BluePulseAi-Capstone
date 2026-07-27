@@ -1,21 +1,47 @@
+# deploy-staging.yml — Automatic Deployment to Vercel Staging Environment
+#
+# Owner: Edwin (CI/CD)
+# Trigger: Fires automatically after CI passes on the `develop` branch.
+#   Manual trigger (workflow_dispatch) is also available for urgent hotfixes.
+#
+# What this deploys:
+#   - Frontend: Reyta's Next.js app → Vercel preview environment
+#   - Backend:  Feven's FastAPI → Railway (auto-deploys on push to develop via webhook)
+#
+# Secrets required (set in GitHub → Settings → Secrets → Actions):
+#   VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID — Vercel deployment auth
+#   RAILWAY_API_URL, RAILWAY_STAGING_URL           — Railway backend URLs
+#   NEXT_PUBLIC_CONVEX_URL                          — Rahil's Convex deployment
+#   ML_API_KEY / NEXT_PUBLIC_API_KEY               — Kong API key for ML endpoints
+#   ANTHROPIC_API_KEY                               — Claude API key for chatbot
+
 name: Deploy — Staging
 
 on:
+  # workflow_run fires when the CI workflow completes on the develop branch.
+  # Using workflow_run (instead of push) means we only deploy AFTER CI passes —
+  # we never deploy a build that failed linting, security, or tests.
   workflow_run:
     workflows: ["CI"]
     types: [completed]
     branches: [develop]
+  # Manual trigger allows Edwin to force a staging deploy without a new push,
+  # e.g. if a secret was updated and the frontend needs a rebuild.
   workflow_dispatch:
 
 jobs:
   deploy-staging:
     name: "Auto-deploy to Vercel Staging"
     runs-on: ubuntu-latest
-    # Deploy when CI passed, or when triggered manually via workflow_dispatch
+    # Only deploy when CI actually passed (not when it was cancelled or failed).
+    # Also allow unconditional deploy on manual workflow_dispatch.
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     steps:
       - uses: actions/checkout@v4
         with:
+          # workflow_run doesn't automatically check out the triggering commit —
+          # we must specify head_sha explicitly. Falls back to github.sha for
+          # manual dispatch runs where workflow_run.head_sha doesn't exist.
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Set up Node.js
@@ -26,6 +52,11 @@ jobs:
       - name: Install Vercel CLI
         run: npm install -g vercel
 
+      # `vercel pull` downloads the Vercel project's linked environment and
+      # build settings into .vercel/. This ensures the CI build uses the same
+      # configuration as Vercel would use if building on their platform.
+      # `--environment=preview` pulls the staging (preview) environment config,
+      # not the production config — so staging and prod can have different env vars.
       - name: Pull Vercel project settings
         working-directory: jasper-frontend
         run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
@@ -37,6 +68,14 @@ jobs:
         working-directory: jasper-frontend
         run: npm install
 
+      # Build runs locally in CI (not on Vercel's build servers) so we can
+      # inject secrets that aren't stored in Vercel's environment.
+      # Key env vars explained:
+      #   NEXT_PUBLIC_API_BASE_URL  — Reyta's frontend uses this to call Feven's API
+      #   NEXT_PUBLIC_ML_API_BASE_URL — used for direct ML endpoint calls
+      #   ML_API_KEY                — server-side only (NOT NEXT_PUBLIC_); used in
+      #                               the /api/chat route to authenticate ML requests
+      #   ANTHROPIC_API_KEY         — Claude API key for the researcher chatbot
       - name: Build for Vercel (locally in CI)
         working-directory: jasper-frontend
         timeout-minutes: 15
@@ -50,6 +89,9 @@ jobs:
           ML_API_KEY: ${{ secrets.ML_API_KEY || secrets.NEXT_PUBLIC_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
+      # Quick sanity check that `vercel build` actually produced output.
+      # If .vercel/output doesn't exist, the deploy step would fail with a
+      # confusing error — this surfaces the real problem earlier.
       - name: Verify build output
         working-directory: jasper-frontend
         run: |
@@ -58,6 +100,9 @@ jobs:
           echo "=== .vercel/output top-level ==="
           ls -la .vercel/output/ 2>/dev/null || echo "no output directory"
 
+      # `--prebuilt` tells Vercel to skip its own build step and upload the
+      # output we already built above. This is faster and ensures the artifact
+      # we tested in CI is exactly what gets deployed — not a fresh rebuild.
       - name: Deploy prebuilt output to Vercel (staging)
         working-directory: jasper-frontend
         timeout-minutes: 10
@@ -66,12 +111,19 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
+      # Railway auto-deploys Feven's backend whenever develop is pushed via a
+      # GitHub webhook configured in the Railway dashboard. No CLI step is needed
+      # here — this step just prints the staging URL for visibility in CI logs.
       - name: Deploy backend to Railway (staging)
         run: |
           echo "Railway deployment triggered via push to develop"
           echo "Railway auto-deploys from this branch via webhook — no CLI step needed here"
           echo "Staging backend URL: ${{ secrets.RAILWAY_STAGING_URL }}"
 
+      # Verify the Railway backend is reachable after deploy.
+      # `--retry 3 --retry-delay 5` gives Railway up to 15 seconds to warm up.
+      # Failure here is a WARNING (not exit 1) on staging — we flag it but don't
+      # block the workflow, since Railway cold starts can exceed the retry window.
       - name: Smoke test staging
         run: |
           STAGING_URL="${{ secrets.RAILWAY_STAGING_URL }}"

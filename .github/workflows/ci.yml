@@ -1,8 +1,25 @@
+# ci.yml — Continuous Integration Pipeline for Project Jasper
+#
+# Owner: Edwin (QA / CI)
+# Pipeline: Lint → Security → Unit Tests → Integration Tests → Build → Performance
+#
+# Every stage must pass before the next one starts (enforced via `needs:`).
+# This order ensures we don't waste time running expensive tests when basic
+# linting or security checks would fail anyway.
+#
+# `continue-on-error: true` is used on individual STEPS (not jobs) throughout
+# this file. It means a step failure is logged but does NOT fail the job.
+# We use this during early sprints when some modules (e.g. jasper-ml) don't
+# have code yet — we don't want CI to fail just because a file doesn't exist.
+# As the project matures, these should be tightened to `continue-on-error: false`.
+
 name: CI
 
 on:
+  # Run on every push to any branch so teammates get feedback immediately.
   push:
     branches: ["**"]
+  # Also run on PRs targeting main or develop to enforce the merge gate.
   pull_request:
     branches: [main, develop]
 
@@ -68,11 +85,14 @@ jobs:
 
   # ─────────────────────────────────────────────────────────────────────────
   # Stage 2 — Security
+  # Blocks on: Stage 1 (Lint must pass first — no point scanning broken code)
+  # Purpose: SAST scan (Semgrep) + dependency CVE scan (pip-audit)
+  # Output: semgrep-report.json uploaded as a CI artifact for 90 days
   # ─────────────────────────────────────────────────────────────────────────
   security:
     name: "Stage 2 — Security"
     runs-on: ubuntu-latest
-    needs: lint
+    needs: lint  # Security only runs after lint passes — prevents scanning invalid code
     steps:
       - uses: actions/checkout@v4
 
@@ -84,6 +104,9 @@ jobs:
       - name: Install security tools
         run: pip install semgrep pip-audit
 
+      # SEMGREP_APP_TOKEN links results to the Semgrep Cloud dashboard (optional).
+      # If the secret is not set, Semgrep still runs locally — it just won't
+      # upload findings to the cloud UI. Edwin manages this token.
       - name: Semgrep SAST — Python
         continue-on-error: true
         run: semgrep --config=p/python --error .
@@ -102,6 +125,10 @@ jobs:
         env:
           SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
 
+      # Generates a JSON artifact regardless of findings so Edwin can review
+      # the full Semgrep output in the GitHub Actions "Artifacts" tab.
+      # `|| echo` prevents this step from failing if Semgrep finds issues —
+      # we want the artifact even when findings exist.
       - name: Semgrep — Generate JSON report artifact
         run: |
           semgrep --config=auto --json --output=semgrep-report.json . \
@@ -109,6 +136,9 @@ jobs:
         env:
           SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
 
+      # `if: always()` ensures the report is uploaded even when Semgrep found
+      # issues (which would otherwise mark the step as failed and skip upload).
+      # 90-day retention covers the full project timeline through M5 sign-off.
       - name: Upload Semgrep report
         uses: actions/upload-artifact@v4
         if: always()
@@ -117,6 +147,9 @@ jobs:
           path: semgrep-report.json
           retention-days: 90
 
+      # pip-audit checks all Python dependencies against the OSV vulnerability DB.
+      # A match means a dependency has a known CVE — Dependabot should also catch
+      # these, but pip-audit provides a second confirmation at build time.
       - name: pip-audit (backend)
         working-directory: jasper-backend
         continue-on-error: true
@@ -139,11 +172,15 @@ jobs:
 
   # ─────────────────────────────────────────────────────────────────────────
   # Stage 3 — Unit Tests
+  # Blocks on: Stage 2 (Security must pass first)
+  # Purpose: Run Jest (frontend) and pytest (backend/ML) in isolation.
+  #   These tests do NOT need a running server — they test individual functions.
+  # Coverage gate: 80% line coverage required for backend and ML modules.
   # ─────────────────────────────────────────────────────────────────────────
   unit-tests:
     name: "Stage 3 — Unit Tests"
     runs-on: ubuntu-latest
-    needs: security
+    needs: security  # Unit tests only run after security scan passes
     steps:
       - uses: actions/checkout@v4
 
@@ -202,11 +239,15 @@ jobs:
 
   # ─────────────────────────────────────────────────────────────────────────
   # Stage 4 — Integration Tests
+  # Blocks on: Stage 3 (Unit Tests must pass first)
+  # Purpose: Spin up the FastAPI backend locally and run Edwin's /tests/ suite
+  #   against it. These tests make real HTTP calls and hit the real Supabase DB.
+  # Key difference from Stage 3: a real server runs here, not mocked functions.
   # ─────────────────────────────────────────────────────────────────────────
   integration-tests:
     name: "Stage 4 — Integration Tests"
     runs-on: ubuntu-latest
-    needs: unit-tests
+    needs: unit-tests  # Integration tests only run after unit tests pass
     steps:
       - uses: actions/checkout@v4
 
@@ -222,6 +263,11 @@ jobs:
             pydantic PyJWT python-multipart python-dotenv \
             supabase httpx
 
+      # Start Feven's FastAPI server in the background (nohup) so it keeps
+      # running while the test steps execute. The health-check loop (30 retries,
+      # 1s each) waits up to 30 seconds for the server to become responsive.
+      # If the server never starts, we print the backend log before failing
+      # so the cause of the startup failure is visible in CI output.
       - name: Start backend locally
         working-directory: jasper-backend
         env:
@@ -252,23 +298,32 @@ jobs:
             echo "No integration tests yet — skipping"
           fi
         env:
+          # Point tests at the local backend started above (not Railway)
           RAILWAY_API_URL: http://127.0.0.1:8000
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          # JWT tokens for RBAC tests — Rahil generates these from Supabase dashboard
           TEST_ANALYST_JWT: ${{ secrets.TEST_ANALYST_JWT }}
           TEST_INGEST_JWT: ${{ secrets.TEST_INGEST_JWT }}
+          # ML_API_KEY falls back to NEXT_PUBLIC_API_KEY during the migration
+          # period when ML_API_KEY has not yet been added as a repository secret.
+          # See: commit 9d2185f (fix: fall back to NEXT_PUBLIC_API_KEY while migrating)
           ML_API_KEY: ${{ secrets.ML_API_KEY || secrets.NEXT_PUBLIC_API_KEY }}
           NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
           ML_API_URL: ${{ secrets.ML_API_URL }}
 
   # ─────────────────────────────────────────────────────────────────────────
   # Stage 5 — Build
+  # Blocks on: Stage 4 (Integration Tests must pass first)
+  # Purpose: Verify the Next.js frontend compiles to a production build,
+  #   and that the backend Docker image builds without errors.
+  #   A failing build here means the code works in dev but breaks in prod.
   # ─────────────────────────────────────────────────────────────────────────
   build:
     name: "Stage 5 — Build"
     runs-on: ubuntu-latest
-    needs: integration-tests
+    needs: integration-tests  # Build only runs after integration tests pass
     steps:
       - uses: actions/checkout@v4
 
@@ -284,6 +339,9 @@ jobs:
         run: npm ci
         continue-on-error: true
 
+      # ML_API_KEY is injected at build time so Next.js can embed the value
+      # in server-side routes. It must NOT be NEXT_PUBLIC_ — the server-side
+      # API route (/api/chat) reads it via process.env on the server only.
       - name: Next.js production build
         working-directory: jasper-frontend
         run: npm run build
@@ -306,11 +364,19 @@ jobs:
 
   # ─────────────────────────────────────────────────────────────────────────
   # Stage 6 — Performance Gate (activates Sprint 3)
+  # Blocks on: Stage 5 (Build must pass first)
+  # Purpose: Lighthouse frontend score + API P95 response time benchmark.
+  #   Both must pass before a PR can merge to develop or main.
+  # Conditional: only runs on develop or main pushes — NOT on feature branches.
+  #   This avoids slowing down every developer push while still enforcing the
+  #   gate before anything reaches the shared branches.
   # ─────────────────────────────────────────────────────────────────────────
   performance:
     name: "Stage 6 — Performance Gate"
     runs-on: ubuntu-latest
-    needs: build
+    needs: build  # Performance runs after build — needs a working artifact to measure
+    # Only enforce the performance gate on shared branches, not every feature branch.
+    # This saves CI time for teammates while still protecting develop and main.
     if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4

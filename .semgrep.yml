@@ -1,5 +1,19 @@
+# .semgrep.yml — Custom SAST Rules for Project Jasper
+#
+# Semgrep performs Static Application Security Testing (SAST):
+# it scans source code for known-bad patterns before the code ever runs.
+# These custom rules extend Semgrep's built-in rulesets with Jasper-specific checks.
+#
+# Run locally:  semgrep --config=.semgrep.yml .
+# Run in CI:    Stage 2 (Security) in .github/workflows/ci.yml
+# Severity key: ERROR = blocks merge | WARNING = flagged for review
+
 rules:
   # ─── Python: secrets in code ───────────────────────────────────────────────
+  # WHY: Added after the NEXT_PUBLIC_API_KEY incident (commit 6c84cb2) where a
+  # backend API key was accidentally exposed to the browser via a NEXT_PUBLIC_
+  # environment variable. This rule catches the equivalent mistake in Python —
+  # hardcoding a secret as a string literal instead of reading it from os.getenv().
   - id: jasper-no-hardcoded-secrets
     patterns:
       - pattern: $KEY = "..."
@@ -11,6 +25,11 @@ rules:
     severity: ERROR
 
   # ─── Python: raw SQL string concatenation (SQLi risk) ─────────────────────
+  # WHY: Feven's FastAPI backend queries Rahil's PostGIS database directly.
+  # Concatenating user-controlled values into SQL strings allows an attacker
+  # to inject arbitrary SQL. Both patterns caught here (string concat and
+  # f-strings) are classic SQL injection vectors. Use parameterized queries
+  # or Supabase's RPC layer instead.
   - id: jasper-no-raw-sql-concat
     patterns:
       - pattern: |
@@ -22,6 +41,10 @@ rules:
     severity: ERROR
 
   # ─── Python: DEBUG=True in production code ────────────────────────────────
+  # WHY: DEBUG=True in a FastAPI or Django app enables interactive error pages
+  # that expose the full stack trace and local variable values to the browser.
+  # If an unhandled exception hits production, an attacker could read internal
+  # paths, environment values, and logic from the error page.
   - id: jasper-no-debug-true
     pattern: DEBUG = True
     message: "DEBUG=True detected. Must not be set in production code."
@@ -29,6 +52,11 @@ rules:
     severity: WARNING
 
   # ─── Python: bare exception in FastAPI handlers (hides stack traces) ───────
+  # WHY: A bare `except Exception as e: return response` in a FastAPI route
+  # swallows the real error silently — Railway logs show nothing, and Reyta's
+  # frontend gets a misleading success or generic error response instead of
+  # the real cause. Use HTTPException or a structured error handler so the
+  # actual failure is logged and the status code is meaningful.
   - id: jasper-no-bare-exception-return
     patterns:
       - pattern: |
@@ -39,6 +67,11 @@ rules:
     severity: WARNING
 
   # ─── TypeScript/JS: dangerouslySetInnerHTML ────────────────────────────────
+  # WHY: Reyta's frontend renders content from the API (sector names, layer
+  # descriptions). If that content is injected via dangerouslySetInnerHTML
+  # without sanitization, an attacker who can write to the database could inject
+  # a <script> tag that runs in every reviewer's browser (stored XSS).
+  # Use React's default text rendering (which auto-escapes) instead.
   - id: jasper-no-dangerous-inner-html
     pattern: dangerouslySetInnerHTML
     message: "dangerouslySetInnerHTML detected. This is an XSS vector — sanitize all content before use."
@@ -46,6 +79,10 @@ rules:
     severity: ERROR
 
   # ─── TypeScript/JS: eval() ────────────────────────────────────────────────
+  # WHY: eval() executes an arbitrary string as JavaScript. Any user-controlled
+  # data that reaches an eval() call is a remote code execution vulnerability.
+  # There is no legitimate use case for eval() in a React/Next.js frontend —
+  # use JSON.parse() for data, or dynamic imports for code splitting.
   - id: jasper-no-eval
     pattern: eval(...)
     message: "eval() detected. Never use eval — this is a code injection vector."
@@ -53,6 +90,12 @@ rules:
     severity: ERROR
 
   # ─── TypeScript/JS: hardcoded API keys in source ──────────────────────────
+  # WHY: Same intent as jasper-no-hardcoded-secrets (Python), but applied to
+  # TypeScript/JavaScript. All API keys must come from NEXT_PUBLIC_* env vars
+  # (client-safe) or server-side env vars (secret). A const API_KEY = "sk-..."
+  # in source code will be bundled into the Next.js build and visible to anyone
+  # who reads the browser's minified JS bundle. This is the TypeScript complement
+  # to the API key incident that triggered commit 6c84cb2.
   - id: jasper-no-hardcoded-api-key-ts
     patterns:
       - pattern: const $KEY = "..."
