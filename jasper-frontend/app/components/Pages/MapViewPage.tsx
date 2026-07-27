@@ -1,7 +1,6 @@
-// MapViewPage is the main interactive map screen.
-// It renders the Leaflet map with all three environmental layers on top,
-// plus layer toggle switches, zoom buttons, a time slider,
-// and a Live Readings panel on the right that shows real-time sensor data.
+// MapViewPage is the main map screen — the hub of the whole app.
+// It manages which layers are visible, the selected date range, and
+// what sensor data shows up in the right panel when a user clicks a zone.
 
 "use client";
 
@@ -31,13 +30,16 @@ interface Props {
 }
 
 export function MapViewPage({ flyTo, mapFullscreen = false, onSetFullscreen }: Props) {
+  // Holds the sensor data for whichever zone the user last clicked on the map
   const [sensorInfo, setSensorInfo] = useState<SensorInfo | null>(null);
   const [sectorId, setSectorId]     = useState<string | null>(null);
 
+  // Date range controlled by the time slider at the bottom of the map
   const [dateFrom, setDateFrom]     = useState("2024-06-01");
   const [dateTo, setDateTo]         = useState("2024-07-24");
   const [centerDate, setCenterDate] = useState("2024-06-24");
 
+  // Controls which environmental layers are visible on the map
   const [showBurnScar, setShowBurnScar]       = useState(true);
   const [showErosion, setShowErosion]         = useState(true);
   const [showContaminant, setShowContaminant] = useState(true);

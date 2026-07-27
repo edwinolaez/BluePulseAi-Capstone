@@ -24,6 +24,9 @@ function toISODate(ms: number) {
   return new Date(ms).toISOString().split("T")[0];
 }
 
+// TemporalSlider is the time slider at the bottom of the map.
+// Dragging it moves through the wildfire timeline — from before the fire (June 2024)
+// to the recovery period (September 2024). It passes the selected date range up to MapViewPage.
 export function TemporalSlider({ onDateRangeChange }: Props) {
   const [value, setValue] = useState(DEFAULT_VALUE);
   const center = sliderToCenter(value);

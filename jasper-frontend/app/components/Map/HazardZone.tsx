@@ -24,6 +24,9 @@ interface Props {
   onMarkerClick?: () => void;
 }
 
+// HazardZone draws the dashed circle and the clickable badge on the map.
+// When the badge is clicked it sends the sensor data up to the parent
+// so the right side panel can display it.
 export function HazardZone({
   center,
   radius,

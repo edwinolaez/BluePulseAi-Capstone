@@ -27,6 +27,9 @@ interface Props {
   sensorInfo?: SensorInfo | null;
 }
 
+// SectorPanel is the right side panel that shows sensor details when a zone is clicked.
+// It receives the sensorInfo object from MapViewPage and displays the risk level,
+// sector ID, and other readings for that specific area.
 export function SectorPanel({ sensorInfo }: Props) {
   return (
     <div className="rounded-xl border border-gray-200/60 dark:border-gray-700/40 bg-surface p-3.5">
