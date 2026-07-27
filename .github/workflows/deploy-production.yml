@@ -49,6 +49,7 @@ jobs:
           NEXT_PUBLIC_ML_API_BASE_URL: ${{ secrets.ML_API_URL }}
           NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
           NEXT_PUBLIC_API_KEY: ${{ secrets.NEXT_PUBLIC_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
       - name: Post-deploy smoke test
         run: |

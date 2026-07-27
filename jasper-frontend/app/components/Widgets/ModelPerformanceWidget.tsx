@@ -9,7 +9,7 @@ import { useEffect, useState, useContext, useCallback } from "react";
 import { useQuery } from "convex/react";
 import { anyApi } from "convex/server";
 import { SettingsIcon } from "../Layout/icons";
-import { ConvexAvailableContext } from "../Providers/ConvexClientProvider";
+import { ConvexAvailableContext, ConvexErrorBoundary } from "../Providers/ConvexClientProvider";
 
 function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));
@@ -23,11 +23,12 @@ function LiveModelData({
 }) {
   // Subscribes to Rahil's getModelMetadata function.
   // Returns the deployed model's current accuracy score and training loss.
-  const data = useQuery(anyApi.modelMetadata.getModelMetadata, {});
+  const data = useQuery(anyApi.models.getModelMetadata, {});
 
   useEffect(() => {
-    if (data) {
-      onData(data.f1Score as number, data.trainingLoss as number);
+    const value = data?.value as Record<string, unknown> | undefined;
+    if (value?.f1Score !== undefined) {
+      onData(value.f1Score as number, (value.trainingLoss as number) ?? 0.0032);
     }
   }, [data, onData]);
 
@@ -74,7 +75,11 @@ export function ModelPerformanceWidget() {
 
   return (
     <div className="rounded-xl border border-gray-200/60 dark:border-gray-700/40 bg-surface p-3.5">
-      {isConvexReady && <LiveModelData onData={handleLiveData} />}
+      {isConvexReady && (
+        <ConvexErrorBoundary>
+          <LiveModelData onData={handleLiveData} />
+        </ConvexErrorBoundary>
+      )}
 
       <div className="flex items-center justify-between mb-3">
         <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">

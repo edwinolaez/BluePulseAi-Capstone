@@ -154,7 +154,6 @@ export function MapViewPage({ flyTo, mapFullscreen = false, onSetFullscreen }: P
 
         {/* Bottom bar: mobile Live button + temporal slider + zoom buttons */}
         <div className="absolute bottom-4 left-4 right-4 z-[1001] flex items-end justify-between gap-3">
-
           <button
             onClick={() => setPanelOpen(true)}
             className="md:hidden flex items-center gap-1.5 px-3 py-2 rounded-full bg-sait-red text-white text-xs font-semibold shadow-lg active:scale-95 transition-transform shrink-0"
@@ -163,15 +162,7 @@ export function MapViewPage({ flyTo, mapFullscreen = false, onSetFullscreen }: P
             Live
           </button>
 
-          <div className="flex-1 min-w-0">
-            <TemporalSlider
-              onDateRangeChange={(from, to, center) => {
-                setDateFrom(from);
-                setDateTo(to);
-                setCenterDate(center);
-              }}
-            />
-          </div>
+          <div className="flex-1" />
 
           {/* Hidden when 3D — ThreeDView has its own zoom controls */}
           <div className={["hidden md:flex flex-col gap-2 shrink-0", is3D ? "invisible" : ""].join(" ")}>
