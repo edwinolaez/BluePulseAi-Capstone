@@ -162,7 +162,15 @@ export function MapViewPage({ flyTo, mapFullscreen = false, onSetFullscreen }: P
             Live
           </button>
 
-          <div className="flex-1" />
+          <div className="flex-1 min-w-0">
+            <TemporalSlider
+              onDateRangeChange={(from, to, center) => {
+                setDateFrom(from);
+                setDateTo(to);
+                setCenterDate(center);
+              }}
+            />
+          </div>
 
           {/* Hidden when 3D — ThreeDView has its own zoom controls */}
           <div className={["hidden md:flex flex-col gap-2 shrink-0", is3D ? "invisible" : ""].join(" ")}>
