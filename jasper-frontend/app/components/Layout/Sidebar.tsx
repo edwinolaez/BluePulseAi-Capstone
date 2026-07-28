@@ -1,3 +1,24 @@
+// Sidebar.tsx — The Left Side Navigation Panel
+//
+// This is the collapsible panel on the left side of the dashboard.
+// It gives users quick access to map tools and information without
+// leaving the main screen.
+//
+// What's inside:
+//   - "Live Sensors" button — opens a list of all monitoring sectors.
+//     Clicking "Focus Map" on any sector zooms the map to that location.
+//   - "Legend Panel" button — opens a colour legend explaining what each
+//     layer colour means and where the data comes from.
+//   - "Download Map Data" button — exports the current sensor readings
+//     as a CSV file the user can open in Excel or any spreadsheet app.
+//   - "Support Request" and "Diagnostic Logs" at the bottom for system tools.
+//
+// On desktop the sidebar can be collapsed to just icons to give more
+// space to the map. On mobile it slides in as a drawer from the left.
+//
+// The sidebar does NOT control which layers are on or off —
+// that is handled by the toggle switches inside MapViewPage.
+
 "use client";
 
 import { useState } from "react";

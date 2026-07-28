@@ -1,5 +1,24 @@
-// ContaminantLayer visualises water contamination flowing through the Athabasca River.
-// It draws two river path lines, animated directional arrows, and a hazard zone circle.
+// ContaminantLayer.tsx — The River Water Contamination Layer
+//
+// This layer shows the water contamination moving through the Athabasca River
+// after the wildfire. Ash and debris from the fire can wash into the river
+// and affect water quality downstream.
+//
+// What you see on the map:
+//   - Two blue lines following the river path through Jasper
+//   - Animated arrows showing which direction the water is flowing
+//   - A dashed circle at the Water Survey of Canada monitoring station
+//
+// How it works:
+//   1. It calls the backend contaminant simulation model with the river's
+//      flow direction and velocity
+//   2. The model returns a risk level and the current flow data
+//   3. The arrows animate faster or slower depending on the water velocity
+//   4. At lower zoom levels, fewer arrows show so the map stays readable
+//   5. Clicking the badge or an arrow loads the river data into the right panel
+//
+// The GPS coordinates for the monitoring station come from the real
+// Water Survey of Canada station (WSC 07AA001) on the Miette River at Jasper.
 
 "use client";
 

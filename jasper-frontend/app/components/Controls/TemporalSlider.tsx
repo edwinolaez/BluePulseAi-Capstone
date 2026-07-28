@@ -24,9 +24,21 @@ function toISODate(ms: number) {
   return new Date(ms).toISOString().split("T")[0];
 }
 
-// TemporalSlider is the time slider at the bottom of the map.
-// Dragging it moves through the wildfire timeline — from before the fire (June 2024)
-// to the recovery period (September 2024). It passes the selected date range up to MapViewPage.
+// TemporalSlider.tsx — The Time Slider at the Bottom of the Map
+//
+// This component is the horizontal slider bar that sits at the bottom of the map.
+// It lets the user move through the Jasper wildfire timeline —
+// from before the fire started in June 2024 all the way to the recovery period in September 2024.
+//
+// How it works:
+//   - The slider goes from 0 to 100 (like a percentage)
+//   - As you drag it, it converts that number into a real calendar date
+//   - It calculates a 14-day window around the selected date (7 days before and after)
+//   - It passes that date range up to MapViewPage using the onDateRangeChange function
+//   - MapViewPage then shares that date with the rest of the dashboard
+//
+// The default position (44%) puts the slider just after the fire started —
+// so the first thing users see is the damage, not the before state.
 export function TemporalSlider({ onDateRangeChange }: Props) {
   const [value, setValue] = useState(DEFAULT_VALUE);
   const center = sliderToCenter(value);

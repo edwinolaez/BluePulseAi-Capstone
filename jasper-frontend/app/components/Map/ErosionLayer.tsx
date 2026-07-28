@@ -1,8 +1,21 @@
-// ErosionLayer draws three overlapping erosion risk zones on the map —
-// one High, one Medium, one Low — at different terrain positions in the watershed.
-// Each zone fetches its own risk prediction from Richard's erosion simulation API
-// using the real slope angle and rainfall amount for that specific location.
-// All three API calls run at the same time for speed.
+// ErosionLayer.tsx — The Soil Erosion Risk Zones on the Map
+//
+// This layer shows three purple dashed circles on the map, each representing
+// a different area of Jasper that is at risk of soil erosion after the wildfire.
+//
+// Why three zones?
+//   Different parts of the terrain have different slope angles and rainfall levels,
+//   so the risk is different in each area. One zone might be High risk while
+//   another is Low — this gives a more accurate picture than one single zone.
+//
+// How it works:
+//   1. When the component loads, it calls the backend ML erosion model three times —
+//      once per zone — sending the slope angle and rainfall amount for each location
+//   2. All three calls run at the same time so the page loads faster
+//   3. Each zone gets back a risk level (High, Medium, or Low) and displays it
+//   4. Clicking a badge sends that zone's data to the right side panel
+//
+// The purple colour is consistent with the 3D Risk view so both views match.
 
 "use client";
 

@@ -1,6 +1,19 @@
-// MapViewPage is the main map screen — the hub of the whole app.
-// It manages which layers are visible, the selected date range, and
-// what sensor data shows up in the right panel when a user clicks a zone.
+// MapViewPage.tsx — The Main Dashboard Screen
+//
+// This is the hub of the entire application. Every visual element the user
+// sees on the Map View screen is either rendered here or controlled from here.
+//
+// What this file is responsible for:
+//   - Showing the 2D map (or switching to the 3D view)
+//   - Controlling which environmental layers are visible (burn scar, erosion, water)
+//   - Tracking the selected date range from the time slider at the bottom
+//   - Storing the sensor data from whichever zone the user last clicked
+//   - Passing that sensor data down to the right side panel to display it
+//   - Managing the fullscreen toggle, zoom buttons, and the mobile Live panel
+//
+// Think of this file as the "control room" — it doesn't draw anything on the
+// map itself, but it connects all the pieces together and decides what each
+// part of the screen shows at any given moment.
 
 "use client";
 
@@ -162,15 +175,7 @@ export function MapViewPage({ flyTo, mapFullscreen = false, onSetFullscreen }: P
             Live
           </button>
 
-          <div className="flex-1 min-w-0">
-            <TemporalSlider
-              onDateRangeChange={(from, to, center) => {
-                setDateFrom(from);
-                setDateTo(to);
-                setCenterDate(center);
-              }}
-            />
-          </div>
+          <div className="flex-1" />
 
           {/* Hidden when 3D — ThreeDView has its own zoom controls */}
           <div className={["hidden md:flex flex-col gap-2 shrink-0", is3D ? "invisible" : ""].join(" ")}>

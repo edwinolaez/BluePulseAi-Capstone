@@ -27,9 +27,25 @@ interface Props {
   sensorInfo?: SensorInfo | null;
 }
 
-// SectorPanel is the right side panel that shows sensor details when a zone is clicked.
-// It receives the sensorInfo object from MapViewPage and displays the risk level,
-// sector ID, and other readings for that specific area.
+// SectorPanel.tsx — The Selected Area Panel on the Right Side
+//
+// This is the panel on the right side of the screen that shows sensor data
+// for whichever zone the user last clicked on the map.
+//
+// How it works:
+//   - It receives a "sensorInfo" object from MapViewPage
+//   - That object contains the zone's title, badge, icon, and a list of fields
+//     (things like sector ID, risk level, status, and readings)
+//   - SectorPanel just renders whatever is in that object — it does not fetch
+//     any data itself, it only displays what it receives
+//
+// When nothing has been clicked yet, it shows a placeholder message:
+// "Click a sensor badge on the map to view environmental data for that area."
+//
+// Each zone on the map has its own sensorInfo object built inside its layer file.
+// For example BurnScarLayer builds one with fire-related fields,
+// and ContaminantLayer builds one with river-related fields.
+// SectorPanel displays all of them the same way — it is reusable.
 export function SectorPanel({ sensorInfo }: Props) {
   return (
     <div className="rounded-xl border border-gray-200/60 dark:border-gray-700/40 bg-surface p-3.5">

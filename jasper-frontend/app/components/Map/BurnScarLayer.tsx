@@ -1,6 +1,20 @@
-// BurnScarLayer shows the forest burn scar zone on the map.
-// It calls Richard's change-detection ML model to find out the current risk level
-// for the Athabasca watershed sector, then draws a coloured circle on the map.
+// BurnScarLayer.tsx — The Forest Burn Scar Zone on the Map
+//
+// This layer represents the area of Jasper that was damaged by the 2024 wildfire.
+// It draws the large dashed circle you see on the map and colours it based on
+// how severe the current risk level is.
+//
+// How it works:
+//   1. When the component loads, it calls the backend ML model (change detection)
+//      and asks: "What is the current risk level for this sector?"
+//   2. The model responds with High, Medium, or Low
+//   3. BurnScarLayer picks the matching colour — red, amber, or green
+//   4. It draws the circle on the map in that colour
+//   5. If the user clicks the badge, it sends the zone's sensor data up to
+//      MapViewPage so the right panel can display it
+//
+// If the backend is unreachable, it defaults to High risk so the map
+// never appears broken — it always shows something.
 
 "use client";
 

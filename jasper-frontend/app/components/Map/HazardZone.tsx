@@ -24,9 +24,21 @@ interface Props {
   onMarkerClick?: () => void;
 }
 
-// HazardZone draws the dashed circle and the clickable badge on the map.
-// When the badge is clicked it sends the sensor data up to the parent
-// so the right side panel can display it.
+// HazardZone.tsx — The Clickable Badge and Dashed Circle on the Map
+//
+// Every environmental zone you see on the map — the burn scar, the erosion areas,
+// the river contamination — uses this component to draw itself.
+//
+// It does two things:
+//   1. Draws a dashed circle on the map in the zone's colour (red, amber, or green)
+//   2. Places a small badge icon in the centre of that circle
+//
+// When the user clicks the badge, HazardZone takes the sensor data for that
+// zone (passed in by the parent layer) and sends it upward to MapViewPage.
+// MapViewPage then passes it to SectorPanel so the right side panel updates.
+//
+// The circle and badge also hide automatically when the user zooms out too far —
+// this keeps the map clean and uncluttered at low zoom levels.
 export function HazardZone({
   center,
   radius,

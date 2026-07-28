@@ -1,3 +1,18 @@
+// TelemetryStation.tsx — The Live Monitoring Station Marker
+//
+// This is the pulsing radar dot you see on the map. It represents a real
+// physical sensor station in Jasper that monitors environmental conditions.
+//
+// What it does:
+//   - Places a white circle with a radar/sensor icon on the map
+//   - Animates with a pulsing ring around it to show it is live and active
+//   - When clicked, sends the station's info to the right side panel
+//     (station ID, status, location, elevation)
+//
+// Unlike the other layers, this one does not call the ML model —
+// it just shows the fixed station location and its status.
+// The pulsing animation is done with CSS to keep it lightweight.
+
 "use client";
 
 import L from "leaflet";
