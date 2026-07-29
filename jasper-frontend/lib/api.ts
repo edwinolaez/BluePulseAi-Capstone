@@ -1,7 +1,19 @@
-// This file is the main connection point between the frontend and the backend APIs.
-// Feven's backend handles the map layer data, and Richard's ML backend handles
-// the three AI model predictions (burn scar, erosion, and contaminant).
-// All the API URLs are stored in environment variables so they're easy to swap out.
+/**
+ * api.ts — Central API client for Project Jasper's two backend services.
+ *
+ * Feven's backend  (NEXT_PUBLIC_API_BASE_URL)    — environmental layer data and sector timelines
+ * Richard's backend (NEXT_PUBLIC_ML_API_BASE_URL) — three ML model simulations
+ *
+ * All fetch calls use a 10-second timeout via AbortController so a slow or
+ * unreachable backend never hangs the UI indefinitely.
+ *
+ * Authentication: every request includes an "X-API-Key" header sourced from
+ * NEXT_PUBLIC_API_KEY.  Both backends share the same key for now.
+ *
+ * Exported types: LayerData, TimelineScan, TimelineData, ModelOutput
+ * Exported functions: fetchTimeline, fetchLayerData, fetchChangeDetection,
+ *                     fetchErosionSimulation, fetchContaminantSimulation
+ */
 
 // Feven's backend URL — handles data pipeline and environmental layer queries
 const FEVEN_API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
@@ -12,12 +24,23 @@ const API_KEY   = process.env.NEXT_PUBLIC_API_KEY ?? "";
 
 const FETCH_TIMEOUT_MS = 10_000;
 
-// Attaches the API key to every request so the server knows it's coming from us
+/**
+ * apiHeaders — builds the shared request headers object.
+ * Attaches the API key to every request so the server knows it's coming from us.
+ * @returns a HeadersInit object with the X-API-Key set
+ */
 function apiHeaders(): HeadersInit {
   return { "X-API-Key": API_KEY };
 }
 
-// Wraps fetch with an AbortController timeout so hung requests don't freeze the UI
+/**
+ * fetchWithTimeout — wraps the native fetch with an automatic abort after timeoutMs.
+ * Without this, a hung network request would silently freeze the UI forever.
+ * @param url       - the full URL to request
+ * @param options   - standard RequestInit options (method, headers, body, etc.)
+ * @param timeoutMs - milliseconds before the request is aborted (default 10 000)
+ * @returns the same Promise<Response> as a normal fetch call
+ */
 function fetchWithTimeout(
   url: string,
   options: RequestInit = {},

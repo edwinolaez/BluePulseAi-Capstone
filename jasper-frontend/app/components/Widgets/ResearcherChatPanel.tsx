@@ -1,3 +1,19 @@
+/**
+ * ResearcherChatPanel.tsx — Conversational AI interface for running ML simulations.
+ *
+ * Sends the full conversation history to POST /api/chat on each user message.
+ * The server-side route handler runs a Claude agentic loop that can call the
+ * three ML model endpoints as tools and narrates the results.
+ *
+ * UI features:
+ *   - Suggested prompt chips on the empty state so users know what to ask
+ *   - Typing indicator (three bouncing dots) while waiting for a response
+ *   - Inline bold formatting: **text** → <strong>text</strong>
+ *   - Enter to send, Shift+Enter for newlines
+ *   - Auto-scroll to the latest message
+ *
+ * All messages are kept in component state — refreshing the page clears the history.
+ */
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -14,6 +30,7 @@ const SUGGESTED_PROMPTS = [
   "What's the current erosion risk with 120mm rainfall?",
 ];
 
+/** AssistantIcon — small circular AI avatar shown next to every assistant message. */
 function AssistantIcon() {
   return (
     <div className="w-7 h-7 rounded-full bg-sait-sky/15 border border-sait-sky/30 flex items-center justify-center shrink-0">
@@ -24,6 +41,7 @@ function AssistantIcon() {
   );
 }
 
+/** TypingIndicator — three sequentially-bouncing dots shown while waiting for the AI response. */
 function TypingIndicator() {
   return (
     <div className="flex items-start gap-2.5">
@@ -39,6 +57,12 @@ function TypingIndicator() {
   );
 }
 
+/**
+ * MessageBubble — renders one chat message as a styled bubble.
+ * User messages are right-aligned in SAIT sky blue.
+ * Assistant messages are left-aligned with the AI avatar and support
+ * **bold** markdown syntax (converted to <strong> inline).
+ */
 function MessageBubble({ msg }: { msg: ChatMsg }) {
   const isUser = msg.role === "user";
 
@@ -79,11 +103,19 @@ function MessageBubble({ msg }: { msg: ChatMsg }) {
   );
 }
 
+/**
+ * ResearcherChatPanel
+ * Full chat UI that connects to the /api/chat route.  Maintains the
+ * conversation history in state and sends the full history with each request
+ * so Claude has context from previous turns.
+ */
 export function ResearcherChatPanel() {
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  // Reference to the invisible div at the bottom — scrolled to after each message
   const bottomRef = useRef<HTMLDivElement>(null);
+  // Reference to the textarea — refocused after the assistant responds
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {

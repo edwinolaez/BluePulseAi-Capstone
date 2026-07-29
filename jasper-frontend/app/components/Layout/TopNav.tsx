@@ -1,7 +1,19 @@
-// TopNav is the navigation bar that runs across the top of the app.
-// It holds the tab links (Dashboard, Map View, AI Overview, etc.),
-// the notification bell, the dark/light theme toggle, the settings icon,
-// and the user avatar button that opens the profile dropdown.
+/**
+ * TopNav.tsx — Application-wide top navigation bar.
+ *
+ * Renders: the app title, tab links (Dashboard / Map View / AI Overview / …),
+ * notification bell, dark/light theme toggle, settings icon, and a user avatar
+ * button that opens a profile dropdown portal.
+ *
+ * Tab visibility rules:
+ *   - All users see: Dashboard, Map View, AI Overview, Reports, Archives
+ *   - Superadmin only sees: + User Management
+ *
+ * The profile dropdown is rendered via React createPortal directly onto
+ * document.body so it is never clipped by a parent's overflow:hidden.
+ *
+ * Exports: AppTab (union type shared with page.tsx), TopNav (component)
+ */
 
 "use client";
 
@@ -38,16 +50,33 @@ const TABS_BASE: { id: AppTab; label: string }[] = [
 ];
 
 interface Props {
+  /** The tab that is currently active — determines the underline indicator. */
   activeTab: AppTab;
+  /** Called when the user clicks a different tab. */
   onTabChange: (tab: AppTab) => void;
+  /** Opens the LiveGisLogsPanel and clears the unread badge. */
   onOpenLogs: () => void;
+  /** When true a red dot appears on the bell icon to indicate unread alerts. */
   hasUnread: boolean;
+  /** Toggles the mobile sidebar drawer open/closed. */
   onToggleSidebar: () => void;
+  /** Opens the SupportRequestModal. */
   onOpenSupport: () => void;
+  /** The logged-in user — used to show name, role badge, and avatar initial. */
   currentUser: AppUser;
+  /** Logs the user out and clears the session. */
   onLogout: () => void;
 }
 
+/**
+ * TopNav — the fixed header bar at the top of every page.
+ *
+ * Builds the tab list dynamically (adds "User Management" for superadmins),
+ * measures the avatar button position to place the dropdown portal correctly,
+ * and relays all action callbacks up to page.tsx.
+ *
+ * @param props - see Props interface above
+ */
 export function TopNav({
   activeTab, onTabChange, onOpenLogs, hasUnread,
   onToggleSidebar, onOpenSupport, currentUser, onLogout,

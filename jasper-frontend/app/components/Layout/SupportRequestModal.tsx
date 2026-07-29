@@ -1,3 +1,15 @@
+/**
+ * SupportRequestModal.tsx — Technical support request form modal.
+ *
+ * Opens as a centred overlay when the user clicks "Support Request" in the
+ * sidebar or profile dropdown.  Lets field technicians or researchers report
+ * a sensor malfunction or data anomaly by selecting the affected station,
+ * entering a subject line, and describing the problem.
+ *
+ * On submit it shows a brief "Submitted ✓" confirmation then closes.
+ * In the current build the form data is NOT actually sent anywhere — a real
+ * implementation would POST to the support ticketing system backend.
+ */
 "use client";
 
 import { useState } from "react";
@@ -12,10 +24,20 @@ const STATIONS = [
 ];
 
 interface Props {
+  /** Whether the modal is currently visible. */
   open: boolean;
+  /** Called when the user closes the modal (X button or backdrop click). */
   onClose: () => void;
 }
 
+/**
+ * SupportRequestModal
+ * Centered overlay form for reporting sensor or data issues.
+ * Returns null when closed to avoid mounting the form unnecessarily.
+ *
+ * @param open    - controls visibility
+ * @param onClose - dismiss handler
+ */
 export function SupportRequestModal({ open, onClose }: Props) {
   const [station, setStation]         = useState(STATIONS[0]);
   const [subject, setSubject]         = useState("");

@@ -1,12 +1,30 @@
+/**
+ * TemporalSlider.tsx — Time history slider for the Map View page.
+ *
+ * Lets users scrub through time from the 2024 pre-fire baseline (June 1)
+ * to the current recovery period (September 30).  Moving the slider:
+ *   - Updates the date range window shown on the map (±7 days from centre)
+ *   - Tells the interpolation engine which date to blend scan values for
+ *   - Shows a friendly phase label: "Before the Fire", "Immediately After",
+ *     or "Current Recovery"
+ *
+ * The slider value is a 0–100 percentage mapped linearly onto the date range.
+ * The window extends 7 days either side of the centre so the map always shows
+ * a 14-day band of data rather than a single point in time.
+ */
 "use client";
 
 import { useState } from "react";
 import { ClockIcon } from "../Layout/icons";
 
+// Full date range of the monitoring period — slider endpoints
 const PRE_EVENT   = new Date("2024-06-01").getTime();
 const RECOVERY    = new Date("2024-09-30").getTime();
+// The 2024 Jasper Wildfire ignition date — used to mark the phase boundary
 const FIRE_EVENT  = new Date("2024-07-04").getTime();
+// Width of the date window shown on the map (14 days total, 7 either side)
 const WINDOW_MS   = 14 * 24 * 60 * 60 * 1000;
+// Default slider position (44%) puts the initial view in the post-fire period
 const DEFAULT_VALUE = 44;
 
 const FIRE_PCT       = ((FIRE_EVENT  - PRE_EVENT) / (RECOVERY - PRE_EVENT)) * 100;
@@ -36,8 +54,17 @@ function toISODate(ms: number) {
   return new Date(ms).toISOString().split("T")[0];
 }
 
+/**
+ * TemporalSlider
+ * Renders a labelled range input that lets users scrub through the wildfire
+ * monitoring timeline.  Fires onDateRangeChange on every slider move so the
+ * map and interpolation engine stay in sync.
+ *
+ * @param onDateRangeChange - called with (dateFrom, dateTo, centerDate) on each change
+ */
 export function TemporalSlider({ onDateRangeChange }: Props) {
   const [value, setValue] = useState(DEFAULT_VALUE);
+  // Convert the 0–100 slider value to an actual millisecond timestamp
   const center = sliderToCenter(value);
   const phase  = getPhaseLabel(value);
 
@@ -45,6 +72,7 @@ export function TemporalSlider({ onDateRangeChange }: Props) {
     const v = Number(e.target.value);
     setValue(v);
     const c = sliderToCenter(v);
+    // Clamp the window edges so they never go outside the full monitoring range
     onDateRangeChange(
       toISODate(Math.max(c - WINDOW_MS / 2, PRE_EVENT)),
       toISODate(Math.min(c + WINDOW_MS / 2, RECOVERY)),

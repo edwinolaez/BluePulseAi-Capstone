@@ -1,3 +1,17 @@
+/**
+ * badgeIcon.ts — Factory function for the circular badge markers on the 2D map.
+ *
+ * Creates a Leaflet DivIcon that looks like a small circular badge:
+ *   - A coloured border ring matching the layer colour
+ *   - A small SVG icon in the centre (mountain, flame, drop, radar, or map)
+ *   - A tiny status dot in the top-right corner (optionally animated/pulsing)
+ *
+ * This is shared by all three layer components (BurnScarLayer, ContaminantLayer,
+ * ErosionLayer) and HazardZone so the marker style stays consistent.
+ *
+ * Usage:
+ *   const icon = createBadgeIcon({ borderColor: "#6D2077", iconType: "mountain", dotColor: "#ef4444", dotPulse: true });
+ */
 import L from "leaflet";
 
 export type BadgeIconType = "mountain" | "flame" | "drop" | "radar" | "map";
@@ -21,6 +35,21 @@ interface BadgeOptions {
   dotPulse?: boolean;
 }
 
+/**
+ * createBadgeIcon
+ * Builds and returns a Leaflet DivIcon for the given badge configuration.
+ * All styling is inline HTML/CSS so Leaflet can render it without any
+ * external stylesheet dependencies.
+ *
+ * @param borderColor - hex colour for the badge ring and icon stroke
+ * @param iconType    - which SVG path to render inside the badge
+ * @param fillStyle   - "outline" (white bg, coloured stroke) or "filled" (solid bg)
+ * @param badgeBg     - custom background colour override for outline style
+ * @param fillColor   - background colour used in "filled" style
+ * @param iconColor   - icon stroke colour override
+ * @param dotColor    - colour of the small status dot
+ * @param dotPulse    - when true, adds a CSS pulse animation to the dot
+ */
 export function createBadgeIcon({
   borderColor,
   iconType,
@@ -31,7 +60,9 @@ export function createBadgeIcon({
   dotColor,
   dotPulse = false,
 }: BadgeOptions): L.DivIcon {
+  // Choose the background: filled style uses the fill colour; outline uses white (or override)
   const bg = fillStyle === "filled" ? (fillColor ?? borderColor) : (badgeBg ?? "#ffffff");
+  // Filled badges get white icons; outline badges get the border colour
   const stroke = iconColor ?? (fillStyle === "filled" ? "#ffffff" : borderColor);
 
   return L.divIcon({

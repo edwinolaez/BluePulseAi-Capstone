@@ -1,13 +1,42 @@
+/**
+ * ToggleSwitch.tsx — Reusable labelled on/off toggle for map layer controls.
+ *
+ * Renders a row with:
+ *   - A coloured dot or mini map badge icon on the left (matches the layer colour on the map)
+ *   - A text label
+ *   - A pill-style toggle switch on the right
+ *
+ * Used in the Sidebar to let users show/hide the erosion, contaminant,
+ * and burn scar layers independently.  The badge icon variant mirrors the
+ * visual style of the HazardZone markers on the actual map.
+ */
 "use client";
 
 interface Props {
+  /** Text shown next to the toggle, e.g. "Soil Erosion Risk". */
   label: string;
+  /** Hex colour for the dot/icon border and the mini status indicator. */
   dotColor: string;
+  /** Whether the toggle is currently on. */
   checked: boolean;
+  /** Called with the new boolean whenever the toggle is clicked. */
   onChange: (checked: boolean) => void;
-  iconPath?: string;  // SVG path data — when provided renders a mini map badge instead of a plain dot
+  /** SVG path data — when provided renders a mini map badge instead of a plain dot */
+  iconPath?: string;
 }
 
+/**
+ * ToggleSwitch
+ * Accessible toggle button (role="switch") that controls map layer visibility.
+ * When iconPath is supplied, renders a circular badge matching the HazardZone
+ * marker style; otherwise falls back to a simple coloured dot.
+ *
+ * @param label     - display text for this layer
+ * @param dotColor  - colour matching the map layer visual
+ * @param checked   - current on/off state
+ * @param onChange  - state setter called on click
+ * @param iconPath  - optional SVG path for the badge icon
+ */
 export function ToggleSwitch({ label, dotColor, checked, onChange, iconPath }: Props) {
   return (
     <button

@@ -1,15 +1,41 @@
+/**
+ * app/api/chat/route.ts — Next.js API route for the Jasper AI Research Assistant.
+ *
+ * This is the backend half of the ResearcherChatPanel.  The browser sends the
+ * full conversation history to POST /api/chat, and this handler:
+ *   1. Forwards it to the Claude claude-sonnet-4-6 model with a specialist system prompt
+ *   2. Runs an agentic tool-use loop — Claude can call any of the three ML
+ *      model endpoints (erosion, contaminant, change-detection) as "tools"
+ *   3. Returns the final text reply to the browser
+ *
+ * The system prompt is cached with Anthropic's prompt caching feature
+ * (cache_control: ephemeral) to reduce latency and token cost on repeated calls.
+ *
+ * Environment variables required:
+ *   ANTHROPIC_API_KEY            — Claude API key
+ *   NEXT_PUBLIC_ML_API_BASE_URL  — Richard's ML backend base URL
+ *   NEXT_PUBLIC_API_KEY          — API key for the ML backend
+ */
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 
+// Anthropic SDK client — reads the API key from the server-only env variable
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+// Richard's ML backend — where erosion, contaminant, and burn scar models live
 const ML_API = process.env.NEXT_PUBLIC_ML_API_BASE_URL ?? "";
 const ML_KEY = process.env.NEXT_PUBLIC_API_KEY ?? "";
 
+/** Returns auth headers for every request to Richard's ML backend. */
 function mlHeaders() {
   return { "X-API-Key": ML_KEY, "Content-Type": "application/json" };
 }
 
+/**
+ * Tools that Claude is allowed to call during a conversation.
+ * Each tool maps to one of Richard's ML API endpoints.  Claude decides
+ * on its own which tool to invoke and what parameters to pass.
+ */
 const tools: Anthropic.Tool[] = [
   {
     name: "run_erosion_simulation",
@@ -53,10 +79,19 @@ const tools: Anthropic.Tool[] = [
   },
 ];
 
+/**
+ * executeTool — calls the appropriate ML endpoint when Claude requests a tool.
+ * Returns a JSON string that is fed back into the conversation as a tool_result.
+ * A 12-second timeout prevents a hung ML backend from blocking the response.
+ *
+ * @param name  - tool name as declared in the tools array above
+ * @param input - arguments that Claude chose to pass to the tool
+ */
 async function executeTool(name: string, input: Record<string, unknown>): Promise<string> {
   if (!ML_API) {
     return JSON.stringify({ error: "ML_API_URL is not configured. Add NEXT_PUBLIC_ML_API_BASE_URL to your environment variables." });
   }
+  // Abort the fetch if the ML backend takes longer than 12 seconds
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 12_000);
   try {
@@ -122,7 +157,19 @@ Default sectors: ATH-001-A (burn), ATH-001-H (erosion), ATH-001-W (contaminant).
 
 Be concise, scientific, and direct. Never fabricate values — only report what the tool returns.`;
 
+/**
+ * POST /api/chat
+ * Accepts the full message history from the ResearcherChatPanel, runs it
+ * through Claude with the Jasper specialist system prompt, and returns the
+ * assistant's final text reply.
+ *
+ * The handler implements an agentic loop: Claude may request one or more tool
+ * calls before producing a final text response.  Each tool call invokes an ML
+ * model endpoint, and the result is appended to the conversation before the
+ * next Claude call.  The loop exits when stop_reason is no longer "tool_use".
+ */
 export async function POST(req: NextRequest) {
+  // Guard: return a friendly 503 if the API key is missing rather than crashing
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json(
       { reply: "ANTHROPIC_API_KEY is not configured. Add it to .env.local to enable the AI assistant." },
@@ -131,29 +178,36 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    // The browser sends the full conversation array so Claude has context
     const { messages } = (await req.json()) as {
       messages: Array<{ role: "user" | "assistant"; content: string }>;
     };
 
+    // Convert the simple {role, content} objects to the Anthropic SDK format
     const anthropicMessages: Anthropic.MessageParam[] = messages.map((m) => ({
       role: m.role,
       content: m.content,
     }));
 
+    // First call to Claude — uses prompt caching on the system prompt to save tokens
     let response = await client.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 1024,
+      // cache_control: ephemeral tells Anthropic to cache this system prompt for ~5 minutes,
+      // dramatically reducing cost and latency on follow-up messages in the same session
       system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
       tools,
       messages: anthropicMessages,
     });
 
-    // Agentic loop — keep running until no more tool calls
+    // Agentic loop — keep running until Claude has no more tool calls to make
     while (response.stop_reason === "tool_use") {
+      // Collect all tool_use blocks from this response (there may be more than one)
       const toolUses = response.content.filter(
         (b): b is Anthropic.ToolUseBlock => b.type === "tool_use"
       );
 
+      // Execute all requested tools in parallel for speed
       const toolResults: Anthropic.ToolResultBlockParam[] = await Promise.all(
         toolUses.map(async (block) => ({
           type: "tool_result" as const,
@@ -162,9 +216,12 @@ export async function POST(req: NextRequest) {
         }))
       );
 
+      // Append Claude's tool-use turn and then the tool results as a "user" turn
+      // This is the Anthropic multi-turn pattern for agentic tool use
       anthropicMessages.push({ role: "assistant", content: response.content });
       anthropicMessages.push({ role: "user", content: toolResults });
 
+      // Call Claude again with the tool results so it can formulate a final answer
       response = await client.messages.create({
         model: "claude-sonnet-4-6",
         max_tokens: 1024,
@@ -174,6 +231,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Extract the final text block from Claude's response
     const text = response.content.find((b): b is Anthropic.TextBlock => b.type === "text");
     return NextResponse.json({ reply: text?.text ?? "No response generated." });
   } catch (err) {

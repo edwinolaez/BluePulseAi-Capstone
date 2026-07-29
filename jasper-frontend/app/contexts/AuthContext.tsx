@@ -1,3 +1,24 @@
+/**
+ * AuthContext.tsx — Application-wide authentication state for Project Jasper.
+ *
+ * Manages user sessions, login/logout, and user management (add/remove) using
+ * localStorage for persistence.  This is a frontend-only auth system — there
+ * is no server-side session validation.  In production it would be replaced
+ * with Feven's backend authentication service.
+ *
+ * Three user roles exist:
+ *   researcher — read-only access to all monitoring data
+ *   admin      — can manage most settings
+ *   superadmin — can manage all users; requires a two-step login confirmation
+ *
+ * The SEED_USERS array provides demo accounts so the app can be tested
+ * immediately without creating accounts first.  These should be removed before
+ * any real deployment.
+ *
+ * Data storage:
+ *   localStorage key "jasper_users_v3"  — full user list (persists across sessions)
+ *   sessionStorage key "jasper_session" — currently logged-in user (cleared on tab close)
+ */
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
