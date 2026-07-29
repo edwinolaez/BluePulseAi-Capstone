@@ -1,9 +1,19 @@
+/**
+ * PipelineStatusWidget.tsx — Data pipeline health indicator widget.
+ *
+ * Displays the satellite ingest percentage, IoT sync status, and per-sensor
+ * health dots for the three monitoring stations.
+ *
+ * Live / mock modes:
+ *   - Convex configured: LivePipelineData calls useQuery(getPipelineStatus) and
+ *     pushes the ingest percentage up via onData.
+ *   - Convex not configured: a setInterval bounces the percentage between 94–100%
+ *     and briefly shows "Syncing..." so the widget looks active during demos.
+ *
+ * The "IoT Jasper-A1" sensor shows "No link" when Convex is not configured,
+ * reflecting that its live feed depends on the Convex connection.
+ */
 "use client";
-
-// PipelineStatusWidget shows the health of the data pipeline that brings
-// satellite and IoT sensor readings into the Jasper dashboard.
-// It subscribes to Rahil's getPipelineStatus Convex function for live stats.
-// If Convex isn't configured yet, it falls back to animated mock data.
 
 import { useEffect, useState, useContext, useCallback } from "react";
 import { useQuery } from "convex/react";
@@ -11,7 +21,14 @@ import { anyApi } from "convex/server";
 import { SyncIcon } from "../Layout/icons";
 import { ConvexAvailableContext, ConvexErrorBoundary } from "../Providers/ConvexClientProvider";
 
-// Inner component that calls useQuery — only mounted when ConvexProvider is active
+/**
+ * LivePipelineData — inner component that safely calls Convex's useQuery hook.
+ *
+ * Only mounted inside a ConvexErrorBoundary when Convex is configured.
+ * Subscribes to getPipelineStatus and pushes the ingest percentage up via onData.
+ *
+ * @param onData - callback receiving the current satellite ingest percentage (0–100)
+ */
 function LivePipelineData({
   onData,
 }: {
@@ -30,6 +47,13 @@ function LivePipelineData({
   return null;
 }
 
+/**
+ * PipelineStatusWidget — sidebar widget showing data pipeline and sensor health.
+ *
+ * Conditionally mounts LivePipelineData when Convex is available.  Renders a
+ * progress bar for satellite ingest, an IoT sync row with a spinning icon, and
+ * a per-sensor health summary with colour-coded status dots.
+ */
 export function PipelineStatusWidget() {
   const isConvexReady = useContext(ConvexAvailableContext);
 

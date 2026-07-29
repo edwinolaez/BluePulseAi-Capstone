@@ -1,7 +1,17 @@
-// Archives Page — stores historical GIS survey records of the Jasper watershed.
-// Users can search by name or ID, and click "View Snapshot" to expand a record.
-// The snapshot preview currently shows a placeholder message — it would display
-// the actual map data once connected to the archive storage backend.
+/**
+ * ArchivesPage.tsx — Historical GIS survey archive browser.
+ *
+ * Shows a searchable list of past watershed survey snapshots (full surveys,
+ * incremental updates, and satellite passes).  Users can filter by name or
+ * archive ID and expand any record to see its metadata.
+ *
+ * The "View Snapshot" expanded panel currently shows a placeholder message
+ * because archived GIS layers are not yet connected to the storage backend.
+ * In production it would render the full map layer for that snapshot date.
+ *
+ * Data source: the SNAPSHOTS constant (static demo data).
+ * In production these would be fetched from Feven's archive storage service.
+ */
 
 "use client";
 
@@ -33,6 +43,13 @@ const TYPE_BADGE: Record<Snapshot["type"], string> = {
   "Satellite Pass": "bg-sait-sky/10 text-sait-sky",
 };
 
+/**
+ * ArchivesPage — full-page archive browser component.
+ *
+ * Renders a search bar, a filtered list of Snapshot cards, and an expandable
+ * detail panel for each record.  Only one record can be expanded at a time —
+ * clicking "View Snapshot" on an already-open record collapses it.
+ */
 export function ArchivesPage() {
   // Text typed into the search box
   const [query, setQuery] = useState("");

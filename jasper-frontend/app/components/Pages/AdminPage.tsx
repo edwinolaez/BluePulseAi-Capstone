@@ -1,3 +1,18 @@
+/**
+ * AdminPage.tsx — User Management page (superadmin only).
+ *
+ * Only accessible to users with role === "superadmin".  Provides two panels:
+ *
+ * 1. All Accounts — a table listing every registered user with their role
+ *    badge and a "Remove" button.  A user cannot remove their own account.
+ *    The last remaining superadmin cannot be removed either.
+ *
+ * 2. Add New Account — a form to create a new user with name, email,
+ *    password, and role assignment.  Duplicate email addresses are rejected.
+ *
+ * All data is managed in-memory by AuthContext (backed by localStorage) — there
+ * is no server call.  In production this would POST to a backend auth service.
+ */
 "use client";
 
 import { useState } from "react";
@@ -16,6 +31,11 @@ const ROLE_BADGE: Record<UserRole, string> = {
   superadmin: "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300",
 };
 
+/**
+ * AdminPage
+ * User management UI — exclusively for superadmin accounts.
+ * Shows a live table of all users and a form to add new ones.
+ */
 export function AdminPage() {
   const { users, currentUser, addUser, removeUser } = useAuth();
   const [newName, setNewName]         = useState("");

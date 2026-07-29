@@ -1,3 +1,19 @@
+/**
+ * JasperMap.tsx — 2D Leaflet map container for the Jasper watershed.
+ *
+ * Renders a full-size MapContainer centred on the Athabasca watershed with
+ * OpenStreetMap base tiles.  Conditionally mounts the three environmental
+ * layer components (ErosionLayer, ContaminantLayer, BurnScarLayer) based on
+ * the toggle props passed from MapViewPage / Sidebar.
+ *
+ * Three internal helper components are defined here:
+ *   SectorClickHandler — converts map clicks to sector IDs
+ *   MapController      — exposes zoomIn/zoomOut callbacks to the parent
+ *   FlyToController    — animates the map to a target when flyTo changes
+ *
+ * This component is loaded dynamically with ssr:false in MapViewPage because
+ * Leaflet requires browser APIs (window, DOM) that don't exist server-side.
+ */
 "use client";
 
 import { useEffect } from "react";
@@ -29,9 +45,15 @@ interface Props {
   flyTo?:          FlyToTarget | null;
 }
 
+/**
+ * SectorClickHandler — invisible component that converts Leaflet map clicks
+ * into a deterministic sector ID string by snapping the lat/lng to a 0.05°
+ * grid cell.  This gives each area of the map a stable ID for the SectorPanel.
+ */
 function SectorClickHandler({ onClick }: { onClick: (id: string) => void }) {
   useMapEvents({
     click(e) {
+      // Snap to a ~5 km grid so nearby clicks resolve to the same sector
       const lat = Math.floor(e.latlng.lat / 0.05);
       const lng = Math.floor(e.latlng.lng / 0.05);
       onClick(`sector_${lat}_${lng}`);
@@ -40,6 +62,11 @@ function SectorClickHandler({ onClick }: { onClick: (id: string) => void }) {
   return null;
 }
 
+/**
+ * MapController — exposes the Leaflet map's zoomIn/zoomOut methods to the
+ * parent via a callback.  This is the correct pattern for accessing the Leaflet
+ * map instance from outside a react-leaflet component tree.
+ */
 function MapController({ onMapInit }: { onMapInit: (zi: () => void, zo: () => void) => void }) {
   const map = useMap();
   useEffect(() => {
@@ -48,15 +75,25 @@ function MapController({ onMapInit }: { onMapInit: (zi: () => void, zo: () => vo
   return null;
 }
 
+/**
+ * FlyToController — animates the map to a new position whenever target changes.
+ * Uses a nonce (timestamp) instead of comparing lat/lng so that clicking the
+ * same sector twice still triggers the animation.
+ */
 function FlyToController({ target }: { target: FlyToTarget }) {
   const map = useMap();
   useEffect(() => {
     map.flyTo([target.lat, target.lng], target.zoom, { duration: 1.2 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target.nonce]);
+  }, [target.nonce]); // intentionally only react to nonce, not lat/lng/zoom
   return null;
 }
 
+/**
+ * JasperMap (default export)
+ * 2D Leaflet map centred on the Athabasca watershed.  Layer components are
+ * mounted conditionally so they only request API data when their toggle is on.
+ */
 export default function JasperMap({
   onSectorClick,
   showBurnScar    = false,

@@ -1,3 +1,22 @@
+/**
+ * AiOverviewPage.tsx — AI Model Overview page showing live ML predictions.
+ *
+ * Calls all three of Richard's ML models in parallel on mount and displays
+ * each result as a card with:
+ *   - Risk level badge and confidence score
+ *   - Risk score bar
+ *   - Collapsible "observed sensor inputs" section showing what data fed the model
+ *   - Data provenance footer (source, last refresh, quality flag)
+ *
+ * Falls back to hardcoded mock values when the ML backend is unreachable,
+ * so the page always shows something rather than going blank.
+ *
+ * Below the three cards is a summary table with all three results side by side,
+ * and below that the ResearcherChatPanel for interactive AI simulations.
+ *
+ * Displays a prominent AI disclaimer banner reminding users that all outputs
+ * require expert validation before use in official reporting.
+ */
 "use client";
 
 import { useEffect, useState } from "react";
@@ -78,6 +97,12 @@ const RISK_BADGE: Record<string, string> = {
   Low:    "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400",
 };
 
+/**
+ * ScoreBar — horizontal progress bar showing a risk score as a percentage.
+ * Colour changes from green → amber → red as risk increases past 40% and 70%.
+ *
+ * @param value - normalised risk score (0.0 – 1.0)
+ */
 function ScoreBar({ value }: { value: number }) {
   const pct = Math.round(value * 100);
   const color = pct >= 70 ? "bg-red-500" : pct >= 40 ? "bg-amber-500" : "bg-green-500";
@@ -94,11 +119,18 @@ function ScoreBar({ value }: { value: number }) {
   );
 }
 
+/**
+ * AiOverviewPage
+ * Displays live ML model outputs for burn scar, erosion, and contaminant
+ * detection.  All three API calls fire in parallel; the page shows estimated
+ * fallback values until they resolve.
+ */
 export function AiOverviewPage() {
   const [results, setResults] = useState<Record<string, ModelOutput | null>>({
     burn: null, erosion: null, contaminant: null,
   });
   const [loading, setLoading] = useState(true);
+  // Tracks which model card has its "sensor inputs" section expanded
   const [expandedInputs, setExpandedInputs] = useState<Record<string, boolean>>({});
 
   useEffect(() => {

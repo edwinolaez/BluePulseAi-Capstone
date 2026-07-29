@@ -1,3 +1,16 @@
+/**
+ * TelemetryStation.tsx — Primary live sensor marker shown on the 2D map.
+ *
+ * Renders the animated radar-ping icon at the main Jasper Sector B-4
+ * monitoring station.  The popup opens automatically on first load so
+ * reviewers and presenters immediately see what the marker represents.
+ *
+ * The "permanent" tooltip label stays visible at all zoom levels so the
+ * station is always identifiable without having to click it.
+ *
+ * Note: the data values shown in the popup (pH, coordinates) are static
+ * demo values — a real build would pull them from Feven's backend.
+ */
 "use client";
 
 import { useEffect, useRef } from "react";
@@ -7,6 +20,7 @@ import { StationPopupCard } from "./StationPopupCard";
 
 const STATION_CENTER: [number, number] = [52.875, -118.08];
 
+// Custom Leaflet icon — animated radar ping ring around a white circle with a crosshair SVG
 const radarPinIcon = L.divIcon({
   className: "",
   html: `
@@ -24,9 +38,15 @@ const radarPinIcon = L.divIcon({
   iconAnchor: [18, 18],
 });
 
+/**
+ * TelemetryStation
+ * Places the primary live sensor marker on the 2D Leaflet map and
+ * auto-opens its popup on first render so it's immediately visible.
+ */
 export function TelemetryStation() {
   const markerRef = useRef<L.Marker>(null);
 
+  // Auto-open the popup on mount so presenters see the station info right away
   useEffect(() => {
     markerRef.current?.openPopup();
   }, []);

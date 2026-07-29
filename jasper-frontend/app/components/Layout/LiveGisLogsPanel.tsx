@@ -1,3 +1,19 @@
+/**
+ * LiveGisLogsPanel.tsx — Sliding panel that shows simulated live system activity.
+ *
+ * Opens from the right edge of the screen when the user clicks the notification
+ * bell or "Diagnostic Logs" in the sidebar.  New log entries are generated
+ * every 2.5 seconds from a pool of realistic GIS / IoT messages to simulate
+ * a live data pipeline feed.
+ *
+ * Controls:
+ *   Pause / Resume — stops or restarts the automatic log generation timer
+ *   Clear          — empties the log list
+ *   Export         — downloads all current logs as a plain-text .txt file
+ *
+ * Note: all messages are randomly generated from MESSAGE_POOL — they are for
+ * demonstration purposes and do not reflect actual backend events.
+ */
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -38,17 +54,32 @@ function randomEntry(id: number): LogEntry {
 }
 
 interface Props {
+  /** Controls whether the panel is visible. */
   open: boolean;
+  /** Called when the user clicks the X button or dismisses the panel. */
   onClose: () => void;
 }
 
+/**
+ * LiveGisLogsPanel
+ * Full-height sliding panel that simulates a live GIS activity feed.
+ * Returns null when closed to avoid running the timer in the background.
+ *
+ * @param open    - whether the panel is currently visible
+ * @param onClose - callback to hide the panel
+ */
 export function LiveGisLogsPanel({ open, onClose }: Props) {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [paused, setPaused] = useState(false);
+  // Shows "Saved ✓" briefly after a successful export
   const [exported, setExported] = useState(false);
+  // Auto-incrementing ID for each log entry so React keys are stable
   const nextId = useRef(1);
+  // Reference to the scrollable log list — used to auto-scroll to the bottom
   const listRef = useRef<HTMLDivElement>(null);
 
+  // Add a new log entry every 2.5s when the panel is open and not paused.
+  // Caps the list at 100 entries to avoid unbounded memory growth.
   useEffect(() => {
     if (!open || paused) return;
     const interval = setInterval(() => {
@@ -60,12 +91,14 @@ export function LiveGisLogsPanel({ open, onClose }: Props) {
     return () => clearInterval(interval);
   }, [open, paused]);
 
+  // Seed the list with 6 entries the first time the panel opens so it isn't empty
   useEffect(() => {
     if (logs.length === 0 && open) {
       setLogs(Array.from({ length: 6 }, () => randomEntry(nextId.current++)));
     }
   }, [open, logs.length]);
 
+  // Auto-scroll to the newest entry whenever the log list changes
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
   }, [logs]);

@@ -1,9 +1,19 @@
+/**
+ * ModelPerformanceWidget.tsx — ML model accuracy display widget.
+ *
+ * Shows the F1 score and training loss of the currently deployed ML model.
+ * Subscribes to Rahil's getModelMetadata Convex function for live values.
+ *
+ * Live / mock modes:
+ *   - Convex configured: LiveModelData sub-component calls useQuery and pushes
+ *     real values up via the onData callback.
+ *   - Convex not configured: a setInterval gently varies the F1 score and loss
+ *     every 6 seconds so the widget still looks active during demos.
+ *
+ * A "last updated" counter ticks up every second.  It resets to 0 whenever
+ * new data arrives (either from Convex or the mock animation).
+ */
 "use client";
-
-// ModelPerformanceWidget shows how accurate the ML model predictions are.
-// It polls Rahil's getModelMetadata Convex function to get the latest
-// F1 score and training loss from whichever model is currently deployed.
-// Falls back to animated mock data when Convex isn't configured yet.
 
 import { useEffect, useState, useContext, useCallback } from "react";
 import { useQuery } from "convex/react";
@@ -15,7 +25,15 @@ function clamp(v: number, min: number, max: number) {
   return Math.max(min, Math.min(max, v));
 }
 
-// Inner component that calls useQuery — only mounted when ConvexProvider is active
+/**
+ * LiveModelData — inner component that safely calls Convex's useQuery hook.
+ *
+ * Only mounted inside a ConvexErrorBoundary when ConvexProvider is active,
+ * so useQuery is never called outside its required provider context.
+ * Pushes new F1 score and training loss values up to the parent via onData.
+ *
+ * @param onData - callback receiving (f1Score, trainingLoss) when Convex data updates
+ */
 function LiveModelData({
   onData,
 }: {
@@ -35,6 +53,13 @@ function LiveModelData({
   return null;
 }
 
+/**
+ * ModelPerformanceWidget — sidebar widget displaying ML model accuracy metrics.
+ *
+ * Conditionally mounts LiveModelData when Convex is available, otherwise runs
+ * the mock animation.  Renders the F1 score, training loss, and a "last updated"
+ * counter that increments every second.
+ */
 export function ModelPerformanceWidget() {
   const isConvexReady = useContext(ConvexAvailableContext);
 
