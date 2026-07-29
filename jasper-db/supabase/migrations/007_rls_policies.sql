@@ -1,5 +1,6 @@
 -- Project Jasper - Sprint 2 RLS Policies
 -- Owner: Rahil Khan
+-- This file implements row level security policies that control what users can access.
 
 SET search_path = public, extensions;
 
@@ -59,10 +60,12 @@ CREATE POLICY viewer_select_environmental_layers
 ON environmental_layers
 FOR SELECT
 TO authenticated
+/** USING controls access to existing rows. */
 USING (
   EXISTS (
     SELECT 1 FROM profiles
-    WHERE profiles.email = auth.jwt() ->> 'email'
+    /** Returns the authenticated user's JWT. */
+    WHERE profiles.email = auth.jwt() ->> 'email' -- Extracts the user's email from the JWT.
     AND profiles.role = 'viewer'
   )
 );
@@ -71,6 +74,7 @@ CREATE POLICY ingest_insert_environmental_layers
 ON environmental_layers
 FOR INSERT
 TO authenticated
+/** WITH CHECK validates inserts and updates. */
 WITH CHECK (
   EXISTS (
     SELECT 1 FROM profiles
@@ -83,6 +87,7 @@ CREATE POLICY ingest_insert_water_quality_archive
 ON water_quality_archive
 FOR INSERT
 TO authenticated
+/** WITH CHECK validates inserts and updates. */
 WITH CHECK (
   EXISTS (
     SELECT 1 FROM profiles

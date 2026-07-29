@@ -1,22 +1,29 @@
+/** This migration creates the sectors and ingest_records tables used by the ingestion pipeline.*/
+
+/** Stores geographic regions and polygons for each sector. */
 CREATE TABLE IF NOT EXISTS sectors (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   sector_id TEXT NOT NULL UNIQUE,
   name TEXT,
   region TEXT,
+  /** Stores GPS coordinates and polygons */
   geometry geometry(Polygon, 4326),
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+/** Stores environmental data, timestamps, coordinates, payload. */
 CREATE TABLE IF NOT EXISTS ingest_records (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   sector_id TEXT NOT NULL,
   layer_type TEXT,
   coordinates geometry(Point, 4326),
+  /** JSONB allows flexible environmental data to be stored. */
   payload JSONB DEFAULT '{}'::jsonb,
   user_id TEXT,
   timestamp TIMESTAMPTZ DEFAULT NOW()
 );
 
+/** Stores geographic information for each sector */
 ALTER TABLE sectors ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ingest_records ENABLE ROW LEVEL SECURITY;
 

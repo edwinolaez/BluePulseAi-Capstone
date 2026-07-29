@@ -3,6 +3,8 @@
 -- Required for test_rbac.py::TestAnalystRole::test_analyst_can_write_water_quality to pass.
 -- Analysts record contamination measurements in the field — they need INSERT on this table.
 
+--This migration adds an RLS policy for water_quality_archive. It allows only authenticated analysts and admins to insert records.
+
 DROP POLICY IF EXISTS analyst_insert_water_quality_archive ON water_quality_archive;
 
 CREATE POLICY analyst_insert_water_quality_archive

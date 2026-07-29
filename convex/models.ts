@@ -1,3 +1,5 @@
+/** This file manages metadata about the machine learning model. */
+
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 
@@ -47,7 +49,9 @@ export const updateModelMetadata = mutation({
 
     let id;
 
+    /** we check if a record exists because so when we update the existing metadata it doesn't create duplicate records. */
     if (existing) {
+      /** We use patch because it updates only the fields that changed. */
       await ctx.db.patch(existing._id, data);
       id = existing._id;
     } else {

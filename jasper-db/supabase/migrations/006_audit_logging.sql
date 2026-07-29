@@ -1,4 +1,5 @@
 -- Project Jasper - Sprint 3 Audit Columns
+-- This migration adds audit logging so database operations can be tracked.
 
 ALTER TABLE environmental_layers
 ADD COLUMN IF NOT EXISTS user_id TEXT,
