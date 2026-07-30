@@ -52,11 +52,12 @@ interface Props {
   showErosion:        boolean;
   showContaminant:    boolean;
   showBurnScar:       boolean;
+  showElevation:      boolean;
   simulationResults?: SimulationResults | null;
   photos?:            FieldPhoto[];
 }
 
-export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBurnScar, simulationResults, photos }: Props) {
+export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBurnScar, showElevation, simulationResults, photos }: Props) {
   const [sectorId, setSectorId]               = useState<string | null>(null);
   const [dateFrom, setDateFrom]               = useState("2024-06-01");
   const [dateTo, setDateTo]                   = useState("2024-07-24");
@@ -107,6 +108,7 @@ export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBur
               showErosion={showErosion}
               showContaminant={showContaminant}
               showBurnScar={showBurnScar}
+              showElevation={showElevation}
               simulationResults={simulationResults ?? null}
             />
           ) : (
@@ -118,6 +120,7 @@ export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBur
               showBurnScar={showBurnScar}
               showErosion={showErosion}
               showContaminant={showContaminant}
+              showElevation={showElevation}
               onMapInit={handleMapInit}
               flyTo={flyTo}
             />

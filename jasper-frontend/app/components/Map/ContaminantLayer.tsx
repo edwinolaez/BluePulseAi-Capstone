@@ -20,7 +20,6 @@ import { useEffect, useState } from "react";
 import L from "leaflet";
 import { CircleMarker, Marker, Polyline, Tooltip, useMap } from "react-leaflet";
 import { fetchContaminantSimulation, ModelOutput } from "../../../lib/api";
-import { HazardZone } from "./HazardZone";
 
 // GPS coordinates that trace the main river channel through the monitored area
 const RIVER_MAIN: [number, number][] = [
@@ -142,31 +141,6 @@ export function ContaminantLayer() {
         </Tooltip>
       </CircleMarker>
 
-      {/* Hazard zone circle at the most critical contamination point */}
-      <HazardZone
-        center={CRITICAL_CENTER}
-        radius={1500}
-        borderColor="#00A3E0"
-        fillColor="#55CAF0"
-        fillOpacity={0.12}
-        label="River Flow Warning"
-        badgeIcon="map"
-        badgeBorderColor="#00A3E0"
-        dotColor={risk === "High" ? "#ef4444" : risk === "Low" ? "#22c55e" : "#f59e0b"}
-        popupIcon="💧"
-        popupTitle="River Water Quality"
-        status="WARNING"
-        name="Athabasca River — SEC-W2"
-        fields={[
-          { label: "Station ID",        value: "SEC-W2" },
-          { label: "Risk Level",        value: risk,                              valueColor: risk === "High" ? "text-red-600" : risk === "Low" ? "text-green-600" : "text-amber-600" },
-          { label: "Plume Direction",   value: `${directionDeg.toFixed(0)}°`,    valueColor: "text-amber-600" },
-          // Velocity is normalized 0–1 from the model, multiply by 5 to get m/s estimate
-          { label: "Flow Velocity",     value: `${(velocity * 5).toFixed(1)} m/s` },
-          { label: "Water Cloudiness",  value: "18.4 NTU (High)",                valueColor: "text-red-600" },
-          { label: "Connection Status", value: "Active Sync",                    valueColor: "text-green-600" },
-        ]}
-      />
     </>
   );
 }

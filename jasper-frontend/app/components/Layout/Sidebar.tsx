@@ -84,6 +84,8 @@ interface Props {
   onToggleContaminant: (v: boolean) => void;
   showBurnScar: boolean;
   onToggleBurnScar: (v: boolean) => void;
+  showElevation: boolean;
+  onToggleElevation: (v: boolean) => void;
 }
 
 /**
@@ -92,7 +94,7 @@ interface Props {
  * live here so the map canvas stays uncluttered.  Collapses to a narrow strip
  * on desktop; becomes a full-screen drawer on mobile.
  */
-export function Sidebar({ activeTab, onNavigate, onFocusSector, onOpenLogs, onOpenSupport, mobileOpen, onCloseMobile, is3D, onToggle3D, showErosion, onToggleErosion, showContaminant, onToggleContaminant, showBurnScar, onToggleBurnScar }: Props) {
+export function Sidebar({ activeTab, onNavigate, onFocusSector, onOpenLogs, onOpenSupport, mobileOpen, onCloseMobile, is3D, onToggle3D, showErosion, onToggleErosion, showContaminant, onToggleContaminant, showBurnScar, onToggleBurnScar, showElevation, onToggleElevation }: Props) {
   const [expandedPanel, setExpandedPanel] = useState<ExpandedPanel>(null);
   const [collapsed, setCollapsed] = useState(false);
 
@@ -231,6 +233,13 @@ export function Sidebar({ activeTab, onNavigate, onFocusSector, onOpenLogs, onOp
           {/* Layer toggles */}
           <div className="px-1 space-y-2">
             <ToggleSwitch
+              label="Elevation Flood Risk"
+              dotColor="#3b82f6"
+              iconPath="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+              checked={showElevation}
+              onChange={onToggleElevation}
+            />
+            <ToggleSwitch
               label="Soil Erosion Risk"
               dotColor="#6D2077"
               iconPath="m8 3 4 8 5-5 5 15H2L8 3z"
@@ -257,10 +266,31 @@ export function Sidebar({ activeTab, onNavigate, onFocusSector, onOpenLogs, onOp
 
       {expandedPanel === "legend" && (
         <div className="mt-2 mx-1 p-3 rounded-lg bg-surface-alt space-y-2">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2">
-            Sensors &amp; Risk
+          {/* Elevation Flood Risk — 5-class ArcGIS-style zones */}
+          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-1">
+            Elevation Flood Risk
           </p>
-          {/* Each row: sensor colour circle + name + High/Med/Low risk squares */}
+          {[
+            { color: "#9ca3af", label: "1 — Minimal",  sub: "High ridges · stable bedrock" },
+            { color: "#f59e0b", label: "2 — Low",       sub: "Upper slopes · stable terrain" },
+            { color: "#22c55e", label: "3 — Moderate",  sub: "Transitional · partial burn" },
+            { color: "#3b82f6", label: "4 — High",      sub: "River corridor · flood-prone" },
+            { color: "#ef4444", label: "5 — Extreme",   sub: "Active burn scar · erosion" },
+          ].map(({ color, label, sub }) => (
+            <div key={label} className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-sm shrink-0" style={{ background: color }} />
+              <div className="flex flex-col leading-none">
+                <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-200">{label}</span>
+                <span className="text-[9px] text-gray-400">{sub}</span>
+              </div>
+            </div>
+          ))}
+
+          <div className="pt-2 border-t border-gray-200/60 dark:border-gray-700/40" />
+
+          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2">
+            Sensors
+          </p>
           {LAYER_LEGEND.map(({ color, label }) => (
             <div key={label} className="flex items-center gap-2">
               <span
@@ -268,16 +298,6 @@ export function Sidebar({ activeTab, onNavigate, onFocusSector, onOpenLogs, onOp
                 style={{ background: color }}
               />
               <span className="text-xs text-gray-600 dark:text-gray-300 flex-1 leading-none">{label}</span>
-              <div className="flex items-center gap-1">
-                {RISK_COLORS.map(({ color: rc, label: rl }) => (
-                  <span
-                    key={rl}
-                    title={rl === "High" ? "High Risk" : rl === "Med" ? "Medium Risk" : "Low Risk"}
-                    className="w-2 h-2 rounded-sm shrink-0"
-                    style={{ background: rc }}
-                  />
-                ))}
-              </div>
             </div>
           ))}
           <div className="pt-2 border-t border-gray-200/60 dark:border-gray-700/40 space-y-0.5">

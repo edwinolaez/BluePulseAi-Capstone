@@ -62,6 +62,7 @@ export default function Home() {
   const [showErosion, setShowErosion]         = useState(true);
   const [showContaminant, setShowContaminant] = useState(true);
   const [showBurnScar, setShowBurnScar]       = useState(true);
+  const [showElevation, setShowElevation]     = useState(true);
   const [simulationResults, setSimulationResults] = useState<SimulationResults | null>(null);
   const [fieldPhotos, setFieldPhotos]             = useState<FieldPhoto[]>([]);
 
@@ -154,10 +155,12 @@ export default function Home() {
           onToggleContaminant={setShowContaminant}
           showBurnScar={showBurnScar}
           onToggleBurnScar={setShowBurnScar}
+          showElevation={showElevation}
+          onToggleElevation={setShowElevation}
         />}
 
         {/* Only one of these pages renders at a time depending on the active tab */}
-        {activeTab === "map"       && <MapViewPage flyTo={flyTo} is3D={is3D} showErosion={showErosion} showContaminant={showContaminant} showBurnScar={showBurnScar} simulationResults={simulationResults} photos={fieldPhotos} />}
+        {activeTab === "map"       && <MapViewPage flyTo={flyTo} is3D={is3D} showErosion={showErosion} showContaminant={showContaminant} showBurnScar={showBurnScar} showElevation={showElevation} simulationResults={simulationResults} photos={fieldPhotos} />}
         {activeTab === "dashboard" && <DashboardPage photos={fieldPhotos} onPhotosChange={setFieldPhotos} simulationResults={simulationResults} />}
         {activeTab === "ai"        && <AiOverviewPage onResultsUpdate={setSimulationResults} onNavigateToMap={() => handleTabChange("map")} />}
         {activeTab === "reports"   && <ReportsPage />}

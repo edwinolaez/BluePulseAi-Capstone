@@ -35,15 +35,16 @@ export interface FlyToTarget {
 }
 
 interface Props {
-  onSectorClick?:  (sectorId: string) => void;
-  activeSectorId?: string | null;
-  dateFrom?:       string;
-  dateTo?:         string;
-  showBurnScar?:   boolean;
-  showErosion?:    boolean;
+  onSectorClick?:   (sectorId: string) => void;
+  activeSectorId?:  string | null;
+  dateFrom?:        string;
+  dateTo?:          string;
+  showBurnScar?:    boolean;
+  showErosion?:     boolean;
   showContaminant?: boolean;
-  onMapInit?:      (zoomIn: () => void, zoomOut: () => void) => void;
-  flyTo?:          FlyToTarget | null;
+  showElevation?:   boolean;
+  onMapInit?:       (zoomIn: () => void, zoomOut: () => void) => void;
+  flyTo?:           FlyToTarget | null;
 }
 
 /**
@@ -100,6 +101,7 @@ export default function JasperMap({
   showBurnScar    = false,
   showErosion     = false,
   showContaminant = false,
+  showElevation   = true,
   onMapInit,
   flyTo,
 }: Props) {
@@ -121,8 +123,8 @@ export default function JasperMap({
       {onMapInit     && <MapController onMapInit={onMapInit} />}
       {flyTo         && <FlyToController target={flyTo} />}
 
-      {/* Elevation risk classification — base layer, always visible */}
-      <ElevationRiskLayer />
+      {/* Elevation flood risk zones — toggleable via Sidebar */}
+      {showElevation && <ElevationRiskLayer />}
 
       {/* Sensor-specific layers render on top of the risk surface */}
       {showErosion     && <ErosionLayer />}
