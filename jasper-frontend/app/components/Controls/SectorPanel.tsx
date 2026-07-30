@@ -1,3 +1,22 @@
+/**
+ * SectorPanel.tsx — Environmental data card shown in the Map View sidebar.
+ *
+ * When the user clicks a location on the map, the clicked sector ID is passed
+ * down through MapViewPage.  This panel then fetches the latest environmental
+ * data for that sector and displays it as a compact card with:
+ *   - Forest regrowth percentage bar (live or interpolated from the timeline)
+ *   - Soil erosion risk badge (High / Medium / Low)
+ *   - Ground stability label
+ *   - Hydrocarbon trace detection flag
+ *
+ * Data priority:
+ *   1. interpolated — values blended from the timeline slider (most up-to-date)
+ *   2. API response  — fetched from Feven's backend on sector selection
+ *   3. getMockData() — deterministic fallback when the API is offline
+ *
+ * The "Estimated" badge appears whenever the values come from timeline
+ * interpolation rather than a real measured scan.
+ */
 "use client";
 
 import { useState, useEffect } from "react";
@@ -33,12 +52,30 @@ function getMockData(sectorId: string): SectorData {
 }
 
 interface Props {
+  /** The sector ID the user clicked on the map, or null when nothing is selected. */
   sectorId:     string | null;
+  /** Start of the current date window (ISO date string from the TemporalSlider). */
   dateFrom:     string;
+  /** End of the current date window (ISO date string from the TemporalSlider). */
   dateTo:       string;
+  /**
+   * Blended values from the timeline interpolation engine, or null when
+   * no scan data is available for the selected sector.
+   */
   interpolated: InterpolatedState | null;
 }
 
+/**
+ * SectorPanel
+ * Renders a compact environmental data card for the currently selected map sector.
+ * Shows a "Live" badge when the API responded, "Estimated" when values are
+ * interpolated from the timeline slider, and nothing when no sector is selected.
+ *
+ * @param sectorId    - clicked sector ID (e.g. "sector_52_-118")
+ * @param dateFrom    - date range start from the TemporalSlider
+ * @param dateTo      - date range end from the TemporalSlider
+ * @param interpolated - blended timeline values, or null
+ */
 export function SectorPanel({ sectorId, dateFrom, dateTo, interpolated }: Props) {
   const [data, setData]       = useState<SectorData | null>(null);
   const [loading, setLoading] = useState(false);

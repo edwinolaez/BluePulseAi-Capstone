@@ -273,6 +273,7 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ML_API_URL: ${{ secrets.ML_API_URL }}
         run: |
           nohup uvicorn main:app --host 0.0.0.0 --port 8000 > /tmp/backend.log 2>&1 &
           echo "Waiting for local backend to be ready..."
@@ -306,10 +307,8 @@ jobs:
           # JWT tokens for RBAC tests — Rahil generates these from Supabase dashboard
           TEST_ANALYST_JWT: ${{ secrets.TEST_ANALYST_JWT }}
           TEST_INGEST_JWT: ${{ secrets.TEST_INGEST_JWT }}
-          # ML_API_KEY falls back to NEXT_PUBLIC_API_KEY during the migration
-          # period when ML_API_KEY has not yet been added as a repository secret.
-          # See: commit 9d2185f (fix: fall back to NEXT_PUBLIC_API_KEY while migrating)
-          ML_API_KEY: ${{ secrets.ML_API_KEY || secrets.NEXT_PUBLIC_API_KEY }}
+          NEXT_PUBLIC_API_KEY: ${{ secrets.NEXT_PUBLIC_API_KEY }}
+          ML_API_KEY: ${{ secrets.ML_API_KEY }}
           NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
           ML_API_URL: ${{ secrets.ML_API_URL }}
 
@@ -348,7 +347,7 @@ jobs:
         continue-on-error: true
         env:
           NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
-          ML_API_KEY: ${{ secrets.ML_API_KEY || secrets.NEXT_PUBLIC_API_KEY }}
+          ML_API_KEY: ${{ secrets.ML_API_KEY }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -412,7 +411,7 @@ jobs:
         env:
           RAILWAY_API_URL: ${{ secrets.RAILWAY_API_URL }}
           ML_API_URL: ${{ secrets.ML_API_URL }}
-          ML_API_KEY: ${{ secrets.ML_API_KEY || secrets.NEXT_PUBLIC_API_KEY }}
+          ML_API_KEY: ${{ secrets.ML_API_KEY }}
         run: |
           pip install -r requirements.txt pytest-benchmark
           if [ -f benchmark_api.py ]; then

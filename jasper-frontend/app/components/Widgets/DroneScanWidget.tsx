@@ -1,3 +1,21 @@
+/**
+ * DroneScanWidget.tsx — CIRUS drone scan upload and management widget.
+ *
+ * Displayed on the Dashboard page.  Has two modes:
+ *
+ * Live mode (Convex configured):
+ *   - Upload zone for drag-and-drop or file picker (JPEG, PNG, GeoTIFF up to 500 MB)
+ *   - Two-step Convex upload: generates a pre-signed URL, uploads direct to storage,
+ *     then calls saveScan to record metadata
+ *   - Real-time list of uploaded scans from the droneScans Convex table
+ *   - Delete button that removes both the database row and the storage file
+ *
+ * Mock mode (Convex not configured):
+ *   - Static drop zone with a "Connect Convex to enable uploads" notice
+ *   - Hardcoded MOCK_SCANS list so the widget still looks populated
+ *
+ * The sector filter buttons at the top let users view scans per monitoring area.
+ */
 "use client";
 
 import { useContext, useRef, useState } from "react";
@@ -55,6 +73,14 @@ const STATUS_STYLE: Record<ScanStatus, { dot: string; label: string; text: strin
   error:      { dot: "bg-red-500",    label: "Error",       text: "text-red-600 dark:text-red-400" },
 };
 
+/**
+ * ScanCard — a single row in the scan list.
+ * Shows the file thumbnail (if available), filename, sector, size, age, and notes.
+ * An optional delete button is shown when onDelete is provided (live mode only).
+ *
+ * @param scan     - scan record from Convex or the mock list
+ * @param onDelete - optional handler called with the scan's _id when delete is clicked
+ */
 function ScanCard({ scan, onDelete }: { scan: Scan; onDelete?: (id: string) => void }) {
   const style = STATUS_STYLE[scan.status];
   const sector = SECTORS.find((s) => s.id === scan.sectorId);
@@ -113,6 +139,13 @@ function ScanCard({ scan, onDelete }: { scan: Scan; onDelete?: (id: string) => v
 }
 
 // ── Live inner component — only rendered when Convex is configured ──────────
+/**
+ * LiveDroneScanWidget — inner component that calls Convex hooks.
+ * Separated from the outer widget so useQuery/useMutation are never called
+ * unless a valid ConvexProvider is in the tree.
+ *
+ * @param filterSector - "all" or a specific sector ID to filter the scan list
+ */
 function LiveDroneScanWidget({ filterSector }: { filterSector: string }) {
   const scans = useQuery(anyApi.droneScans.listScans, {
     sectorId: filterSector === "all" ? undefined : filterSector,
@@ -129,10 +162,19 @@ function LiveDroneScanWidget({ filterSector }: { filterSector: string }) {
   const [notes, setNotes]           = useState("");
   const [sector, setSector]         = useState(SECTORS[0].id);
 
+  /**
+   * upload — handles the two-step Convex file upload:
+   *   1. Get a pre-signed URL from Convex storage
+   *   2. POST the raw file bytes to that URL (with XHR for progress tracking)
+   *   3. Parse the storageId from the response and call saveScan to record metadata
+   *
+   * Uses XHR instead of fetch so we can track upload progress with xhr.upload.onprogress.
+   */
   async function upload(file: File) {
     setUploading(true);
     setProgress(10);
     try {
+      // Step 1 — request a short-lived upload URL from Convex storage
       const url = await generateUploadUrl({});
       setProgress(30);
 
@@ -243,6 +285,11 @@ function LiveDroneScanWidget({ filterSector }: { filterSector: string }) {
 }
 
 // ── Outer widget — renders mock when Convex is not configured ───────────────
+/**
+ * DroneScanWidget
+ * Top-level exported widget.  Checks whether Convex is available and renders
+ * either the live version (with real upload/delete) or a static mock version.
+ */
 export function DroneScanWidget() {
   const isConvexReady = useContext(ConvexAvailableContext);
   const [filterSector, setFilterSector] = useState("all");

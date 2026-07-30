@@ -1,9 +1,19 @@
+/**
+ * PipelineStatusWidget.tsx — Data pipeline health indicator widget.
+ *
+ * Displays the satellite ingest percentage, IoT sync status, and per-sensor
+ * health dots for the three monitoring stations.
+ *
+ * Live / mock modes:
+ *   - Convex configured: LivePipelineData calls useQuery(getPipelineStatus) and
+ *     pushes the ingest percentage up via onData.
+ *   - Convex not configured: a setInterval bounces the percentage between 94–100%
+ *     and briefly shows "Syncing..." so the widget looks active during demos.
+ *
+ * The "IoT Jasper-A1" sensor shows "No link" when Convex is not configured,
+ * reflecting that its live feed depends on the Convex connection.
+ */
 "use client";
-
-// PipelineStatusWidget shows the health of the data pipeline that brings
-// satellite and IoT sensor readings into the Jasper dashboard.
-// It subscribes to Rahil's getPipelineStatus Convex function for live stats.
-// If Convex isn't configured yet, it falls back to animated mock data.
 
 import { useEffect, useState, useContext, useCallback } from "react";
 import { useQuery } from "convex/react";
@@ -11,7 +21,14 @@ import { anyApi } from "convex/server";
 import { SyncIcon } from "../Layout/icons";
 import { ConvexAvailableContext, ConvexErrorBoundary } from "../Providers/ConvexClientProvider";
 
-// Inner component that calls useQuery — only mounted when ConvexProvider is active
+/**
+ * LivePipelineData — inner component that safely calls Convex's useQuery hook.
+ *
+ * Only mounted inside a ConvexErrorBoundary when Convex is configured.
+ * Subscribes to getPipelineStatus and pushes the ingest percentage up via onData.
+ *
+ * @param onData - callback receiving the current satellite ingest percentage (0–100)
+ */
 function LivePipelineData({
   onData,
 }: {
@@ -30,6 +47,13 @@ function LivePipelineData({
   return null;
 }
 
+/**
+ * PipelineStatusWidget — sidebar widget showing data pipeline and sensor health.
+ *
+ * Conditionally mounts LivePipelineData when Convex is available.  Renders a
+ * progress bar for satellite ingest, an IoT sync row with a spinning icon, and
+ * a per-sensor health summary with colour-coded status dots.
+ */
 export function PipelineStatusWidget() {
   const isConvexReady = useContext(ConvexAvailableContext);
 
@@ -65,10 +89,10 @@ export function PipelineStatusWidget() {
         <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide">
           Data Connection
         </p>
-        <span className="flex items-center gap-1.5 text-xs font-medium text-green-500">
-          <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-          Active
-        </span>
+        {isConvexReady
+          ? <span className="flex items-center gap-1.5 text-xs font-medium text-green-500"><span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />Live</span>
+          : <span className="flex items-center gap-1.5 text-xs font-medium text-amber-500"><span className="w-1.5 h-1.5 rounded-full bg-amber-500" />Simulated</span>
+        }
       </div>
 
       {/* Progress bar showing how much of the satellite data has been ingested */}
@@ -86,12 +110,36 @@ export function PipelineStatusWidget() {
       </div>
 
       {/* IoT sync row — spins the icon briefly each time new data arrives */}
-      <div className="flex items-center justify-between text-xs">
+      <div className="flex items-center justify-between text-xs mb-2">
         <span className="text-gray-700 dark:text-gray-200 font-medium">IoT Jasper-A1</span>
         <span className={`flex items-center gap-1 font-medium transition-colors ${syncing ? "text-amber-400" : "text-sait-sky"}`}>
           <SyncIcon className={`w-3 h-3 ${syncing ? "animate-spin" : ""}`} />
           {syncing ? "Syncing..." : "Sync"}
         </span>
+      </div>
+
+      {/* Sensor health summary row */}
+      <div className="pt-2 border-t border-gray-100 dark:border-gray-800 space-y-1.5">
+        <p className="text-[9px] font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-1">Sensor Health</p>
+        {[
+          { name: "IoT Jasper-A1",    status: isConvexReady ? "Online" : "No link" },
+          { name: "Silt Monitor S-2", status: "Online" },
+          { name: "Slope Sensor SL-4",status: "Online" },
+        ].map(({ name, status }) => {
+          const isOnline   = status === "Online";
+          const isNoLink   = status === "No link";
+          const dot        = isOnline ? "bg-green-500 animate-pulse" : isNoLink ? "bg-amber-500" : "bg-red-500";
+          const textColor  = isOnline ? "text-green-500" : isNoLink ? "text-amber-500" : "text-red-500";
+          return (
+            <div key={name} className="flex items-center justify-between text-[10px]">
+              <span className="text-gray-600 dark:text-gray-400">{name}</span>
+              <span className={`flex items-center gap-1 font-semibold ${textColor}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${dot}`} />
+                {status}
+              </span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

@@ -1,8 +1,20 @@
-// ErosionLayer draws three overlapping erosion risk zones on the map —
-// one High, one Medium, one Low — at different terrain positions in the watershed.
-// Each zone fetches its own risk prediction from Richard's erosion simulation API
-// using the real slope angle and rainfall amount for that specific location.
-// All three API calls run at the same time for speed.
+/**
+ * ErosionLayer.tsx — Multi-zone soil erosion risk overlay for the Leaflet map.
+ *
+ * Renders three HazardZone circles at different terrain positions in the
+ * Athabasca watershed — each zone represents a distinct slope/rainfall scenario.
+ *
+ * Data flow:
+ *   1. On mount, fires three erosion simulation requests in parallel (Promise.allSettled).
+ *   2. Each zone independently shows a sensor dot + hazard circle.
+ *   3. Colour and label are driven by the ML model's risk_label for that zone.
+ *   4. If any single zone's API call fails, that zone falls back to its DEFAULT_RISK entry.
+ *
+ * Zone definitions (in ZONES constant):
+ *   ATH-001-H — steep slope 42°, 95 mm rainfall → typically High risk
+ *   ATH-001-M — moderate 28°, 68 mm            → typically Medium risk
+ *   ATH-001-L — gentle 16°, 40 mm              → typically Low risk
+ */
 
 "use client";
 
@@ -29,6 +41,15 @@ const STYLE_BY_LABEL = {
 // Default risk order if the API hasn't responded yet — High for the steepest zone, Low for the flattest
 const DEFAULT_RISK = ["High", "Medium", "Low"] as const;
 
+/**
+ * ErosionLayer — react-leaflet layer that renders all three erosion zones.
+ *
+ * Fires parallel API requests for each zone on mount and maps the results
+ * to HazardZone overlays with colour-coded risk styling.  Sensor dots use
+ * purple (#6D2077) to visually distinguish erosion from burn scar (blue)
+ * and contaminant (cyan) layers.
+ * No props required.
+ */
 export function ErosionLayer() {
   // One result slot per zone — starts as null until each API call resolves
   const [results, setResults] = useState<(ModelOutput | null)[]>([null, null, null]);

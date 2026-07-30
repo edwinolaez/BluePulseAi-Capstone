@@ -1,12 +1,32 @@
+/**
+ * ThreeDView.tsx — 3D risk visualization of the Jasper watershed using deck.gl.
+ *
+ * Renders a full-screen interactive 3D scene over real Rocky Mountain terrain:
+ *   - TerrainLayer   — SRTM 30m elevation mesh with ESRI satellite imagery
+ *   - PolygonLayer   — OSM 3D building footprints for the Jasper townsite
+ *   - ColumnLayer    — risk score bars (height = score, colour = High/Med/Low)
+ *   - ScatterplotLayer — coloured sensor dots at each monitoring position
+ *
+ * Data flow:
+ *   1. Fetches timeline scans for all five sectors on mount
+ *   2. Re-interpolates values whenever the centerDate (slider position) changes
+ *   3. Column heights and colours update to reflect the current interpolated state
+ *
+ * Hover tooltips show the sector label, risk score, real GPS coordinates, and
+ * whether the position is from a real database record or estimated.
+ *
+ * Loaded dynamically with ssr:false in MapViewPage — deck.gl requires WebGL.
+ */
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import DeckGL from "@deck.gl/react";
 import { LightingEffect, AmbientLight, DirectionalLight } from "@deck.gl/core";
 import { ColumnLayer, ScatterplotLayer, PolygonLayer } from "@deck.gl/layers";
-import { TerrainLayer } from "@deck.gl/geo-layers";
+import { TerrainLayer, TripsLayer } from "@deck.gl/geo-layers";
+import { HeatmapLayer } from "@deck.gl/aggregation-layers";
 import { fetchTimeline } from "../../../lib/api";
-import type { TimelineScan } from "../../../lib/api";
+import type { TimelineScan, SimulationResults } from "../../../lib/api";
 import { interpolateScans } from "../../../lib/interpolation";
 import type { InterpolatedState } from "../../../lib/interpolation";
 
@@ -45,6 +65,35 @@ const SURFACE_TILES = "https://server.arcgisonline.com/ArcGIS/rest/services/Worl
 const SUN_LIGHT   = new DirectionalLight({ color: [255, 248, 220], intensity: 1.8, direction: [-2, -3, -1] });
 const SKY_AMBIENT = new AmbientLight({ color: [200, 220, 255], intensity: 0.6 });
 const LIGHTING    = new LightingEffect({ SUN_LIGHT, SKY_AMBIENT });
+
+// ── Simulation helpers ────────────────────────────────────────────────────────
+
+const PLUME_LOOP = 1000; // animation cycle length in arbitrary time units
+
+// Compute downstream waypoints from a source point using compass bearing.
+// Returns [lon, lat, elevation] triples — elevation floats above terrain mesh.
+function computePlumePath(
+  startLon: number,
+  startLat: number,
+  directionDeg: number,
+  numPoints = 12,
+  stepKm = 0.35,
+): [number, number, number][] {
+  const kmPerDegLat = 111.0;
+  const kmPerDegLon = 111.0 * Math.cos((startLat * Math.PI) / 180);
+  const bearingRad  = (directionDeg * Math.PI) / 180;
+  const pts: [number, number, number][] = [];
+  let lon = startLon;
+  let lat = startLat;
+  for (let i = 0; i < numPoints; i++) {
+    pts.push([lon, lat, 1180]);
+    lat += (Math.cos(bearingRad) * stepKm) / kmPerDegLat;
+    lon += (Math.sin(bearingRad) * stepKm) / kmPerDegLon;
+  }
+  return pts;
+}
+
+interface HeatPoint { lon: number; lat: number; weight: number; }
 
 // ── Sector definitions ────────────────────────────────────────────────────────
 
@@ -125,14 +174,27 @@ interface OsmBuilding {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 interface Props {
-  centerDate:      string;
-  activeSectorId:  string | null;
-  onSectorClick:   (id: string) => void;
-  showErosion:     boolean;
-  showContaminant: boolean;
-  showBurnScar:    boolean;
+  centerDate:        string;
+  activeSectorId:    string | null;
+  onSectorClick:     (id: string) => void;
+  showErosion:       boolean;
+  showContaminant:   boolean;
+  showBurnScar:      boolean;
+  simulationResults: SimulationResults | null;
 }
 
+/**
+ * ThreeDView
+ * Deck.gl 3D risk visualization.  Fetches timeline data for all five sectors
+ * in parallel on mount and re-renders column heights whenever the slider moves.
+ *
+ * @param centerDate     - current slider position as ISO date
+ * @param activeSectorId - ID of the sector the user has selected
+ * @param onSectorClick  - handler called when a column or sensor dot is clicked
+ * @param showErosion    - visibility toggle for erosion columns
+ * @param showContaminant - visibility toggle for contaminant column
+ * @param showBurnScar   - visibility toggle for burn scar column
+ */
 export function ThreeDView({
   centerDate,
   activeSectorId,
@@ -140,6 +202,7 @@ export function ThreeDView({
   showErosion,
   showContaminant,
   showBurnScar,
+  simulationResults,
 }: Props) {
 
   const [viewState, setViewState] = useState(INITIAL_VIEW_STATE);
@@ -179,6 +242,22 @@ export function ThreeDView({
   }, [centerDate, sectorScans]);
 
   const [buildings, setBuildings] = useState<OsmBuilding[]>([]);
+
+  // Contaminant plume animation
+  const [plumeTime, setPlumeTime] = useState(0);
+  const velocityRef = useRef(0.44);
+  useEffect(() => {
+    velocityRef.current = simulationResults?.contaminant?.contaminant_vector?.velocity ?? 0.44;
+  }, [simulationResults?.contaminant?.contaminant_vector?.velocity]);
+  useEffect(() => {
+    let frame: number;
+    const tick = () => {
+      setPlumeTime(t => (t + 1 + velocityRef.current * 3) % PLUME_LOOP);
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   // Fetch OSM building footprints for Jasper townsite on mount
   useEffect(() => {
@@ -246,6 +325,28 @@ export function ThreeDView({
       layerType: SECTOR_LAYER[s.id],
     }));
 
+  // ── Simulation layer data ─────────────────────────────────────────────────
+  // Use AI simulation score for the High zone; derive Medium/Low proportionally.
+  // Falls back to interpolated live-sensor scores when no simulation has run yet.
+  const erosionScore = simulationResults?.erosion?.risk_score
+    ?? (sectorInterps["ATH-001-H"]?.erosion_risk_score ?? 0.87);
+
+  const heatPoints: HeatPoint[] = [
+    { lon: -118.092, lat: 52.858, weight: erosionScore },
+    { lon: -118.100, lat: 52.851, weight: erosionScore * 0.80 },
+    { lon: -118.085, lat: 52.862, weight: erosionScore * 0.70 },
+    { lon: -118.070, lat: 52.870, weight: erosionScore * 0.55 },
+    { lon: -118.078, lat: 52.865, weight: erosionScore * 0.45 },
+    { lon: -118.057, lat: 52.877, weight: erosionScore * 0.35 },
+    { lon: -118.045, lat: 52.884, weight: erosionScore * 0.22 },
+  ];
+
+  const directionDeg = simulationResults?.contaminant?.contaminant_vector?.direction_deg ?? 180;
+  const plumeData = showContaminant ? [{
+    path:       computePlumePath(-118.1069, 52.8639, directionDeg),
+    timestamps: Array.from({ length: 12 }, (_, i) => i * (PLUME_LOOP / 12)),
+  }] : [];
+
   const layers = [
     // 3D terrain — high-res elevation mesh with satellite imagery draped on top
     new TerrainLayer({
@@ -258,6 +359,39 @@ export function ThreeDView({
       texture:          SURFACE_TILES,
       elevationScale:   1,
       meshMaxError:     1.5,   // default 4m — lower = sharper ridgelines and valleys
+    }),
+
+    // Erosion risk heatmap — continuous risk surface driven by AI simulation score
+    new HeatmapLayer<HeatPoint>({
+      id:           "erosion-heatmap",
+      data:         showErosion ? heatPoints : [],
+      getPosition:  (d) => [d.lon, d.lat],
+      getWeight:    (d) => d.weight,
+      radiusPixels: 100,
+      intensity:    1.4,
+      threshold:    0.05,
+      opacity:      0.55,
+      colorRange: [
+        [34,  197, 94],
+        [132, 204, 22],
+        [234, 179, 8],
+        [245, 158, 11],
+        [239, 68,  68],
+        [185, 28,  28],
+      ],
+    }),
+
+    // Contaminant plume — animated trail following ML-predicted flow direction
+    new TripsLayer({
+      id:           "contaminant-plume",
+      data:         plumeData,
+      getPath:      (d) => d.path,
+      getTimestamps:(d) => d.timestamps,
+      getColor:     [0, 163, 224],   // SAIT Sky blue
+      opacity:      0.85,
+      widthMinPixels: 4,
+      trailLength:  280,
+      currentTime:  plumeTime,
     }),
 
     // OSM 3D buildings — extruded footprints from Overpass API

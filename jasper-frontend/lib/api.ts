@@ -69,6 +69,24 @@ export interface ModelOutput {
   confidence:  number;
 }
 
+export interface SimulationResults {
+  burn:        ModelOutput | null;
+  erosion:     ModelOutput | null;
+  contaminant: ModelOutput | null;
+}
+
+export type SimulationTag = "erosion" | "contaminant" | "burnScar" | "untagged";
+
+export interface FieldPhoto {
+  id:            string;
+  url:           string;
+  name:          string;
+  uploadedAt:    string;
+  simulationTag: SimulationTag;
+  riskLabel?:    string;
+  riskScore?:    number;
+}
+
 // ─── Functions that call Feven's backend (via server-side proxy) ──────────────
 
 // Fetches all timestamped scan records for a sector — used by the timeline slider

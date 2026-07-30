@@ -20,6 +20,11 @@ jest.mock("../../lib/api", () => ({
   fetchContaminantSimulation: (...args: unknown[]) => mockFetchContaminantSimulation(...args),
 }));
 
+const defaultProps = {
+  onResultsUpdate:  jest.fn(),
+  onNavigateToMap:  jest.fn(),
+};
+
 beforeEach(() => {
   // Default: API calls are pending (promises that never resolve)
   // This lets us check the initial/loading state in tests
@@ -29,49 +34,49 @@ beforeEach(() => {
 });
 
 it("renders the AI Model Overview heading", () => {
-  render(<AiOverviewPage />);
+  render(<AiOverviewPage {...defaultProps} />);
   expect(screen.getByText("AI Model Overview")).toBeInTheDocument();
 });
 
 it("shows a description mentioning the ML models", () => {
-  render(<AiOverviewPage />);
+  render(<AiOverviewPage {...defaultProps} />);
   expect(screen.getByText(/burn scar detection, erosion simulation, and contaminant tracking/i)).toBeInTheDocument();
 });
 
 it("renders a card for Forest Burn Scar Detection", () => {
-  render(<AiOverviewPage />);
+  render(<AiOverviewPage {...defaultProps} />);
   expect(screen.getByText("Forest Burn Scar Detection")).toBeInTheDocument();
 });
 
 it("renders a card for Erosion Risk Simulation", () => {
-  render(<AiOverviewPage />);
+  render(<AiOverviewPage {...defaultProps} />);
   expect(screen.getByText("Erosion Risk Simulation")).toBeInTheDocument();
 });
 
 it("renders a card for Contaminant Plume Tracker", () => {
-  render(<AiOverviewPage />);
+  render(<AiOverviewPage {...defaultProps} />);
   expect(screen.getByText("Contaminant Plume Tracker")).toBeInTheDocument();
 });
 
 it("shows the Model Output Summary table", () => {
-  render(<AiOverviewPage />);
+  render(<AiOverviewPage {...defaultProps} />);
   expect(screen.getByText("Model Output Summary")).toBeInTheDocument();
 });
 
 it("shows the loading message while API calls are in-flight", () => {
-  render(<AiOverviewPage />);
+  render(<AiOverviewPage {...defaultProps} />);
   expect(screen.getByText(/Fetching live model data/i)).toBeInTheDocument();
 });
 
 it("shows mock fallback data (Estimated badge) before API resolves", () => {
-  render(<AiOverviewPage />);
+  render(<AiOverviewPage {...defaultProps} />);
   // All three cards should show 'Estimated' while the calls are pending
   const estimatedBadges = screen.getAllByText("Estimated");
   expect(estimatedBadges.length).toBeGreaterThanOrEqual(1);
 });
 
 it("shows risk score bars for each model", () => {
-  render(<AiOverviewPage />);
+  render(<AiOverviewPage {...defaultProps} />);
   // Each card has a 'Risk Score' label in the ScoreBar component
   const scoreBars = screen.getAllByText("Risk Score");
   expect(scoreBars).toHaveLength(3);
@@ -83,7 +88,7 @@ it("shows Live badges when API calls resolve successfully", async () => {
   mockFetchErosionSimulation.mockResolvedValue({ ...mockResult, risk_label: "High", risk_score: 0.74 });
   mockFetchContaminantSimulation.mockResolvedValue({ ...mockResult, risk_label: "Medium", risk_score: 0.55 });
 
-  render(<AiOverviewPage />);
+  render(<AiOverviewPage {...defaultProps} />);
 
   await waitFor(() => {
     // After all 3 API calls resolve, the "Live" badges appear
@@ -93,7 +98,7 @@ it("shows Live badges when API calls resolve successfully", async () => {
 });
 
 it("shows sector codes in the summary table", () => {
-  render(<AiOverviewPage />);
+  render(<AiOverviewPage {...defaultProps} />);
   expect(screen.getByText("ATH-001-A")).toBeInTheDocument();
   expect(screen.getByText("ATH-001-H")).toBeInTheDocument();
   expect(screen.getByText("ATH-001-W")).toBeInTheDocument();

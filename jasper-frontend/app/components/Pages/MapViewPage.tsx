@@ -1,7 +1,24 @@
-// MapViewPage is the main interactive map screen.
-// It renders the Leaflet map with all three environmental layers on top,
-// plus layer toggle switches, zoom buttons, a time slider,
-// and a Live Readings panel on the right that shows real-time sensor data.
+/**
+ * MapViewPage.tsx — Main interactive map view page.
+ *
+ * Hosts either the 2D Leaflet map (JasperMap) or the 3D deck.gl view (ThreeDView)
+ * depending on the is3D prop.  Both map components are loaded with dynamic() /
+ * ssr:false because Leaflet and WebGL require browser APIs not available on the server.
+ *
+ * Layout:
+ *   - Left/main: the full-screen map with zoom buttons and mobile "Live" button overlaid
+ *   - Right sidebar: TemporalSlider, SectorPanel, and four live sensor widgets
+ *     (on mobile this sidebar is hidden off-screen and slides in when "Live" is tapped)
+ *
+ * Data flow:
+ *   1. User clicks a sector on the map → sectorId state updates
+ *   2. useEffect fetches timeline scans for that sector from Feven's backend
+ *   3. Slider position (centerDate) feeds into interpolateScans() to blend values
+ *   4. Blended InterpolatedState is passed to SectorPanel for display
+ *
+ * A fetchIdRef prevents stale responses from an older sector fetch overwriting
+ * a newer one if the user clicks sectors quickly.
+ */
 
 "use client";
 
@@ -16,7 +33,7 @@ import { ModelPerformanceWidget } from "../Widgets/ModelPerformanceWidget";
 import { FieldPhotosWidget } from "../Widgets/FieldPhotosWidget";
 import type { FlyToTarget } from "../Map/JasperMap";
 import { fetchTimeline } from "../../../lib/api";
-import type { TimelineScan } from "../../../lib/api";
+import type { TimelineScan, SimulationResults, FieldPhoto } from "../../../lib/api";
 import { interpolateScans } from "../../../lib/interpolation";
 import type { InterpolatedState } from "../../../lib/interpolation";
 
@@ -30,14 +47,16 @@ const ThreeDView = dynamic(
 );
 
 interface Props {
-  flyTo?:          FlyToTarget | null;
-  is3D:            boolean;
-  showErosion:     boolean;
-  showContaminant: boolean;
-  showBurnScar:    boolean;
+  flyTo?:             FlyToTarget | null;
+  is3D:               boolean;
+  showErosion:        boolean;
+  showContaminant:    boolean;
+  showBurnScar:       boolean;
+  simulationResults?: SimulationResults | null;
+  photos?:            FieldPhoto[];
 }
 
-export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBurnScar }: Props) {
+export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBurnScar, simulationResults, photos }: Props) {
   const [sectorId, setSectorId]               = useState<string | null>(null);
   const [dateFrom, setDateFrom]               = useState("2024-06-01");
   const [dateTo, setDateTo]                   = useState("2024-07-24");
@@ -88,6 +107,7 @@ export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBur
               showErosion={showErosion}
               showContaminant={showContaminant}
               showBurnScar={showBurnScar}
+              simulationResults={simulationResults ?? null}
             />
           ) : (
             <JasperMap
@@ -104,10 +124,10 @@ export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBur
           )}
         </div>
 
-        {/* Bottom bar: [mobile: live data button] + slider + [desktop: zoom buttons] */}
+        {/* Bottom bar: [mobile: live data button] + [desktop: zoom buttons] */}
         <div className="absolute bottom-4 left-4 right-4 z-[1001] flex items-end gap-3">
 
-          {/* Live Data button — mobile only, sits to the left of the slider.
+          {/* Live Data button — mobile only.
               On desktop the Live Readings sidebar is always visible so this is hidden. */}
           <button
             onClick={() => setPanelOpen(true)}
@@ -117,15 +137,7 @@ export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBur
             Live
           </button>
 
-          <div className="flex-1 min-w-0">
-            <TemporalSlider
-              onDateRangeChange={(from, to, center) => {
-                setDateFrom(from);
-                setDateTo(to);
-                setCenterDate(center);
-              }}
-            />
-          </div>
+          <div className="flex-1" />
 
           {/* Zoom buttons — desktop only, 2D mode only (3D uses deck.gl orbit controls). */}
           <div className={["hidden md:flex flex-col gap-2 shrink-0", is3D ? "invisible" : ""].join(" ")}>
@@ -188,6 +200,15 @@ export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBur
           </button>
         </div>
 
+        {/* Time History slider — controls the date range shown on the map and in SectorPanel */}
+        <TemporalSlider
+          onDateRangeChange={(from, to, center) => {
+            setDateFrom(from);
+            setDateTo(to);
+            setCenterDate(center);
+          }}
+        />
+
         {/* Shows data for the sector the user clicked on the map.
             interpolated carries blended values from the timeline slider — null
             when no sector is selected or the backend has no scan data yet. */}
@@ -210,7 +231,7 @@ export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBur
         <WaterQualityWidget />
         <PipelineStatusWidget />
         <ModelPerformanceWidget />
-        <FieldPhotosWidget />
+        <FieldPhotosWidget photos={photos} />
       </aside>
 
     </div>

@@ -1,14 +1,26 @@
 """
 model_endpoint.py — Project Jasper ML Model API
 
-FastAPI endpoints for change detection, erosion simulation, and contaminant tracking.
+This is the main HTTP server for the Jasper machine-learning layer.  It wraps
+three environmental-risk models behind a FastAPI app so the Next.js frontend
+can call them over HTTP.
 
-Endpoints:
-- POST /predict/change-detection
-- POST /simulate/erosion
-- POST /simulate/contaminant
+Endpoints exposed:
+  GET  /health                    — liveness check used by the Kong gateway
+  GET  /metrics                   — lightweight observability info
+  POST /predict/change-detection  — burn-scar risk for a grid sector
+  POST /simulate/erosion          — soil-loss risk given rainfall + terrain slope
+  POST /simulate/contaminant      — hydrocarbon plume tracking from a source point
 
-Rate limit: 20 req/min (configured by Kong Gateway)
+Rate limit: 20 req/min (enforced upstream by Kong Gateway, not in this file).
+
+How data flows:
+  1. A frontend or CI test sends a JSON POST to one of the /simulate or /predict routes.
+  2. The Pydantic request model validates the incoming JSON fields.
+  3. For erosion and contaminant endpoints, live sensor data is fetched from
+     Environment Canada via sensor_fetch.py (with a 5-minute cache).
+  4. The appropriate simulation model function is called.
+  5. The result is packaged into the standardised ModelOutput schema and returned.
 """
 
 from pathlib import Path
@@ -25,7 +37,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, ConfigDict
 
-# Add parent directory to path for imports
+# Make the sibling "models/" directory importable without installing the package.
+# This is needed because the repo is not set up as an installable Python package.
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from models.simulations.erosion_model import (
@@ -35,6 +48,12 @@ from models.simulations.contaminant_model import (
     calculate_contaminant_vector as calc_contaminant,
 )
 from api.sensor_fetch import live_water_velocity, live_rainfall_mm, live_slope_deg, sector_coords
+
+# TODO(real imagery): once real Landsat GeoTIFFs land in data/{sector_id}_{pre,post}.tif,
+# wire up real inference in predict_change_detection() below using:
+#   sys.path.insert(0, str(Path(__file__).parent.parent / "models" / "change_detection"))
+#   from predict import get_sector_features, predict as cd_predict
+
 
 
 # ============================================================================
@@ -59,7 +78,9 @@ app = FastAPI(
 # CORS Configuration (for Frontend Integration)
 # ============================================================================
 
-# Get allowed origins from environment, default to localhost for development
+# Pull the comma-separated list of allowed origins from the environment so we
+# don't hard-code production URLs into source code.  Defaults to localhost for
+# local development (Vite on 5173, Next.js on 3000).
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173").split(",")
 
 app.add_middleware(
@@ -77,7 +98,14 @@ app.add_middleware(
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
-    """Log all requests and responses."""
+    """
+    Log every incoming request and its response status/timing.
+
+    This runs before and after every route handler.  It records the HTTP method,
+    path, response status code, and how long the handler took.  Timing is also
+    exposed to callers via the X-Process-Time response header so frontend
+    developers can see latency without opening server logs.
+    """
     request_time = datetime.now(timezone.utc)
 
     # Log request
@@ -96,7 +124,7 @@ async def log_requests(request: Request, call_next):
             elapsed,
         )
 
-        # Add timing header
+        # Add timing header so callers can measure end-to-end latency
         response.headers["X-Process-Time"] = str(elapsed)
         return response
 
@@ -112,7 +140,13 @@ async def log_requests(request: Request, call_next):
 # ============================================================================
 
 class ChangeDetectionRequest(BaseModel):
-    """Validate change detection prediction request."""
+    """
+    Input schema for the /predict/change-detection endpoint.
+
+    Fields:
+        sector_id — the grid cell to analyse (e.g. "ATH-001-A").  This is the
+                    same sector ID used throughout the database and frontend map.
+    """
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -120,18 +154,31 @@ class ChangeDetectionRequest(BaseModel):
             }
         }
     )
-    
+
     sector_id: str = Field(..., description="Grid sector ID (e.g., ATH-001-A)")
 
 
 class SourcePoint(BaseModel):
-    """Source point coordinates with lat/lon."""
+    """
+    A geographic coordinate pair.  Used to specify where a contaminant spill
+    originated so the simulation knows where to start tracking the plume.
+    """
     lat: float = Field(..., description="Latitude")
     lon: float = Field(..., description="Longitude")
 
 
 class ErosionSimulationRequest(BaseModel):
-    """Validate erosion risk simulation request."""
+    """
+    Input schema for the /simulate/erosion endpoint.
+
+    Fields:
+        sector_id    — grid cell to simulate.
+        rainfall_mm  — optional rainfall amount.  If omitted, the endpoint
+                       fetches the live reading from Environment Canada.
+        coordinates  — optional lat/lon used to look up real terrain slope via
+                       the SRTM 30m DEM.  Omit to use the known ATH sector
+                       centre or the Jasper watershed default.
+    """
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -154,7 +201,15 @@ class ErosionSimulationRequest(BaseModel):
 
 
 class ContaminantSimulationRequest(BaseModel):
-    """Validate contaminant tracking simulation request."""
+    """
+    Input schema for the /simulate/contaminant endpoint.
+
+    Fields:
+        sector_id    — grid cell to simulate.
+        source_point — where the contaminant entered the watershed.  Must be
+                       within the Athabasca watershed bounds (52-60°N, 120-110°W);
+                       the endpoint returns HTTP 422 if it falls outside.
+    """
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -163,13 +218,13 @@ class ContaminantSimulationRequest(BaseModel):
             }
         }
     )
-    
+
     sector_id: str = Field(..., description="Grid sector ID")
     source_point: SourcePoint = Field(..., description="Source point coordinates with lat/lon")
 
 
 class ChangeDetectionResponse(BaseModel):
-    """Response model for change detection predictions."""
+    """Response shape returned by /predict/change-detection (simplified form)."""
     sector_id: str
     risk_label: str  # "High" | "Medium" | "Low"
     confidence: float
@@ -177,21 +232,39 @@ class ChangeDetectionResponse(BaseModel):
 
 
 class ErosionSimulationResponse(BaseModel):
-    """Response model for erosion simulations."""
+    """Response shape returned by /simulate/erosion (simplified form)."""
     sector_id: str
     soil_loss_t_ha: float
     risk_level: str  # "High" | "Medium" | "Low"
 
 
 class ContaminantSimulationResponse(BaseModel):
-    """Response model for contaminant simulations."""
+    """Response shape returned by /simulate/contaminant (simplified form)."""
     sector_id: str
     spread_radius_km: float
     peak_concentration: float
 
 
 class ModelOutput(BaseModel):
-    """Standardized ML output schema."""
+    """
+    Standardised ML output schema shared by all three prediction endpoints.
+
+    Every endpoint returns this same shape so the frontend can handle all
+    responses with a single TypeScript type.
+
+    Fields:
+        sector_id          — the grid cell that was analysed.
+        model_version      — version tag of the model used (e.g. "v1.0").
+        simulation_type    — "change_detection", "erosion", or "contaminant".
+        risk_score         — continuous risk value between 0.0 (none) and 1.0 (maximum).
+        risk_label         — human-readable tier: "High", "Medium", or "Low".
+        contaminant_vector — direction/velocity dict (change detection / contaminant)
+                             or None (erosion, which doesn't track plume movement).
+        timestamp          — UTC ISO-8601 string of when the prediction was made.
+        confidence         — model confidence between 0.0 and 1.0.
+        live_inputs        — optional dict of raw sensor values used as inputs,
+                             included so callers can audit what data drove the result.
+    """
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
@@ -223,21 +296,30 @@ class ModelOutput(BaseModel):
 # Model Loading & Caching
 # ============================================================================
 
-# Global model cache
+# A process-level dictionary that stores loaded models so we only read the
+# pickle file once per worker process instead of on every request.
 _model_cache: Dict[str, Any] = {}
 
 
 def load_change_detection_model():
-    """Load trained change detection model from pickle file."""
+    """
+    Load the trained change-detection RandomForest from disk, caching it in
+    memory after the first load.
+
+    Returns the model object, or None if the model file hasn't been trained
+    and saved yet (i.e. we're in development mode before real imagery arrives).
+
+    Raises RuntimeError if the file exists but can't be deserialized.
+    """
     if "change_detection_model" in _model_cache:
         return _model_cache["change_detection_model"]
-    
+
     model_path = Path(__file__).parent.parent / "models" / "change_detection" / "model_v1.pkl"
-    
+
     if not model_path.exists():
-        # Return None if model not yet trained (development mode)
+        # Model hasn't been trained yet — callers fall back to a random score
         return None
-    
+
     try:
         with open(model_path, "rb") as f:
             model = pickle.load(f)
@@ -260,16 +342,19 @@ def load_change_detection_model():
 @app.get("/health")
 async def health_check():
     """
-    Health check endpoint.
-    
-    Used by Kong Gateway and load balancers to verify service is running.
-    Returns status, version, and component health.
+    Liveness endpoint used by the Kong gateway and load balancers.
+
+    Returns a JSON object with an overall "status" field ("ok" or "error") and
+    per-component health for the change-detection model, the erosion model, and
+    the contaminant model.  A 503 is returned if any component raises an
+    exception during the health check itself.
     """
     try:
         # Check if model can be loaded (if available)
         model = load_change_detection_model()
+        # "pending" means the model file doesn't exist yet (pre-training phase)
         model_status = "ready" if model is not None else "pending"
-        
+
         return {
             "status": "ok",
             "service": "Project Jasper ML API",
@@ -297,9 +382,10 @@ async def health_check():
 @app.get("/metrics")
 async def metrics():
     """
-    Basic metrics endpoint for monitoring.
-    
-    In production, this would connect to Prometheus or similar.
+    Lightweight metrics endpoint for observability dashboards.
+
+    In a production deployment this would integrate with Prometheus or
+    Datadog.  For now it returns static metadata about this service.
     """
     return {
         "status": "ok",
@@ -316,43 +402,59 @@ async def metrics():
 @app.post("/predict/change-detection", response_model=ModelOutput)
 async def predict_change_detection(request: ChangeDetectionRequest):
     """
-    Predict post-fire burn scar risk for a given sector.
-    
-    **Endpoint:** `POST /predict/change-detection`
-    
-    **Input:**
-    - sector_id: Grid cell identifier from ingest pipeline
-    
-    **Output:**
-    - sector_id: Grid sector identifier
-    - risk_score: Risk score [0, 1]
-    - risk_label: High/Medium/Low classification
-    - confidence: Model confidence [0, 1]
-    - simulation_type: "change_detection"
-    - model_version: "v1.0"
-    - timestamp: ISO timestamp of prediction
-    - contaminant_vector: Direction and velocity data
-    
-    **Status Codes:**
-    - 200: Successful prediction
-    - 422: Invalid input (missing or malformed sector_id)
-    - 500: Prediction failed (model error)
-    
-    **Example:**
-    ```
-    curl -X POST http://localhost:8000/predict/change-detection \\
-      -H "Content-Type: application/json" \\
-      -d '{"sector_id": "ATH-001"}'
-    ```
+    Predict post-fire burn-scar risk level for a given watershed sector.
+
+    Takes a sector_id, runs (or simulates) the change-detection model, and
+    returns a risk classification together with a confidence score.
+
+    Input:
+        sector_id — the grid cell to evaluate (e.g. "ATH-001").
+
+    Output (ModelOutput):
+        risk_score  — float 0–1.
+        risk_label  — "High" (>= 0.7), "Medium" (>= 0.4), or "Low".
+        confidence  — float 0–1.
+        simulation_type — "change_detection".
+
+    NOTE: The current implementation generates a random score rather than
+    calling the trained model.  The TODO block below documents exactly how
+    to swap in real inference once Landsat GeoTIFFs are available.
+
+    Status codes:
+        200 — success.
+        422 — missing or malformed sector_id.
+        500 — unexpected prediction failure.
     """
     try:
         logger.info("Processing change detection for sector: %s", request.sector_id)
 
-        # Calculate risk
+        # PLACEHOLDER: this never calls load_change_detection_model() or reads sector imagery — it's a random score regardless of whether model_v1.pkl exists.
+        # TODO(real imagery): replace this block with:
+        #
+        #     model = load_change_detection_model()
+        #     data_dir = Path(__file__).parent.parent / "data"
+        #
+        #     if model is not None:
+        #         features = get_sector_features(request.sector_id, str(data_dir))
+        #         prediction, confidence, _ = cd_predict(model, features)
+        #         label_map = {0: "Low", 1: "Medium", 2: "High"}
+        #         risk_label = label_map.get(int(prediction), "Unknown")
+        #         risk_score = float(confidence)
+        #     else:
+        #         # keep this fallback for when no trained model is deployed yet
+        #         risk_score = np.random.uniform(0.6, 0.95)
+        #         confidence = np.random.uniform(0.7, 1.0)
+        #         risk_label = "High" if risk_score >= 0.7 else "Medium" if risk_score >= 0.4 else "Low"
+        #         # (then skip the "Classify risk" block below, it's now redundant)
+        #
+        # Requires the import at the top of this file:
+        #     from predict import get_sector_features, predict as cd_predict
         risk_score = np.random.uniform(0.6, 0.95)
         confidence = np.random.uniform(0.7, 1.0)
 
-        # Classify risk
+        # Map the continuous risk_score to a human-readable tier.
+        # Thresholds chosen to match the frontend's colour coding:
+        #   red = High (>= 0.7), amber = Medium (>= 0.4), green = Low.
         if risk_score >= 0.7:
             risk_label = "High"
         elif risk_score >= 0.4:
@@ -366,6 +468,9 @@ async def predict_change_detection(request: ChangeDetectionRequest):
             simulation_type="change_detection",
             risk_score=float(risk_score),
             risk_label=risk_label,
+            # Change detection doesn't track a moving plume, so direction and
+            # velocity are both zero here.  The field is kept to satisfy the
+            # shared ModelOutput schema.
             contaminant_vector={"direction_deg": 0.0, "velocity": 0.0},
             timestamp=datetime.now(timezone.utc).isoformat(),
             confidence=float(confidence)
@@ -387,48 +492,49 @@ async def predict_change_detection(request: ChangeDetectionRequest):
 @app.post("/simulate/erosion", response_model=ModelOutput)
 async def simulate_erosion(request: ErosionSimulationRequest):
     """
-    Simulate erosion risk for given sector and rainfall conditions.
-    
-    **Endpoint:** `POST /simulate/erosion`
-    
-    **Input:**
-    - sector_id: Grid cell identifier
-    - rainfall_mm: Rainfall intensity (0-500mm)
-    
-    **Output:**
-    - sector_id: Grid sector identifier
-    - soil_loss_t_ha: Estimated soil loss in tons per hectare
-    - risk_score: Risk score [0, 1]
-    - risk_label: High/Medium/Low classification
-    - simulation_type: "erosion"
-    - model_version: "v1.0"
-    - timestamp: ISO timestamp
-    - contaminant_vector: Direction and velocity data
-    - confidence: Model confidence [0, 1]
-    
-    **Status Codes:**
-    - 200: Successful simulation
-    - 422: Invalid parameters (out of range)
-    - 500: Simulation failed
-    
-    **Example:**
-    ```
-    curl -X POST http://localhost:8000/simulate/erosion \
-      -H "Content-Type: application/json" \
-      -d '{"sector_id": "ATH-001", "rainfall_mm": 45.0}'
-    ```
+    Simulate erosion risk for a sector based on terrain slope and rainfall.
+
+    The endpoint first resolves the two key inputs — rainfall and slope — from
+    either the request body or live sensor feeds:
+      - If rainfall_mm is provided, use it; otherwise fetch today's reading
+        from Environment Canada climate station 2203 (Jasper).
+      - If coordinates are provided, use them for the SRTM slope lookup;
+        otherwise fall back to the known ATH sector centre coordinates.
+
+    Then it calls the RUSLE-inspired erosion model in erosion_model.py and
+    packages the result into the standard ModelOutput shape.
+
+    Input:
+        sector_id   — grid cell to simulate.
+        rainfall_mm — optional, 0–500 mm.
+        coordinates — optional lat/lon for terrain lookup.
+
+    Output (ModelOutput):
+        risk_score     — float 0–1 derived from soil_loss_t_ha / 50.
+        risk_label     — "High", "Medium", or "Low".
+        simulation_type — "erosion".
+        live_inputs    — the actual rainfall and slope values used, with
+                         source labels so the caller can audit the inputs.
+
+    Status codes:
+        200 — success.
+        422 — out-of-range parameter.
+        500 — simulation failure.
     """
     # ── Live rainfall ──────────────────────────────────────────────────────────
     if request.rainfall_mm is not None:
+        # Caller supplied a value — use it directly (e.g. hypothetical scenario)
         rainfall_mm = request.rainfall_mm
         rainfall_source = f"user-specified {rainfall_mm} mm"
     else:
+        # No value provided — pull today's reading from Environment Canada
         rainfall_mm, rainfall_source = live_rainfall_mm()
 
     # ── Live terrain slope from SRTM 30m ───────────────────────────────────────
     if request.coordinates:
         lat, lon = request.coordinates.lat, request.coordinates.lon
     else:
+        # Resolve the sector to a known lat/lon centre point
         lat, lon = sector_coords(request.sector_id)
 
     slope_deg, slope_source = live_slope_deg(lat, lon)
@@ -444,6 +550,9 @@ async def simulate_erosion(request: ErosionSimulationRequest):
             soil_loss  = model_result.get("soil_loss_t_ha", rainfall_mm * 0.5)
             risk_level = model_result.get("risk_label", "Medium")
         except Exception as model_err:
+            # If the erosion model fails for any reason, use a simple linear
+            # fallback: 0.5 tonnes per mm of rain.  This is conservative but
+            # keeps the API responsive rather than returning a 500.
             logger.warning(
                 "Erosion model failed for %s: %s, using fallback",
                 request.sector_id, str(model_err),
@@ -456,6 +565,8 @@ async def simulate_erosion(request: ErosionSimulationRequest):
             else:
                 risk_level = "Low"
 
+        # Normalise soil loss to a 0–1 risk score.  50 t/ha is treated as the
+        # maximum plausible value for a severely burned Rocky Mountain watershed.
         risk_score = min(soil_loss / 50.0, 1.0)
 
         result = ModelOutput(
@@ -464,7 +575,7 @@ async def simulate_erosion(request: ErosionSimulationRequest):
             simulation_type="erosion",
             risk_score=float(risk_score),
             risk_label=risk_level,
-            contaminant_vector=None,
+            contaminant_vector=None,  # not applicable for erosion simulations
             timestamp=datetime.now(timezone.utc).isoformat(),
             confidence=0.85,
             live_inputs={
@@ -490,43 +601,41 @@ async def simulate_erosion(request: ErosionSimulationRequest):
 @app.post("/simulate/contaminant", response_model=ModelOutput)
 async def simulate_contaminant(request: ContaminantSimulationRequest):
     """
-    Simulate contaminant plume tracking based on source point.
-    
-    **Endpoint:** `POST /simulate/contaminant`
-    
-    **Input:**
-    - sector_id: Grid cell identifier
-    - source_point: Source coordinates as {lat, lon}
-    
-    **Output:**
-    - sector_id: Grid sector identifier
-    - spread_radius_km: Contamination spread radius in kilometers
-    - peak_concentration: Peak contamination concentration level
-    - risk_score: Risk score [0, 1]
-    - risk_label: High/Medium/Low classification
-    - simulation_type: "contaminant"
-    - model_version: "v1.0"
-    - timestamp: ISO timestamp
-    - contaminant_vector: Direction and velocity data
-    - confidence: Model confidence [0, 1]
-    
-    **Status Codes:**
-    - 200: Successful simulation
-    - 422: Invalid parameters
-    - 500: Simulation failed
-    
-    **Example:**
-    ```
-    curl -X POST http://localhost:8000/simulate/contaminant \
-      -H "Content-Type: application/json" \
-      -d '{"sector_id": "ATH-001", "source_point": {"lat": 55.123, "lon": -114.456}}'
-    ```
+    Simulate a hydrocarbon contaminant plume spreading from a spill source point.
+
+    The endpoint:
+      1. Validates that the source point lies within the Athabasca watershed
+         bounding box (52-60°N, 120-110°W).  Returns 422 if it doesn't.
+      2. Fetches the current Athabasca River discharge from Environment Canada
+         Water Office station 07AA002 and converts it to a surface velocity.
+      3. Calls contaminant_model.py with a fixed NE flow direction
+         (the Athabasca flows northeast from Jasper) and the live velocity.
+      4. Returns spread radius, peak concentration, and a risk tier.
+
+    Input:
+        sector_id    — grid cell to simulate.
+        source_point — {lat, lon} of the spill.
+
+    Output (ModelOutput):
+        risk_score         — equals peak_concentration (0–1).
+        risk_label         — "High", "Medium", or "Low".
+        contaminant_vector — [[lat, lon]] of the source point (used by the
+                             frontend to place the plume marker on the map).
+        simulation_type    — "contaminant".
+        live_inputs        — actual water velocity and its data source.
+
+    Status codes:
+        200 — success.
+        422 — source point out of watershed bounds, or invalid parameters.
+        500 — simulation failure.
     """
     # Validate coordinates are within Athabasca watershed bounds BEFORE try block
     # Athabasca watershed: lat 52-60°N, lon -120 to -110°W
     athabasca_lat_min, athabasca_lat_max = 52.0, 60.0
     athabasca_lon_min, athabasca_lon_max = -120.0, -110.0
-    
+
+    # Reject requests outside the watershed early so we don't waste a sensor
+    # fetch on obviously invalid input.
     if not (athabasca_lat_min <= request.source_point.lat <= athabasca_lat_max and
             athabasca_lon_min <= request.source_point.lon <= athabasca_lon_max):
         logger.warning(
@@ -538,8 +647,10 @@ async def simulate_contaminant(request: ContaminantSimulationRequest):
             status_code=422,
             detail=f"Source point ({request.source_point.lat}, {request.source_point.lon}) is outside Athabasca watershed bounds. Valid range: lat {athabasca_lat_min}-{athabasca_lat_max}°N, lon {athabasca_lon_min}-{athabasca_lon_max}°W"
         )
-    
-    # Always fetch live discharge from Environment Canada Water Office
+
+    # Always fetch live discharge from Environment Canada Water Office.
+    # This is not optional for contaminant tracking because velocity directly
+    # controls how far and fast the plume spreads downstream.
     water_velocity_ms, velocity_source = live_water_velocity()
 
     try:
@@ -555,11 +666,13 @@ async def simulate_contaminant(request: ContaminantSimulationRequest):
             model_result = calc_contaminant(
                 flow_direction_deg=45.0,       # Athabasca flows NE from Jasper
                 water_velocity_ms=water_velocity_ms,  # live EC Water Office value
-                contamination_level=0.5,
+                contamination_level=0.5,       # mid-range starting concentration
             )
             spread_radius    = model_result.get("spread_radius_km", 2.5)
             peak_concentration = model_result.get("peak_concentration", 0.65)
         except Exception as model_err:
+            # If the model raises, fall back to conservative defaults so the
+            # frontend still gets a usable response instead of a 500.
             logger.warning(
                 "Contaminant model failed for %s: %s, using fallback",
                 request.sector_id,
@@ -568,6 +681,7 @@ async def simulate_contaminant(request: ContaminantSimulationRequest):
             spread_radius      = 2.5
             peak_concentration = 0.65
 
+        # Use peak_concentration directly as the risk score (it's already 0–1).
         risk_score = float(peak_concentration)
         if risk_score >= 0.7:
             risk_label = "High"
@@ -582,6 +696,8 @@ async def simulate_contaminant(request: ContaminantSimulationRequest):
             simulation_type="contaminant",
             risk_score=float(risk_score),
             risk_label=risk_label,
+            # Wrap the source coordinate in a nested list so the frontend can
+            # treat it as a GeoJSON-like coordinate array for map rendering.
             contaminant_vector=[[request.source_point.lat, request.source_point.lon]],
             timestamp=datetime.now(timezone.utc).isoformat(),
             confidence=0.80,
@@ -608,7 +724,8 @@ async def simulate_contaminant(request: ContaminantSimulationRequest):
 if __name__ == "__main__":
     import uvicorn
 
-    # Get configuration from environment
+    # Read server configuration from environment variables so the same image
+    # can be used in development and production without code changes.
     host = os.getenv("API_HOST", "0.0.0.0")
     port = int(os.getenv("API_PORT", "8001"))
     env = os.getenv("API_ENV", "development")
@@ -618,7 +735,8 @@ if __name__ == "__main__":
     logger.info("   Host: %s:%s", host, port)
     logger.info("   Allowed Origins: %s", ", ".join(ALLOWED_ORIGINS))
 
-    # Production mode uses more workers
+    # Use multiple workers in production to handle concurrent requests.
+    # A single worker is fine for development/CI because we don't need parallelism.
     workers = 4 if env == "production" else 1
 
     uvicorn.run(

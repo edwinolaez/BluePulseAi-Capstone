@@ -20,14 +20,16 @@ it("shows the Satellite Updates row", () => {
   expect(screen.getByText("Satellite Updates")).toBeInTheDocument();
 });
 
-it("shows the Active status badge", () => {
+it("shows the status badge", () => {
   render(<PipelineStatusWidget />);
-  expect(screen.getByText("Active")).toBeInTheDocument();
+  // Without ConvexAvailableContext the badge shows "Simulated"; with it shows "Live"
+  expect(screen.getByText(/Live|Simulated/)).toBeInTheDocument();
 });
 
 it("shows the IoT Jasper-A1 row", () => {
   render(<PipelineStatusWidget />);
-  expect(screen.getByText("IoT Jasper-A1")).toBeInTheDocument();
+  // Appears in both the sync row and the sensor health list
+  expect(screen.getAllByText("IoT Jasper-A1").length).toBeGreaterThanOrEqual(1);
 });
 
 it("shows a percentage value for satellite updates", () => {

@@ -1,3 +1,19 @@
+/**
+ * Sidebar.tsx — Left navigation panel shown on the Map View page.
+ *
+ * On desktop the sidebar is always visible and can be collapsed to a narrow
+ * icon strip.  On mobile it slides in from the left as a full-width drawer
+ * (triggered by the hamburger button in TopNav).
+ *
+ * Contents:
+ *   - Page navigation links (mobile only — desktop uses TopNav tabs)
+ *   - Map tool buttons: "Live Sensors" and "Legend Panel"
+ *   - 2D / 3D view toggle + layer on/off switches (map tab only)
+ *   - Expandable sector list — clicking a sector flies the map to that location
+ *   - Expandable map legend with data provenance information
+ *   - Download Map Data button — exports a CSV of current sensor readings
+ *   - Support Request + Diagnostic Logs shortcut links at the bottom
+ */
 "use client";
 
 import { useState } from "react";
@@ -45,13 +61,21 @@ const SECTORS = [
 type ExpandedPanel = "legend" | "sectors" | null;
 
 interface Props {
+  /** Currently active tab — used to highlight nav links and show map-only controls. */
   activeTab: AppTab;
+  /** Navigate to a different page tab. */
   onNavigate: (tab: AppTab) => void;
+  /** Fly the map to a specific sector's coordinates. */
   onFocusSector: (lat: number, lng: number, zoom: number) => void;
+  /** Open the live GIS diagnostic logs panel. */
   onOpenLogs: () => void;
+  /** Open the support request modal. */
   onOpenSupport: () => void;
+  /** Whether the mobile drawer is currently open. */
   mobileOpen: boolean;
+  /** Close the mobile drawer (called when the backdrop is tapped). */
   onCloseMobile: () => void;
+  /** Whether the 3D deck.gl view is active (vs. 2D Leaflet). */
   is3D: boolean;
   onToggle3D: (v: boolean) => void;
   showErosion: boolean;
@@ -62,6 +86,12 @@ interface Props {
   onToggleBurnScar: (v: boolean) => void;
 }
 
+/**
+ * Sidebar
+ * Left navigation panel for the Map View.  All layer toggles and map controls
+ * live here so the map canvas stays uncluttered.  Collapses to a narrow strip
+ * on desktop; becomes a full-screen drawer on mobile.
+ */
 export function Sidebar({ activeTab, onNavigate, onFocusSector, onOpenLogs, onOpenSupport, mobileOpen, onCloseMobile, is3D, onToggle3D, showErosion, onToggleErosion, showContaminant, onToggleContaminant, showBurnScar, onToggleBurnScar }: Props) {
   const [expandedPanel, setExpandedPanel] = useState<ExpandedPanel>(null);
   const [collapsed, setCollapsed] = useState(false);

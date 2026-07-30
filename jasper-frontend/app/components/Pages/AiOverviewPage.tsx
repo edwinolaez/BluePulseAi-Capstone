@@ -1,7 +1,27 @@
+/**
+ * AiOverviewPage.tsx — AI Model Overview page showing live ML predictions.
+ *
+ * Calls all three of Richard's ML models in parallel on mount and displays
+ * each result as a card with:
+ *   - Risk level badge and confidence score
+ *   - Risk score bar
+ *   - Collapsible "observed sensor inputs" section showing what data fed the model
+ *   - Data provenance footer (source, last refresh, quality flag)
+ *
+ * Falls back to hardcoded mock values when the ML backend is unreachable,
+ * so the page always shows something rather than going blank.
+ *
+ * Below the three cards is a summary table with all three results side by side,
+ * and below that the ResearcherChatPanel for interactive AI simulations.
+ *
+ * Displays a prominent AI disclaimer banner reminding users that all outputs
+ * require expert validation before use in official reporting.
+ */
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchChangeDetection, fetchErosionSimulation, fetchContaminantSimulation, ModelOutput } from "../../../lib/api";
+import { fetchChangeDetection, fetchErosionSimulation, fetchContaminantSimulation } from "../../../lib/api";
+import type { ModelOutput, SimulationResults } from "../../../lib/api";
 import { ResearcherChatPanel } from "../Widgets/ResearcherChatPanel";
 
 const MODELS = [
@@ -78,6 +98,12 @@ const RISK_BADGE: Record<string, string> = {
   Low:    "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400",
 };
 
+/**
+ * ScoreBar — horizontal progress bar showing a risk score as a percentage.
+ * Colour changes from green → amber → red as risk increases past 40% and 70%.
+ *
+ * @param value - normalised risk score (0.0 – 1.0)
+ */
 function ScoreBar({ value }: { value: number }) {
   const pct = Math.round(value * 100);
   const color = pct >= 70 ? "bg-red-500" : pct >= 40 ? "bg-amber-500" : "bg-green-500";
@@ -94,11 +120,17 @@ function ScoreBar({ value }: { value: number }) {
   );
 }
 
-export function AiOverviewPage() {
+interface Props {
+  onResultsUpdate:  (results: SimulationResults) => void;
+  onNavigateToMap:  () => void;
+}
+
+export function AiOverviewPage({ onResultsUpdate, onNavigateToMap }: Props) {
   const [results, setResults] = useState<Record<string, ModelOutput | null>>({
     burn: null, erosion: null, contaminant: null,
   });
   const [loading, setLoading] = useState(true);
+  // Tracks which model card has its "sensor inputs" section expanded
   const [expandedInputs, setExpandedInputs] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -107,14 +139,14 @@ export function AiOverviewPage() {
       fetchErosionSimulation("ATH-001-H", 42, 95),
       fetchContaminantSimulation("ATH-001-W", 180, 2.1, 0.72),
     ]).then(([burn, erosion, contaminant]) => {
-      setResults({
-        burn:        burn.status        === "fulfilled" ? burn.value        : null,
-        erosion:     erosion.status     === "fulfilled" ? erosion.value     : null,
-        contaminant: contaminant.status === "fulfilled" ? contaminant.value : null,
-      });
+      const burnVal        = burn.status        === "fulfilled" ? burn.value        : null;
+      const erosionVal     = erosion.status     === "fulfilled" ? erosion.value     : null;
+      const contaminantVal = contaminant.status === "fulfilled" ? contaminant.value : null;
+      setResults({ burn: burnVal, erosion: erosionVal, contaminant: contaminantVal });
+      onResultsUpdate({ burn: burnVal, erosion: erosionVal, contaminant: contaminantVal });
       setLoading(false);
     });
-  }, []);
+  }, [onResultsUpdate]);
 
   const mockFallback: Record<string, Partial<ModelOutput>> = {
     burn:        { risk_label: "High",   risk_score: 0.82, confidence: 0.946, model_version: "v1.3.0", timestamp: new Date().toISOString() },
@@ -200,12 +232,15 @@ export function AiOverviewPage() {
                 <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-400">AI-generated · Pending expert review</span>
               </div>
 
-              {/* Risk + confidence */}
-              <div className="flex items-center gap-2">
-                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${RISK_BADGE[risk] ?? "bg-gray-100 dark:bg-gray-800 text-gray-500"}`}>
-                  {risk} Risk
-                </span>
-                <span className="text-xs text-gray-400">{Math.round(confidence * 100)}% confidence</span>
+              {/* AI Prediction output — risk + confidence */}
+              <div>
+                <p className="text-[9px] font-bold uppercase tracking-widest text-purple-500 dark:text-purple-400 mb-1.5">AI Prediction</p>
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${RISK_BADGE[risk] ?? "bg-gray-100 dark:bg-gray-800 text-gray-500"}`}>
+                    {risk} Risk
+                  </span>
+                  <span className="text-xs text-gray-400">{Math.round(confidence * 100)}% confidence</span>
+                </div>
               </div>
 
               <ScoreBar value={score} />
@@ -219,7 +254,8 @@ export function AiOverviewPage() {
                   <svg className={`w-3 h-3 transition-transform ${showInputs ? "rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
                   </svg>
-                  Contributing inputs
+                  <span>Observed sensor inputs</span>
+                  <span className="ml-1 px-1 py-0.5 rounded text-[8px] font-bold uppercase bg-sait-sky/10 text-sait-sky border border-sait-sky/20">Real data</span>
                 </button>
                 {showInputs && (
                   <div className="mt-2 rounded-lg bg-gray-50 dark:bg-gray-800/50 p-2.5 space-y-1.5">
@@ -258,6 +294,27 @@ export function AiOverviewPage() {
         })}
       </div>
 
+      {/* ── View on Map CTA — appears once simulation results have loaded ─────── */}
+      {!loading && (
+        <div className="mb-6 flex items-center justify-between gap-4 p-4 rounded-xl border border-sait-sky/40 bg-sait-sky/5 dark:bg-sait-sky/10">
+          <div>
+            <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">Simulations complete</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+              Erosion heatmap and contaminant plume are ready to view on the 3D map.
+            </p>
+          </div>
+          <button
+            onClick={onNavigateToMap}
+            className="shrink-0 flex items-center gap-2 px-4 py-2 rounded-lg bg-sait-sky text-white text-sm font-semibold hover:bg-sait-sky/80 transition-colors shadow"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 6l6 6-6 6" />
+            </svg>
+            View on Map
+          </button>
+        </div>
+      )}
+
       {/* ── Model Output Summary table ───────────────────────────────────────── */}
       <div className="rounded-xl border border-gray-200/60 dark:border-gray-700/40 bg-surface overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-200/60 dark:border-gray-700/40">
@@ -270,8 +327,18 @@ export function AiOverviewPage() {
               <tr className="border-b border-gray-200/60 dark:border-gray-700/40 text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">
                 <th className="text-left px-5 py-3">Model</th>
                 <th className="text-left px-5 py-3">Sector</th>
-                <th className="text-left px-5 py-3">Risk Level</th>
-                <th className="text-left px-5 py-3">Score</th>
+                <th className="text-left px-5 py-3">
+                  <span className="flex items-center gap-1">
+                    Predicted Risk
+                    <span className="px-1 py-0.5 rounded text-[8px] font-bold normal-case bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-700/40">AI</span>
+                  </span>
+                </th>
+                <th className="text-left px-5 py-3">
+                  <span className="flex items-center gap-1">
+                    Score
+                    <span className="px-1 py-0.5 rounded text-[8px] font-bold normal-case bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-700/40">AI</span>
+                  </span>
+                </th>
                 <th className="text-left px-5 py-3">Confidence</th>
                 <th className="text-left px-5 py-3">Review Status</th>
               </tr>

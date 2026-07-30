@@ -1,9 +1,17 @@
-// Timeline interpolation — blends map layer values between real scan dates.
-//
-// When the user drags the slider to a date that sits between two actual scans,
-// this module finds the two nearest real data points and linearly blends their
-// vegetation, erosion, and water quality values. This is a rendering estimation
-// only — no predictive model is involved. See scope doc section 2 for rationale.
+/**
+ * interpolation.ts — Timeline blending for the TemporalSlider.
+ *
+ * When the user drags the slider to a date that sits between two actual
+ * satellite scan dates, this module finds the two nearest real data points
+ * and linearly blends their vegetation, erosion, and water quality values.
+ *
+ * This is a rendering estimation only — no predictive model is involved.
+ * The blended values are visually smooth but not scientifically precise.
+ * See scope doc section 2 for rationale.
+ *
+ * Exported types:    ScanRecord, InterpolatedState
+ * Exported function: interpolateScans
+ */
 
 export interface ScanRecord {
   timestamp:           string;
@@ -24,10 +32,15 @@ export interface InterpolatedState {
   nearest_after:       string | null; // ISO timestamp of the right anchor scan
 }
 
+/** Linear interpolation — returns the value t% of the way from a to b. */
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
+/**
+ * scoreToLabel — converts a 0–1 erosion risk score to a human-readable label.
+ * Thresholds: ≥0.7 → High, ≥0.35 → Medium, else Low.
+ */
 function scoreToLabel(score: number): "High" | "Medium" | "Low" {
   if (score >= 0.7)  return "High";
   if (score >= 0.35) return "Medium";

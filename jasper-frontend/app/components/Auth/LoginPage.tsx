@@ -1,7 +1,18 @@
-// Login Page — the first screen users see before they're signed in.
-// Supports both light and dark mode — it checks localStorage to see which
-// theme the user had last time, so signing out and back in looks consistent.
-// The demo credentials section at the bottom is just for testing — remove before going live.
+/**
+ * LoginPage.tsx — Sign-in screen shown to unauthenticated users.
+ *
+ * Renders a centred card with email + password fields.  On submit it calls
+ * AuthContext.login() which validates against the in-memory user list.
+ *
+ * Special cases:
+ *   - Superadmin accounts get a two-step confirmation modal instead of
+ *     logging straight in — onSuperadminPending() triggers that flow.
+ *   - A 600 ms artificial delay is added so sign-in doesn't feel instant
+ *     (UX signal that a real request is happening).
+ *
+ * The "Demo credentials" collapsible at the bottom shows seed account
+ * passwords for testing.  Remove it before any real deployment.
+ */
 
 "use client";
 
@@ -9,10 +20,23 @@ import { useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 
 interface Props {
+  /** Called after a non-superadmin successfully logs in. */
   onLoginSuccess: () => void;
+  /** Called when a superadmin submits valid credentials — parent should show the confirmation modal. */
   onSuperadminPending: () => void;
 }
 
+/**
+ * LoginPage — full-screen sign-in form.
+ *
+ * Validates credentials via AuthContext.login().  Handles the superadmin
+ * two-step flow by calling onSuperadminPending() instead of completing login
+ * directly.  Shows inline error messages and a loading spinner during submission.
+ *
+ * @param onLoginSuccess      - called after a successful non-superadmin login
+ * @param onSuperadminPending - called when superadmin credentials are correct
+ *                              but confirmation modal must be shown next
+ */
 export function LoginPage({ onLoginSuccess, onSuperadminPending }: Props) {
   const { login } = useAuth();
   const [email, setEmail]       = useState("");

@@ -1,5 +1,13 @@
-// Root layout — wraps every page in the app.
-// Sets up fonts, dark mode, Leaflet CSS, auth context, and Convex real-time provider.
+/**
+ * layout.tsx — Root HTML layout for Project Jasper.
+ *
+ * This is the outermost shell that Next.js wraps every page in.  It:
+ *   - Sets the <html> lang attribute and page metadata (title, description)
+ *   - Loads the two custom fonts: Hanken Grotesk (display) and JetBrains Mono (code)
+ *   - Injects theme-init.js before the page renders to prevent a flash of the wrong theme
+ *   - Imports global Tailwind CSS and Leaflet's default marker/tile styles
+ *   - Wraps every page in ConvexClientProvider (real-time data) and AuthProvider (user sessions)
+ */
 
 import type { Metadata } from "next";
 import { Hanken_Grotesk, JetBrains_Mono } from "next/font/google";
@@ -25,6 +33,15 @@ export const metadata: Metadata = {
   description: "Post-wildfire environmental monitoring dashboard for the Athabasca watershed",
 };
 
+/**
+ * RootLayout — the single HTML shell that wraps every page in the app.
+ *
+ * Applies font CSS variables to <body>, sets antialiasing, and nests the
+ * Convex and Auth providers so all child pages have access to live data
+ * and user session state.
+ *
+ * @param children — the active page component rendered by Next.js routing
+ */
 export default function RootLayout({
   children,
 }: Readonly<{

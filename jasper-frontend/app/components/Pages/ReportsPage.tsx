@@ -1,8 +1,15 @@
-// Reports Page — shows a list of environmental reports that can be downloaded.
-// Users can filter by category (Hydro-geology, Limnology, etc.)
-// Reports marked "Ready" can be downloaded as a text file.
-// Reports marked "Draft Model" have a button to trigger the model ingest process.
-// Note: the downloaded files currently contain sample data — real PDFs would come from the backend.
+/**
+ * ReportsPage.tsx — Environmental reports listing with download and ingest controls.
+ *
+ * Shows categorised report cards that can be filtered by discipline.
+ * "Ready" reports generate and download a plain-text file in the browser
+ * (real PDFs would be served from the backend in production).
+ * "Draft Model" reports show a "Run Stability Model Ingest" button that simulates
+ * a 1.5-second processing delay before changing status to "Ready".
+ *
+ * An audit log at the bottom of the page tracks all downloads and ingest runs
+ * for the current session (cleared on page refresh — no persistence yet).
+ */
 
 "use client";
 
@@ -43,6 +50,13 @@ const INITIAL_REPORTS: Report[] = [
   { id: "REP-004", category: "Model Output",   title: "Soil Stability Assessment & Contour Plume Prediction",  author: "Erosion Predictor v2.4",   date: "2024-07-29", fileSize: "4.1 MB",  status: "Draft Model" },
 ];
 
+/**
+ * ReportsPage — full-page report browser with filter, download, ingest, and audit log.
+ *
+ * Manages category filter state, the list of reports (status can change from
+ * "Draft Model" → "Running..." → "Ready"), download spinners, and the session
+ * audit log.
+ */
 export function ReportsPage() {
   const [filter, setFilter]               = useState<"All" | Category>("All");
   const [reports, setReports]             = useState(INITIAL_REPORTS);

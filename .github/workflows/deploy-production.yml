@@ -1,24 +1,6 @@
-# deploy-production.yml — Manual Production Deployment to Vercel + Railway
-#
-# Owner: Edwin (CI/CD) — only Edwin can approve this workflow
-# Trigger: Manual only (workflow_dispatch). Production is NEVER deployed automatically.
-#
-# Two-layer protection before anything reaches production:
-#   1. Typed confirmation: the deployer must type "DEPLOY" in the dispatch form.
-#      Prevents accidental triggers from the GitHub Actions UI.
-#   2. GitHub Environments approval: Edwin must click "Approve" in the
-#      GitHub UI before the deploy job starts (configured under
-#      Settings → Environments → production → Required reviewers).
-#
-# Always deploy from the `main` branch — never from feature or develop branches.
-# Run this workflow only AFTER: CI is green on main, staging has been validated,
-# and M4/M5 sign-off has been received.
-
 name: Deploy — Production
 
 on:
-  # Manual dispatch only — no automatic production deploys under any circumstances.
-  # The `confirm` input is a human-readable safety gate to prevent UI mis-clicks.
   workflow_dispatch:
     inputs:
       confirm:
@@ -27,8 +9,6 @@ on:
         default: ""
 
 jobs:
-  # Gate check runs first and fails fast if the confirmation text is wrong.
-  # This stops the deployment before any expensive steps run.
   gate-check:
     name: "Production Gate Check"
     runs-on: ubuntu-latest
@@ -44,14 +24,9 @@ jobs:
   deploy-production:
     name: "Deploy to Vercel Production"
     runs-on: ubuntu-latest
-    needs: gate-check  # Only runs if the gate-check job succeeded
-    # `environment: production` requires Edwin's manual click-to-approve in
-    # GitHub → Settings → Environments → production before this job starts.
-    # This is a second human gate on top of the typed confirmation above.
-    environment: production
+    needs: gate-check
+    environment: production   # requires Edwin's manual approval in GitHub Environments
     steps:
-      # Always check out `main` — production must only ever come from main,
-      # never from a feature branch or develop.
       - uses: actions/checkout@v4
         with:
           ref: main
@@ -64,9 +39,6 @@ jobs:
       - name: Install Vercel CLI
         run: npm install -g vercel
 
-      # `--prod` deploys to the production Vercel alias (the public URL),
-      # not a preview URL. RAILWAY_PROD_URL points to the production Railway
-      # service (separate from the staging service used in deploy-staging.yml).
       - name: Deploy frontend to Vercel (production)
         working-directory: jasper-frontend
         run: vercel --prod --token=${{ secrets.VERCEL_TOKEN }} --yes
@@ -76,13 +48,9 @@ jobs:
           NEXT_PUBLIC_API_BASE_URL: ${{ secrets.RAILWAY_PROD_URL }}
           NEXT_PUBLIC_ML_API_BASE_URL: ${{ secrets.ML_API_URL }}
           NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
-          ML_API_KEY: ${{ secrets.ML_API_KEY || secrets.NEXT_PUBLIC_API_KEY }}
+          ML_API_KEY: ${{ secrets.ML_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
-      # Production smoke test is STRICTER than staging: `exit 1` on failure
-      # means the CI job is marked red and visible in the GitHub PR/commit view.
-      # `--retry 5 --retry-delay 10` gives Railway up to 50 seconds — enough
-      # for a cold start — before declaring the deploy failed.
       - name: Post-deploy smoke test
         run: |
           PROD_URL="${{ secrets.RAILWAY_PROD_URL }}"

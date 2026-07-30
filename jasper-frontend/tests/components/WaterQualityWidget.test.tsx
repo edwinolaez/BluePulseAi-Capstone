@@ -28,5 +28,6 @@ it("shows the pH unit label", () => {
 
 it("shows the live indicator", () => {
   render(<WaterQualityWidget />);
-  expect(screen.getByText("Live")).toBeInTheDocument();
+  // Without ConvexAvailableContext the widget shows "Simulated"; with it shows "Live · Observed"
+  expect(screen.getByText(/Live|Simulated/)).toBeInTheDocument();
 });
