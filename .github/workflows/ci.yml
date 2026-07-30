@@ -259,6 +259,7 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           TEST_ANALYST_JWT: ${{ secrets.TEST_ANALYST_JWT }}
           TEST_INGEST_JWT: ${{ secrets.TEST_INGEST_JWT }}
+          NEXT_PUBLIC_API_KEY: jasper-dev-api-key-2026
           ML_API_KEY: ${{ secrets.ML_API_KEY }}
           NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
           ML_API_URL: ${{ secrets.ML_API_URL }}
