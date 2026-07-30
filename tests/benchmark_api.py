@@ -26,7 +26,7 @@ from dotenv import load_dotenv
 load_dotenv(dotenv_path=".env.local")
 
 BASE_API_URL = os.getenv("RAILWAY_API_URL", "http://localhost:8000")
-KONG_API_KEY = os.getenv("NEXT_PUBLIC_API_KEY", "")
+KONG_API_KEY = os.getenv("ML_API_KEY") or os.getenv("NEXT_PUBLIC_API_KEY", "")
 
 BACKEND_CONFIGURED = bool(BASE_API_URL and BASE_API_URL != "http://localhost:8000")
 
@@ -47,7 +47,7 @@ def measure_response_times(endpoint: str, method: str = "GET",
     headers = {"X-API-Key": KONG_API_KEY}
     times = []
 
-    with httpx.Client(base_url=BASE_API_URL, timeout=10.0) as client:
+    with httpx.Client(base_url=BASE_API_URL, timeout=10.0, verify=False) as client:
         for _ in range(n):
             if method == "GET":
                 response = client.get(endpoint, headers=headers)
@@ -180,7 +180,7 @@ class TestMLInferencePerformance:
 
         # Warm up: one request to load the model into memory
         # (we don't count this in the measurements)
-        with httpx.Client(base_url=BASE_API_URL, timeout=30.0) as client:
+        with httpx.Client(base_url=BASE_API_URL, timeout=30.0, verify=False) as client:
             client.post(
                 "/predict/change-detection",
                 json=payload,
@@ -219,7 +219,7 @@ class TestMLInferencePerformance:
         }
 
         # Warm up
-        with httpx.Client(base_url=BASE_API_URL, timeout=30.0) as client:
+        with httpx.Client(base_url=BASE_API_URL, timeout=30.0, verify=False) as client:
             client.post(
                 "/simulate/contaminant",
                 json=payload,
