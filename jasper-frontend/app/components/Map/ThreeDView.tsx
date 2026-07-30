@@ -1,3 +1,22 @@
+/**
+ * ThreeDView.tsx — 3D risk visualization of the Jasper watershed using deck.gl.
+ *
+ * Renders a full-screen interactive 3D scene over real Rocky Mountain terrain:
+ *   - TerrainLayer   — SRTM 30m elevation mesh with ESRI satellite imagery
+ *   - PolygonLayer   — OSM 3D building footprints for the Jasper townsite
+ *   - ColumnLayer    — risk score bars (height = score, colour = High/Med/Low)
+ *   - ScatterplotLayer — coloured sensor dots at each monitoring position
+ *
+ * Data flow:
+ *   1. Fetches timeline scans for all five sectors on mount
+ *   2. Re-interpolates values whenever the centerDate (slider position) changes
+ *   3. Column heights and colours update to reflect the current interpolated state
+ *
+ * Hover tooltips show the sector label, risk score, real GPS coordinates, and
+ * whether the position is from a real database record or estimated.
+ *
+ * Loaded dynamically with ssr:false in MapViewPage — deck.gl requires WebGL.
+ */
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -164,6 +183,18 @@ interface Props {
   simulationResults: SimulationResults | null;
 }
 
+/**
+ * ThreeDView
+ * Deck.gl 3D risk visualization.  Fetches timeline data for all five sectors
+ * in parallel on mount and re-renders column heights whenever the slider moves.
+ *
+ * @param centerDate     - current slider position as ISO date
+ * @param activeSectorId - ID of the sector the user has selected
+ * @param onSectorClick  - handler called when a column or sensor dot is clicked
+ * @param showErosion    - visibility toggle for erosion columns
+ * @param showContaminant - visibility toggle for contaminant column
+ * @param showBurnScar   - visibility toggle for burn scar column
+ */
 export function ThreeDView({
   centerDate,
   activeSectorId,

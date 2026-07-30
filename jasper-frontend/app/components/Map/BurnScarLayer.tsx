@@ -1,8 +1,17 @@
-// BurnScarLayer shows the forest burn scar zone on the map.
-// It calls Richard's change-detection ML model to find out the current risk level
-// for the Athabasca watershed sector, then draws a coloured circle on the map
-// where the risk is — red for high, amber for medium, green for low.
-// If the API call fails, it just defaults to showing High risk colours.
+/**
+ * BurnScarLayer.tsx — Forest burn scar hazard zone for the Leaflet map.
+ *
+ * On mount, calls Richard's change-detection ML model (fetchChangeDetection)
+ * for sector ATH-001-A.  The returned risk_label (High / Medium / Low) drives
+ * both the visual style of the HazardZone overlay and the popup badge colour.
+ *
+ * If the API call fails for any reason, the layer falls back to "High" risk
+ * styling — the most visible and most cautious default.
+ *
+ * Rendered elements:
+ *   - A small sensor dot (CircleMarker) at the burn scar centroid
+ *   - A large semi-transparent HazardZone circle around the affected area
+ */
 
 "use client";
 
@@ -24,6 +33,13 @@ const RISK_STYLE = {
   Low:    { borderColor: "#004a92", fillColor: "#5aaee0", badge: "text-green-500", dotColor: "#22c55e" },
 } as const;
 
+/**
+ * BurnScarLayer — react-leaflet layer component for the forest burn scar zone.
+ *
+ * Fetches the current burn risk from Richard's API on first render and
+ * renders a sensor dot + hazard zone circle with colour-coded risk styling.
+ * No props — uses the hard-coded DEFAULT_SECTOR and CENTER constants.
+ */
 export function BurnScarLayer() {
   // Holds the response from Richard's API — null while loading or if the call failed
   const [result, setResult] = useState<ModelOutput | null>(null);

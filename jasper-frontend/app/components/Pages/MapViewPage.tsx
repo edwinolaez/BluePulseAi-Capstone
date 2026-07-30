@@ -1,7 +1,24 @@
-// MapViewPage is the main interactive map screen.
-// It renders the Leaflet map with all three environmental layers on top,
-// plus layer toggle switches, zoom buttons, a time slider,
-// and a Live Readings panel on the right that shows real-time sensor data.
+/**
+ * MapViewPage.tsx — Main interactive map view page.
+ *
+ * Hosts either the 2D Leaflet map (JasperMap) or the 3D deck.gl view (ThreeDView)
+ * depending on the is3D prop.  Both map components are loaded with dynamic() /
+ * ssr:false because Leaflet and WebGL require browser APIs not available on the server.
+ *
+ * Layout:
+ *   - Left/main: the full-screen map with zoom buttons and mobile "Live" button overlaid
+ *   - Right sidebar: TemporalSlider, SectorPanel, and four live sensor widgets
+ *     (on mobile this sidebar is hidden off-screen and slides in when "Live" is tapped)
+ *
+ * Data flow:
+ *   1. User clicks a sector on the map → sectorId state updates
+ *   2. useEffect fetches timeline scans for that sector from Feven's backend
+ *   3. Slider position (centerDate) feeds into interpolateScans() to blend values
+ *   4. Blended InterpolatedState is passed to SectorPanel for display
+ *
+ * A fetchIdRef prevents stale responses from an older sector fetch overwriting
+ * a newer one if the user clicks sectors quickly.
+ */
 
 "use client";
 

@@ -1,17 +1,41 @@
+/**
+ * SuperadminConfirmModal.tsx — Second-step confirmation for superadmin login.
+ *
+ * When a superadmin signs in, they are NOT immediately logged in.  Instead,
+ * AuthContext puts the account into a "pendingSuperadmin" state and the login
+ * page calls onSuperadminPending() to show this modal.
+ *
+ * The modal shows the user's name, email, and role badge, and asks them to
+ * confirm they are an authorised administrator before completing the login.
+ * Cancelling clears the pending state and returns the user to the login screen.
+ *
+ * Why the extra step?  Superadmins can delete accounts — the confirmation
+ * makes accidental logins much less likely.
+ */
 "use client";
 
 import { useAuth } from "../../contexts/AuthContext";
 
 interface Props {
+  /** Called after the user clicks "Confirm & Sign In" and the session is saved. */
   onConfirmed: () => void;
 }
 
+/**
+ * SuperadminConfirmModal
+ * Overlay modal that appears as the second step of the superadmin login flow.
+ * Renders nothing (returns null) until a superadmin account is pending confirmation.
+ *
+ * @param onConfirmed - callback invoked once the superadmin session is established
+ */
 export function SuperadminConfirmModal({ onConfirmed }: Props) {
   const { pendingSuperadmin, confirmSuperadmin, cancelSuperadmin } = useAuth();
 
+  // Don't render anything until a superadmin account is waiting for confirmation
   if (!pendingSuperadmin) return null;
 
   function handleConfirm() {
+    // Finalise the session in AuthContext, then notify the parent page
     confirmSuperadmin();
     onConfirmed();
   }

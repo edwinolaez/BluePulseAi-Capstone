@@ -1,5 +1,20 @@
+/**
+ * icons.tsx — Centralised SVG icon components used throughout the Jasper UI.
+ *
+ * Each icon is a thin wrapper around an inline SVG with sensible defaults:
+ *   - stroke-current: inherits the parent element's text colour
+ *   - fill-none: outline style (no filled backgrounds)
+ *   - strokeWidth 2, rounded caps and joins
+ *
+ * All icons accept an optional className prop so callers can control size
+ * and colour via Tailwind classes (e.g. "w-5 h-5 text-sait-sky").
+ *
+ * Adding a new icon: copy any existing function, swap the SVG path, and
+ * export it.  No icon library dependency is needed.
+ */
 type IconProps = { className?: string };
 
+// Shared SVG class applied to every icon — inherits text colour, no fill
 const base = "stroke-current fill-none";
 
 export function MenuIcon({ className }: IconProps) {

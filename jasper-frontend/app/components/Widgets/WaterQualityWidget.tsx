@@ -1,9 +1,20 @@
+/**
+ * WaterQualityWidget.tsx — Live water turbidity and pH sensor widget.
+ *
+ * Displays the latest turbidity (NTU) and acidity (pH) readings from the
+ * Athabasca watershed sensors, plus a 7-bar sparkline showing recent turbidity history.
+ *
+ * Live / mock modes:
+ *   - Convex configured: LiveWaterData subscribes to getLiveWaterQuality and
+ *     pushes new turbidity + pH values up via the onData callback.
+ *   - Convex not configured: a setInterval applies small random jitter every
+ *     2.5 seconds so the numbers and sparkline stay in motion during demos.
+ *
+ * The useCallback on handleLiveData is important — without it a new function
+ * reference would be created every render, causing LiveWaterData's useEffect
+ * to re-fire and potentially create an update loop.
+ */
 "use client";
-
-// WaterQualityWidget shows live turbidity and pH readings from the
-// Athabasca watershed sensors stored in Rahil's Convex database.
-// When Convex is not yet configured (URL not set), it falls back to
-// a realistic animated simulation so the dashboard still looks alive.
 
 import { useEffect, useState, useContext, useCallback } from "react";
 import { useQuery } from "convex/react";
@@ -20,9 +31,15 @@ function jitter(v: number, amount: number, min: number, max: number) {
   return clamp(v + (Math.random() - 0.5) * amount, min, max);
 }
 
-// Inner component that calls Convex's useQuery hook.
-// Only rendered when ConvexClientProvider has a real URL configured —
-// so useQuery is never called outside its required ConvexProvider context.
+/**
+ * LiveWaterData — inner component that safely calls Convex's useQuery hook.
+ *
+ * Only rendered inside a ConvexErrorBoundary when ConvexProvider is active.
+ * Subscribes to getLiveWaterQuality for sector "sector-1" and pushes new
+ * turbidity + pH readings up to the parent widget via onData.
+ *
+ * @param onData - callback receiving (turbidity, ph) whenever Convex data updates
+ */
 function LiveWaterData({
   onData,
 }: {
@@ -44,6 +61,13 @@ function LiveWaterData({
   return null;
 }
 
+/**
+ * WaterQualityWidget — sidebar widget displaying turbidity, pH, and a mini sparkline.
+ *
+ * Conditionally mounts LiveWaterData when Convex is available; otherwise runs
+ * the mock jitter animation.  Shows a "Live · Observed" badge when live, or
+ * "Simulated" when running in mock mode.
+ */
 export function WaterQualityWidget() {
   // Check if Convex is ready — set by ConvexClientProvider based on .env.local
   const isConvexReady = useContext(ConvexAvailableContext);

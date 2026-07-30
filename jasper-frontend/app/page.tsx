@@ -1,7 +1,18 @@
-// This is the main entry point of the app — the root page that controls
-// everything the user sees after logging in.
-// It handles: which tab is active, whether the sidebar is open,
-// authentication state, and rendering the correct page component.
+/**
+ * page.tsx — Root page component for Project Jasper.
+ *
+ * This is the single-page application shell that sits at the "/" route.
+ * It owns all top-level state: which tab is active, sidebar open/closed,
+ * which map layers are shown, and whether the 3D view is enabled.
+ *
+ * Rendering logic:
+ *   1. Shows a spinner while AuthContext checks localStorage for a saved session.
+ *   2. Shows LoginPage (+ optional SuperadminConfirmModal) when no user is logged in.
+ *   3. Shows the full dashboard (TopNav + Sidebar + active page + Footer) once logged in.
+ *
+ * Only one page component renders at a time — the active one is chosen by the
+ * `activeTab` state variable controlled by TopNav clicks.
+ */
 
 "use client";
 
@@ -23,6 +34,13 @@ import { AiOverviewPage } from "./components/Pages/AiOverviewPage";
 import type { FlyToTarget } from "./components/Map/JasperMap";
 import type { SimulationResults, FieldPhoto } from "../lib/api";
 
+/**
+ * Home — the root page component mounted at "/".
+ *
+ * Manages all top-level UI state for the dashboard shell (active tab,
+ * sidebar, layer toggles, fly-to target) and delegates rendering to
+ * the appropriate page component based on which tab is selected.
+ */
 export default function Home() {
   // useAuth gives us the currently logged-in user and the logout function.
   // If currentUser is null, we show the login page instead of the dashboard.

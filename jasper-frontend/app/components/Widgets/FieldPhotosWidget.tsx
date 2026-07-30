@@ -1,3 +1,11 @@
+/**
+ * FieldPhotosWidget.tsx — Field validation photo thumbnails widget.
+ *
+ * Shown in the Map View Live Readings sidebar.  Currently renders two
+ * placeholder gradient squares representing field photos from the monitoring
+ * team.  In a full build these would be replaced with real photos uploaded
+ * from the field — either from Convex storage or an S3-compatible bucket.
+ */
 "use client";
 
 import { useState } from "react";

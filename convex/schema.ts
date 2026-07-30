@@ -1,41 +1,76 @@
+/**
+ * schema.ts — Convex database schema for Project Jasper.
+ *
+ * Defines every table that lives in the Convex database and the shape of each
+ * document inside it.  Convex enforces these types at runtime, so any write
+ * that doesn't match will be rejected automatically.
+ *
+ * Tables:
+ *   pipelineStatus    — tracks whether each data-ingest pipeline is healthy
+ *   waterQualityLive  — latest turbidity / pH / hydrocarbon reading per sector
+ *   modelMetadata     — accuracy stats for the deployed ML model
+ *   droneScans        — uploaded CIRUS drone imagery files with metadata
+ */
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
+  /**
+   * One document per data pipeline (e.g. "satellite", "iot").
+   * Updated whenever the ingest worker runs — lets the dashboard show
+   * whether data is fresh or stale.
+   */
   pipelineStatus: defineTable({
-    ingestType: v.string(),
-    lastIngestTime: v.number(),
-    recordCount: v.number(),
-    status: v.string(),
-    errorMessage: v.optional(v.string()),
+    ingestType:    v.string(),           // identifier for the pipeline, e.g. "satellite"
+    lastIngestTime: v.number(),          // Unix timestamp (ms) of the last successful run
+    recordCount:   v.number(),           // how many records were ingested in that run
+    status:        v.string(),           // "ok", "error", etc.
+    errorMessage:  v.optional(v.string()), // present only when status is "error"
   }),
 
+  /**
+   * Latest water quality reading for each monitoring sector.
+   * Only one "live" row per sector is kept — the mutation patches the existing row.
+   * Indexed by sectorId for fast single-sector lookups.
+   */
   waterQualityLive: defineTable({
-    sectorId: v.string(),
-    turbidity: v.number(),
-    ph: v.number(),
-    hydrocarbonLevel: v.number(),
-    timestamp: v.number(),
+    sectorId:         v.string(),  // e.g. "ATH-001-W"
+    turbidity:        v.number(),  // NTU — higher = murkier water
+    ph:               v.number(),  // 0–14 scale; 7 = neutral
+    hydrocarbonLevel: v.number(),  // normalised 0–1 contamination proxy
+    timestamp:        v.number(),  // Unix ms of when this reading was taken
   }).index("by_sector", ["sectorId"]),
 
+  /**
+   * Accuracy metrics for the currently deployed ML model.
+   * Written by Rahil's model pipeline after each training run.
+   */
   modelMetadata: defineTable({
-    modelName: v.string(),
-    modelVersion: v.string(),
-    f1Score: v.number(),
-    runId: v.optional(v.string()),
-    trainingDate: v.number(),
-    lastPrediction: v.number(),
+    modelName:      v.string(),           // which model, e.g. "default"
+    modelVersion:   v.string(),           // semver string, e.g. "v1.2"
+    f1Score:        v.number(),           // 0–1 accuracy metric (higher is better)
+    runId:          v.optional(v.string()), // MLflow/W&B run identifier for traceability
+    trainingDate:   v.number(),           // Unix ms when training finished
+    lastPrediction: v.number(),           // Unix ms of most recent inference
   }),
 
+  /**
+   * Drone scan files uploaded by the CIRUS team.
+   * storageId is a reference to a file in Convex's built-in file storage.
+   * Indexed by sector and date so the widget can list scans quickly.
+   */
   droneScans: defineTable({
-    storageId:   v.id("_storage"),
+    storageId:   v.id("_storage"),  // file stored in Convex's blob storage
     filename:    v.string(),
-    uploadedBy:  v.string(),
-    sectorId:    v.string(),
-    scanDate:    v.number(),
-    notes:       v.optional(v.string()),
-    fileSize:    v.number(),
-    mimeType:    v.string(),
+    uploadedBy:  v.string(),        // e.g. "CIRUS Team"
+    sectorId:    v.string(),        // which monitoring sector this scan covers
+    scanDate:    v.number(),        // Unix ms timestamp of the actual flight
+    notes:       v.optional(v.string()), // optional field notes from the pilot
+    fileSize:    v.number(),        // bytes
+    mimeType:    v.string(),        // e.g. "image/jpeg" or "image/tiff"
+    // processing = file uploaded but not yet analysed
+    // ready      = analysis complete, file is viewable
+    // error      = ingest pipeline failed for this scan
     status:      v.union(v.literal("processing"), v.literal("ready"), v.literal("error")),
   })
     .index("by_sector", ["sectorId"])

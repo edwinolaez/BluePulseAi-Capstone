@@ -1,3 +1,17 @@
+/**
+ * StationPopupCard.tsx — Popup card shown inside Leaflet map markers.
+ *
+ * Renders a compact information card used by HazardZone and TelemetryStation
+ * when a marker is clicked.  The card shows:
+ *   - An emoji icon + title row with a colour-coded status badge
+ *   - A large station name
+ *   - A two-column grid of key/value data fields
+ *
+ * The status badge colours are:
+ *   OPERATIONAL — grey (all good)
+ *   WARNING     — amber (attention needed)
+ *   CRITICAL    — red (immediate action required)
+ */
 "use client";
 
 export type StationStatus = "OPERATIONAL" | "WARNING" | "CRITICAL";
@@ -22,6 +36,16 @@ const STATUS_BADGE: Record<StationStatus, string> = {
   CRITICAL:    "bg-red-100 text-red-700",
 };
 
+/**
+ * StationPopupCard
+ * Compact data card rendered inside a Leaflet Popup.
+ *
+ * @param icon   - emoji displayed at the start of the title row (default "✨")
+ * @param title  - header text describing the sensor type
+ * @param status - determines the badge colour
+ * @param name   - full station or area name shown prominently
+ * @param fields - array of label/value rows displayed in a two-column grid
+ */
 export function StationPopupCard({ icon = "✨", title, status, name, fields }: Props) {
   return (
     <div className="w-64 font-sans">

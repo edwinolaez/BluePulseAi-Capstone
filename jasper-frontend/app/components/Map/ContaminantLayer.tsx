@@ -1,10 +1,18 @@
-// ContaminantLayer visualises water contamination flowing through the Athabasca River.
-// It draws two river path lines on the map (main channel + branch),
-// places animated directional arrows along the river to show which way the plume is moving,
-// and adds a hazard zone circle at the critical contamination point.
-//
-// The arrow direction and animation speed come directly from Richard's contaminant API —
-// so as the model updates, the arrows update too.
+/**
+ * ContaminantLayer.tsx — Athabasca River water contamination layer for the Leaflet map.
+ *
+ * Draws the river course as two Polyline overlays (main channel + branch),
+ * places animated directional arrow markers to visualise where the contaminant
+ * plume is heading, and renders a HazardZone circle at the critical point
+ * (WSC station 07AA001 — Miette River at Jasper).
+ *
+ * Arrow behaviour:
+ *   - Direction comes from contaminant_vector.direction_deg returned by Richard's API
+ *   - Animation speed is inversely proportional to velocity (faster water = faster pulse)
+ *   - Arrow count scales with zoom level (hidden at low zoom to reduce clutter)
+ *
+ * Falls back to direction=180°, velocity=0.65 if the API is unreachable.
+ */
 
 "use client";
 
@@ -41,9 +49,17 @@ const ARROW_POSITIONS: [number, number][] = [
   [52.905, -117.988],
 ];
 
-// Creates a Leaflet custom icon that looks like a directional arrow.
-// The arrow rotates to match the plume's direction, and its pulse animation
-// speeds up when the water velocity is higher.
+/**
+ * arrowIcon — builds a Leaflet DivIcon shaped like a rotating directional arrow.
+ *
+ * The SVG arrow is rotated to directionDeg so it points the way the plume is
+ * moving.  The CSS pulse animation duration is shortened for higher velocities
+ * so faster-moving water produces a more urgent visual rhythm.
+ *
+ * @param directionDeg - compass heading (0–360°) the arrow should point
+ * @param velocity     - normalised plume speed (0–1); higher = faster animation
+ * @returns a Leaflet DivIcon with inline SVG and CSS animation
+ */
 function arrowIcon(directionDeg: number, velocity: number): L.DivIcon {
   // Lower duration = faster animation = faster moving water
   const duration = Math.max(0.6, 2.5 - velocity * 2).toFixed(1);
@@ -61,6 +77,14 @@ function arrowIcon(directionDeg: number, velocity: number): L.DivIcon {
   });
 }
 
+/**
+ * ContaminantLayer — react-leaflet layer component for the river contamination visualisation.
+ *
+ * Fetches contaminant simulation data from Richard's API on mount, then renders
+ * the river polylines, animated flow arrows, sensor dot, and hazard zone.
+ * Subscribes to map zoom changes so arrow density adjusts as the user zooms.
+ * No props required.
+ */
 export function ContaminantLayer() {
   const [result, setResult] = useState<ModelOutput | null>(null);
   const map = useMap();

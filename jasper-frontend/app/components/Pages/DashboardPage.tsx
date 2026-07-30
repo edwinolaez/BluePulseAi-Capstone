@@ -1,8 +1,16 @@
-// Dashboard Page — the first thing users see after logging in.
-// Shows a health overview of the Jasper watershed with 4 key readings:
-// water cloudiness, acidity, ash levels, and ground stability.
-// Users can click each card to change the chart below it,
-// and filter by sensor station using the buttons at the top right.
+/**
+ * DashboardPage.tsx — Jasper Valley Health Monitor overview page.
+ *
+ * Presents four clickable stat cards (water cloudiness, acidity, ash, soil stability),
+ * a line chart that updates to show the trend for the selected card, an area health
+ * alert panel, and the CIRUS drone scan widget.
+ *
+ * Users can filter all readings by sensor station using the pill buttons at the top.
+ * Clicking a stat card selects it (blue border) and updates the chart below.
+ *
+ * Data source: the STATION_DATA constant (static demo data per station).
+ * Real readings would replace this with API calls once the sensor backend is live.
+ */
 
 "use client";
 
@@ -135,9 +143,17 @@ const ALERTS = [
   },
 ];
 
-// The line chart that appears below the stat cards.
-// It draws the hourly trend for whichever card the user last clicked,
-// and shows a dashed warning line so you can see if readings are getting close to danger levels.
+/**
+ * TrendChart — SVG sparkline that shows hourly sensor values for the selected metric.
+ *
+ * Draws a polyline of the last 12 hours of readings with a dashed horizontal
+ * "danger baseline" so the viewer can instantly see how close values are to
+ * the warning threshold.
+ *
+ * @param data        - array of 12 normalised values (0–100 scale)
+ * @param dangerValue - y-position (0–100) where the warning line is drawn
+ * @param dangerLabel - text label shown next to the warning line
+ */
 function TrendChart({ data, dangerValue, dangerLabel }: { data: number[]; dangerValue: number; dangerLabel: string }) {
   const width = 700;
   const height = 180;
@@ -171,8 +187,22 @@ function TrendChart({ data, dangerValue, dangerLabel }: { data: number[]; danger
   );
 }
 
-// Each of the 4 clickable cards at the top of the dashboard.
-// Clicking a card selects it (shows a blue border) and updates the chart below to match that metric.
+/**
+ * StatCard — one of the four clickable metric summary cards at the top of the dashboard.
+ *
+ * When selected (selected=true) it shows a blue border and highlights its icon.
+ * Clicking it fires onClick which updates the chart below to show that metric's trend.
+ *
+ * @param icon     - icon component to render in the card's icon slot
+ * @param label    - short metric name shown above the value
+ * @param value    - current reading formatted as a string
+ * @param unit     - unit label (NTU, pH, ppm, %)
+ * @param status   - human-readable status text shown in the badge
+ * @param badge    - Tailwind class string for the badge background and text colour
+ * @param delta    - change description shown below the badge (e.g. "+0.4 NTU from last week")
+ * @param selected - true when this card's metric is currently shown in the chart
+ * @param onClick  - called when the user clicks this card
+ */
 function StatCard({
   icon: Icon, label, value, unit, status, badge, delta, selected, onClick,
 }: {
