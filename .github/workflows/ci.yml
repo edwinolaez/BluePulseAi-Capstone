@@ -140,7 +140,7 @@ jobs:
       # issues (which would otherwise mark the step as failed and skip upload).
       # 90-day retention covers the full project timeline through M5 sign-off.
       - name: Upload Semgrep report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: semgrep-report-${{ github.sha }}
