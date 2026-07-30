@@ -33,7 +33,7 @@ import { ModelPerformanceWidget } from "../Widgets/ModelPerformanceWidget";
 import { FieldPhotosWidget } from "../Widgets/FieldPhotosWidget";
 import type { FlyToTarget } from "../Map/JasperMap";
 import { fetchTimeline } from "../../../lib/api";
-import type { TimelineScan } from "../../../lib/api";
+import type { TimelineScan, SimulationResults, FieldPhoto } from "../../../lib/api";
 import { interpolateScans } from "../../../lib/interpolation";
 import type { InterpolatedState } from "../../../lib/interpolation";
 
@@ -47,28 +47,16 @@ const ThreeDView = dynamic(
 );
 
 interface Props {
-  /** When set, tells the Leaflet map to animate to these coordinates.  Uses a nonce to re-trigger on repeat clicks of the same sector. */
-  flyTo?:          FlyToTarget | null;
-  /** When true, renders the 3D deck.gl view instead of the 2D Leaflet map. */
-  is3D:            boolean;
-  /** Controls visibility of the purple erosion risk zones. */
-  showErosion:     boolean;
-  /** Controls visibility of the cyan contaminant / river flow layer. */
-  showContaminant: boolean;
-  /** Controls visibility of the blue forest burn scar layer. */
-  showBurnScar:    boolean;
+  flyTo?:             FlyToTarget | null;
+  is3D:               boolean;
+  showErosion:        boolean;
+  showContaminant:    boolean;
+  showBurnScar:       boolean;
+  simulationResults?: SimulationResults | null;
+  photos?:            FieldPhoto[];
 }
 
-/**
- * MapViewPage — the full interactive map screen.
- *
- * Manages sector selection, timeline fetching, interpolation, and the
- * mobile sidebar drawer.  Delegates actual map rendering to JasperMap or
- * ThreeDView based on the is3D prop.
- *
- * @param props - see Props interface above
- */
-export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBurnScar }: Props) {
+export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBurnScar, simulationResults, photos }: Props) {
   const [sectorId, setSectorId]               = useState<string | null>(null);
   const [dateFrom, setDateFrom]               = useState("2024-06-01");
   const [dateTo, setDateTo]                   = useState("2024-07-24");
@@ -119,6 +107,7 @@ export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBur
               showErosion={showErosion}
               showContaminant={showContaminant}
               showBurnScar={showBurnScar}
+              simulationResults={simulationResults ?? null}
             />
           ) : (
             <JasperMap
@@ -242,7 +231,7 @@ export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBur
         <WaterQualityWidget />
         <PipelineStatusWidget />
         <ModelPerformanceWidget />
-        <FieldPhotosWidget />
+        <FieldPhotosWidget photos={photos} />
       </aside>
 
     </div>

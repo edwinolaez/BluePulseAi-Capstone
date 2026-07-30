@@ -24,7 +24,7 @@ const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 // Richard's ML backend — where erosion, contaminant, and burn scar models live
 const ML_API = process.env.NEXT_PUBLIC_ML_API_BASE_URL ?? "";
-const ML_KEY = process.env.NEXT_PUBLIC_API_KEY ?? "";
+const ML_KEY = process.env.ML_API_KEY ?? "";
 
 /** Returns auth headers for every request to Richard's ML backend. */
 function mlHeaders() {

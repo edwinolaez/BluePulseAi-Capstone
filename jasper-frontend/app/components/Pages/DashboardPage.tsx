@@ -14,7 +14,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import {
   DropletIcon,
   TargetIcon,
@@ -22,8 +22,38 @@ import {
   PulseIcon,
   ChartLineIcon,
   LayersIcon,
+  FolderIcon,
+  XIcon,
 } from "../Layout/icons";
 import { DroneScanWidget } from "../Widgets/DroneScanWidget";
+import type { FieldPhoto, SimulationTag, SimulationResults } from "../../../lib/api";
+
+interface DashboardProps {
+  photos:            FieldPhoto[];
+  onPhotosChange:    (photos: FieldPhoto[]) => void;
+  simulationResults: SimulationResults | null;
+}
+
+const TAG_LABELS: Record<SimulationTag, string> = {
+  erosion:     "Erosion",
+  contaminant: "Contaminant",
+  burnScar:    "Burn Scar",
+  untagged:    "Untagged",
+};
+
+const TAG_ACTIVE: Record<SimulationTag, string> = {
+  erosion:     "bg-amber-500 text-white border-amber-500",
+  contaminant: "bg-blue-500 text-white border-blue-500",
+  burnScar:    "bg-red-500 text-white border-red-500",
+  untagged:    "bg-gray-500 text-white border-gray-500",
+};
+
+const TAG_BADGE: Record<SimulationTag, string> = {
+  erosion:     "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300",
+  contaminant: "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300",
+  burnScar:    "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300",
+  untagged:    "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400",
+};
 
 // The list of sensor stations the user can filter by
 const STATIONS = ["All Stations", "IoT Jasper-A1", "Silt Monitor S-2", "Slope Sensor SL-4"] as const;
@@ -203,20 +233,48 @@ function StatCard({
   );
 }
 
-/**
- * DashboardPage — the main environmental health overview screen.
- *
- * Orchestrates the station filter, stat card selection, and chart rendering.
- * Passes the selected station's data to StatCard and TrendChart, then renders
- * the area health alerts panel and DroneScanWidget below.
- */
-export function DashboardPage() {
+export function DashboardPage({ photos, onPhotosChange, simulationResults }: DashboardProps) {
   // Which station the user has selected — starts on "All Stations"
   const [station, setStation] = useState<Station>("All Stations");
   // Which metric card is currently selected — starts on water cloudiness
   const [metric, setMetric] = useState<MetricKey>("turbidity");
+  // Which simulation tag to apply on the next photo upload
+  const [pendingTag, setPendingTag] = useState<SimulationTag>("untagged");
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const s = STATION_DATA[station];
   const metricConfig = METRICS[metric];
+
+  // Auto-suggest a tag based on whatever simulation last ran in AI Overview
+  const suggestedTag = useMemo((): SimulationTag => {
+    if (!simulationResults) return "untagged";
+    if (simulationResults.contaminant) return "contaminant";
+    if (simulationResults.erosion) return "erosion";
+    if (simulationResults.burn) return "burnScar";
+    return "untagged";
+  }, [simulationResults]);
+
+  useEffect(() => { setPendingTag(suggestedTag); }, [suggestedTag]);
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length) return;
+    const now = new Date().toISOString();
+    const newPhotos: FieldPhoto[] = files.map(file => ({
+      id:            `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      url:           URL.createObjectURL(file),
+      name:          file.name,
+      uploadedAt:    now,
+      simulationTag: pendingTag,
+    }));
+    onPhotosChange([...photos, ...newPhotos]);
+    e.target.value = "";
+  }
+
+  function removePhoto(id: string) {
+    const photo = photos.find(p => p.id === id);
+    if (photo) URL.revokeObjectURL(photo.url);
+    onPhotosChange(photos.filter(p => p.id !== id));
+  }
 
   const trendByMetric: Record<MetricKey, number[]> = {
     turbidity: s.trendTurbidity,
@@ -311,6 +369,95 @@ export function DashboardPage() {
       {/* CIRUS Drone Scans — full-width section below the main grid */}
       <div className="mt-4">
         <DroneScanWidget />
+      </div>
+
+      {/* Field Photo Upload */}
+      <div className="mt-4">
+        <div className="rounded-xl border border-gray-200/60 dark:border-gray-700/40 bg-surface p-5">
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100 flex items-center gap-2">
+              <FolderIcon className="w-4 h-4 text-sait-sky" />
+              Field Validation Photos
+            </h2>
+            <span className="text-xs text-gray-400">{photos.length} uploaded</span>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+            Upload site photos and tag them to a simulation type. Tagged photos appear in the Map View sidebar.
+          </p>
+
+          {/* Tag picker */}
+          <div className="mb-3">
+            <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">
+              Simulation Tag
+              {simulationResults && (
+                <span className="ml-2 text-sait-sky normal-case font-normal">
+                  · auto-suggested from last AI run
+                </span>
+              )}
+            </p>
+            <div className="flex gap-2 flex-wrap">
+              {(["erosion", "contaminant", "burnScar", "untagged"] as SimulationTag[]).map(tag => (
+                <button
+                  key={tag}
+                  onClick={() => setPendingTag(tag)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                    pendingTag === tag
+                      ? TAG_ACTIVE[tag]
+                      : "bg-transparent text-gray-500 border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-500"
+                  }`}
+                >
+                  {TAG_LABELS[tag]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Upload button */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={handleFileChange}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full py-2.5 rounded-lg border-2 border-dashed border-sait-sky/30 hover:border-sait-sky/60 text-sait-sky text-xs font-semibold flex items-center justify-center gap-2 transition-colors mb-4"
+          >
+            <span className="text-base leading-none">↑</span>
+            Browse &amp; Upload Images
+          </button>
+
+          {/* Uploaded thumbnails */}
+          {photos.length > 0 && (
+            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2">
+              {photos.map(photo => (
+                <div key={photo.id} className="relative group aspect-square rounded-lg overflow-hidden bg-surface-alt">
+                  <img
+                    src={photo.url}
+                    alt={photo.name}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <button
+                      onClick={() => removePhoto(photo.id)}
+                      className="w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600"
+                      title="Remove photo"
+                    >
+                      <XIcon className="w-3 h-3" />
+                    </button>
+                  </div>
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-1.5 pb-0.5 pt-2">
+                    <span className={`text-[8px] font-semibold ${TAG_BADGE[photo.simulationTag]}`}>
+                      {TAG_LABELS[photo.simulationTag]}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

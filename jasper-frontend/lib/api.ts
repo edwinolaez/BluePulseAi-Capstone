@@ -1,46 +1,13 @@
-/**
- * api.ts — Central API client for Project Jasper's two backend services.
- *
- * Feven's backend  (NEXT_PUBLIC_API_BASE_URL)    — environmental layer data and sector timelines
- * Richard's backend (NEXT_PUBLIC_ML_API_BASE_URL) — three ML model simulations
- *
- * All fetch calls use a 10-second timeout via AbortController so a slow or
- * unreachable backend never hangs the UI indefinitely.
- *
- * Authentication: every request includes an "X-API-Key" header sourced from
- * NEXT_PUBLIC_API_KEY.  Both backends share the same key for now.
- *
- * Exported types: LayerData, TimelineScan, TimelineData, ModelOutput
- * Exported functions: fetchTimeline, fetchLayerData, fetchChangeDetection,
- *                     fetchErosionSimulation, fetchContaminantSimulation
- */
-
-// Feven's backend URL — handles data pipeline and environmental layer queries
-const FEVEN_API = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
-// Richard's ML model API — runs the three AI simulations; falls back to FEVEN_API if not set separately
-const ML_API    = process.env.NEXT_PUBLIC_ML_API_BASE_URL ?? FEVEN_API;
-// API key sent in every request header to authenticate with the backend
-const API_KEY   = process.env.NEXT_PUBLIC_API_KEY ?? "";
+// This file is the main connection point between the frontend and the backend APIs.
+// Feven's backend handles the map layer data, and Richard's ML backend handles
+// the three AI model predictions (burn scar, erosion, and contaminant).
+//
+// All external calls are proxied through Next.js API routes so that the backend
+// API key never leaves the server and is never bundled into the client JS.
 
 const FETCH_TIMEOUT_MS = 10_000;
 
-/**
- * apiHeaders — builds the shared request headers object.
- * Attaches the API key to every request so the server knows it's coming from us.
- * @returns a HeadersInit object with the X-API-Key set
- */
-function apiHeaders(): HeadersInit {
-  return { "X-API-Key": API_KEY };
-}
-
-/**
- * fetchWithTimeout — wraps the native fetch with an automatic abort after timeoutMs.
- * Without this, a hung network request would silently freeze the UI forever.
- * @param url       - the full URL to request
- * @param options   - standard RequestInit options (method, headers, body, etc.)
- * @param timeoutMs - milliseconds before the request is aborted (default 10 000)
- * @returns the same Promise<Response> as a normal fetch call
- */
+// Wraps fetch with an AbortController timeout so hung requests don't freeze the UI
 function fetchWithTimeout(
   url: string,
   options: RequestInit = {},
@@ -102,13 +69,31 @@ export interface ModelOutput {
   confidence:  number;
 }
 
-// ─── Functions that call Feven's backend ─────────────────────────────────────
+export interface SimulationResults {
+  burn:        ModelOutput | null;
+  erosion:     ModelOutput | null;
+  contaminant: ModelOutput | null;
+}
+
+export type SimulationTag = "erosion" | "contaminant" | "burnScar" | "untagged";
+
+export interface FieldPhoto {
+  id:            string;
+  url:           string;
+  name:          string;
+  uploadedAt:    string;
+  simulationTag: SimulationTag;
+  riskLabel?:    string;
+  riskScore?:    number;
+}
+
+// ─── Functions that call Feven's backend (via server-side proxy) ──────────────
 
 // Fetches all timestamped scan records for a sector — used by the timeline slider
 // interpolation to blend values between real capture dates.
 export async function fetchTimeline(sectorId: string): Promise<TimelineData> {
-  const url = `${FEVEN_API}/api/v1/sectors/${encodeURIComponent(sectorId)}/timeline`;
-  const res = await fetchWithTimeout(url, { headers: apiHeaders() });
+  const params = new URLSearchParams({ sector_id: sectorId });
+  const res = await fetchWithTimeout(`/api/backend/timeline?${params}`);
   if (!res.ok) throw new Error(`Timeline fetch failed: ${res.status}`);
   return res.json();
 }
@@ -121,21 +106,26 @@ export async function fetchLayerData(
   dateTo:    string,
   layerType: string
 ): Promise<LayerData> {
-  const url = `${FEVEN_API}/api/v1/layers/${encodeURIComponent(sectorId)}?date_from=${dateFrom}&date_to=${dateTo}&layer_type=${layerType}`;
-  const res = await fetchWithTimeout(url, { headers: apiHeaders() });
+  const params = new URLSearchParams({
+    sector_id:  sectorId,
+    date_from:  dateFrom,
+    date_to:    dateTo,
+    layer_type: layerType,
+  });
+  const res = await fetchWithTimeout(`/api/backend/layers?${params}`);
   if (!res.ok) throw new Error(`Layer fetch failed: ${res.status}`);
   return res.json();
 }
 
-// ─── Functions that call Richard's ML backend ─────────────────────────────────
+// ─── Functions that call Richard's ML backend (via server-side proxy) ─────────
 
 // Asks Richard's model to predict the burn scar / forest damage risk for a sector.
 export async function fetchChangeDetection(
   sectorId: string
 ): Promise<ModelOutput> {
-  const res = await fetchWithTimeout(`${ML_API}/api/v1/predict/change-detection`, {
+  const res = await fetchWithTimeout("/api/ml/change-detection", {
     method:  "POST",
-    headers: { ...apiHeaders(), "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json" },
     body:    JSON.stringify({ sector_id: sectorId }),
   });
   if (!res.ok) throw new Error(`Change detection failed: ${res.status}`);
@@ -155,9 +145,7 @@ export async function fetchErosionSimulation(
     slope_deg:   String(slopeDeg),
     rainfall_mm: String(rainfallMm),
   });
-  const res = await fetchWithTimeout(`${ML_API}/api/v1/simulate/erosion?${params}`, {
-    headers: apiHeaders(),
-  });
+  const res = await fetchWithTimeout(`/api/ml/erosion?${params}`);
   if (!res.ok) throw new Error(`Erosion simulation failed: ${res.status}`);
   return res.json();
 }
@@ -175,9 +163,7 @@ export async function fetchContaminantSimulation(
     water_velocity_ms:   String(waterVelocityMs),
     contamination_level: String(contaminationLevel),
   });
-  const res = await fetchWithTimeout(`${ML_API}/api/v1/simulate/contaminant?${params}`, {
-    headers: apiHeaders(),
-  });
+  const res = await fetchWithTimeout(`/api/ml/contaminant?${params}`);
   if (!res.ok) throw new Error(`Contaminant simulation failed: ${res.status}`);
   return res.json();
 }

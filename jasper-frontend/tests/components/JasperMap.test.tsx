@@ -14,6 +14,7 @@ jest.mock("react-leaflet", () => ({
   Circle: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
   Tooltip: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
   Polyline: () => <div />,
+  Polygon:  ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
   useMap: () => ({}),
   useMapEvents: () => null,
 }));

@@ -22,6 +22,7 @@ import { BurnScarLayer } from "./BurnScarLayer";
 import { ErosionLayer } from "./ErosionLayer";
 import { ContaminantLayer } from "./ContaminantLayer";
 import { TelemetryStation } from "./TelemetryStation";
+import { ElevationRiskLayer } from "./ElevationRiskLayer";
 
 const ATHABASCA_CENTER: [number, number] = [52.875, -118.08];
 const DEFAULT_ZOOM = 12;
@@ -120,6 +121,10 @@ export default function JasperMap({
       {onMapInit     && <MapController onMapInit={onMapInit} />}
       {flyTo         && <FlyToController target={flyTo} />}
 
+      {/* Elevation risk classification — base layer, always visible */}
+      <ElevationRiskLayer />
+
+      {/* Sensor-specific layers render on top of the risk surface */}
       {showErosion     && <ErosionLayer />}
       {showContaminant && <ContaminantLayer />}
       {showBurnScar    && <BurnScarLayer />}

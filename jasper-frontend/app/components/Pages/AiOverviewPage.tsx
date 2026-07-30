@@ -20,7 +20,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchChangeDetection, fetchErosionSimulation, fetchContaminantSimulation, ModelOutput } from "../../../lib/api";
+import { fetchChangeDetection, fetchErosionSimulation, fetchContaminantSimulation } from "../../../lib/api";
+import type { ModelOutput, SimulationResults } from "../../../lib/api";
 import { ResearcherChatPanel } from "../Widgets/ResearcherChatPanel";
 
 const MODELS = [
@@ -119,13 +120,12 @@ function ScoreBar({ value }: { value: number }) {
   );
 }
 
-/**
- * AiOverviewPage
- * Displays live ML model outputs for burn scar, erosion, and contaminant
- * detection.  All three API calls fire in parallel; the page shows estimated
- * fallback values until they resolve.
- */
-export function AiOverviewPage() {
+interface Props {
+  onResultsUpdate:  (results: SimulationResults) => void;
+  onNavigateToMap:  () => void;
+}
+
+export function AiOverviewPage({ onResultsUpdate, onNavigateToMap }: Props) {
   const [results, setResults] = useState<Record<string, ModelOutput | null>>({
     burn: null, erosion: null, contaminant: null,
   });
@@ -139,14 +139,14 @@ export function AiOverviewPage() {
       fetchErosionSimulation("ATH-001-H", 42, 95),
       fetchContaminantSimulation("ATH-001-W", 180, 2.1, 0.72),
     ]).then(([burn, erosion, contaminant]) => {
-      setResults({
-        burn:        burn.status        === "fulfilled" ? burn.value        : null,
-        erosion:     erosion.status     === "fulfilled" ? erosion.value     : null,
-        contaminant: contaminant.status === "fulfilled" ? contaminant.value : null,
-      });
+      const burnVal        = burn.status        === "fulfilled" ? burn.value        : null;
+      const erosionVal     = erosion.status     === "fulfilled" ? erosion.value     : null;
+      const contaminantVal = contaminant.status === "fulfilled" ? contaminant.value : null;
+      setResults({ burn: burnVal, erosion: erosionVal, contaminant: contaminantVal });
+      onResultsUpdate({ burn: burnVal, erosion: erosionVal, contaminant: contaminantVal });
       setLoading(false);
     });
-  }, []);
+  }, [onResultsUpdate]);
 
   const mockFallback: Record<string, Partial<ModelOutput>> = {
     burn:        { risk_label: "High",   risk_score: 0.82, confidence: 0.946, model_version: "v1.3.0", timestamp: new Date().toISOString() },
@@ -293,6 +293,27 @@ export function AiOverviewPage() {
           );
         })}
       </div>
+
+      {/* ── View on Map CTA — appears once simulation results have loaded ─────── */}
+      {!loading && (
+        <div className="mb-6 flex items-center justify-between gap-4 p-4 rounded-xl border border-sait-sky/40 bg-sait-sky/5 dark:bg-sait-sky/10">
+          <div>
+            <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">Simulations complete</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+              Erosion heatmap and contaminant plume are ready to view on the 3D map.
+            </p>
+          </div>
+          <button
+            onClick={onNavigateToMap}
+            className="shrink-0 flex items-center gap-2 px-4 py-2 rounded-lg bg-sait-sky text-white text-sm font-semibold hover:bg-sait-sky/80 transition-colors shadow"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 6l6 6-6 6" />
+            </svg>
+            View on Map
+          </button>
+        </div>
+      )}
 
       {/* ── Model Output Summary table ───────────────────────────────────────── */}
       <div className="rounded-xl border border-gray-200/60 dark:border-gray-700/40 bg-surface overflow-hidden">

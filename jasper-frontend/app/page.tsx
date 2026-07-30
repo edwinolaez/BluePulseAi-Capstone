@@ -32,6 +32,7 @@ import { ArchivesPage } from "./components/Pages/ArchivesPage";
 import { AdminPage } from "./components/Pages/AdminPage";
 import { AiOverviewPage } from "./components/Pages/AiOverviewPage";
 import type { FlyToTarget } from "./components/Map/JasperMap";
+import type { SimulationResults, FieldPhoto } from "../lib/api";
 
 /**
  * Home — the root page component mounted at "/".
@@ -61,6 +62,8 @@ export default function Home() {
   const [showErosion, setShowErosion]         = useState(true);
   const [showContaminant, setShowContaminant] = useState(true);
   const [showBurnScar, setShowBurnScar]       = useState(true);
+  const [simulationResults, setSimulationResults] = useState<SimulationResults | null>(null);
+  const [fieldPhotos, setFieldPhotos]             = useState<FieldPhoto[]>([]);
 
   // The superadmin confirmation modal — only shows after a superadmin logs in
   const [showSuperConfirm, setShowSuperConfirm] = useState(false);
@@ -154,9 +157,9 @@ export default function Home() {
         />}
 
         {/* Only one of these pages renders at a time depending on the active tab */}
-        {activeTab === "map"       && <MapViewPage flyTo={flyTo} is3D={is3D} showErosion={showErosion} showContaminant={showContaminant} showBurnScar={showBurnScar} />}
-        {activeTab === "dashboard" && <DashboardPage />}
-        {activeTab === "ai"        && <AiOverviewPage />}
+        {activeTab === "map"       && <MapViewPage flyTo={flyTo} is3D={is3D} showErosion={showErosion} showContaminant={showContaminant} showBurnScar={showBurnScar} simulationResults={simulationResults} photos={fieldPhotos} />}
+        {activeTab === "dashboard" && <DashboardPage photos={fieldPhotos} onPhotosChange={setFieldPhotos} simulationResults={simulationResults} />}
+        {activeTab === "ai"        && <AiOverviewPage onResultsUpdate={setSimulationResults} onNavigateToMap={() => handleTabChange("map")} />}
         {activeTab === "reports"   && <ReportsPage />}
         {activeTab === "archives"  && <ArchivesPage />}
         {/* Admin page only renders for superadmin — extra safety check here */}

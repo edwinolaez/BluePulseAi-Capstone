@@ -259,7 +259,7 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           TEST_ANALYST_JWT: ${{ secrets.TEST_ANALYST_JWT }}
           TEST_INGEST_JWT: ${{ secrets.TEST_INGEST_JWT }}
-          NEXT_PUBLIC_API_KEY: ${{ secrets.NEXT_PUBLIC_API_KEY }}
+          ML_API_KEY: ${{ secrets.ML_API_KEY }}
           NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
           ML_API_URL: ${{ secrets.ML_API_URL }}
 
@@ -291,7 +291,7 @@ jobs:
         continue-on-error: true
         env:
           NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
-          NEXT_PUBLIC_API_KEY: ${{ secrets.NEXT_PUBLIC_API_KEY }}
+          ML_API_KEY: ${{ secrets.ML_API_KEY }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -347,7 +347,7 @@ jobs:
         env:
           RAILWAY_API_URL: ${{ secrets.RAILWAY_API_URL }}
           ML_API_URL: ${{ secrets.ML_API_URL }}
-          NEXT_PUBLIC_API_KEY: ${{ secrets.NEXT_PUBLIC_API_KEY }}
+          ML_API_KEY: ${{ secrets.ML_API_KEY }}
         run: |
           pip install -r requirements.txt pytest-benchmark
           if [ -f benchmark_api.py ]; then
