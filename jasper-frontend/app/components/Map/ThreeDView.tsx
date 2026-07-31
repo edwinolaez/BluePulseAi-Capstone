@@ -25,8 +25,8 @@ import { LightingEffect, AmbientLight, DirectionalLight } from "@deck.gl/core";
 import { ColumnLayer, ScatterplotLayer, PolygonLayer } from "@deck.gl/layers";
 import { TerrainLayer, TripsLayer } from "@deck.gl/geo-layers";
 import { HeatmapLayer } from "@deck.gl/aggregation-layers";
-import { fetchTimeline } from "../../../lib/api";
-import type { TimelineScan, SimulationResults } from "../../../lib/api";
+import { fetchTimeline, fetchErosionSimulation } from "../../../lib/api";
+import type { TimelineScan, SimulationResults, ModelOutput } from "../../../lib/api";
 import { interpolateScans } from "../../../lib/interpolation";
 import type { InterpolatedState } from "../../../lib/interpolation";
 
@@ -107,9 +107,9 @@ interface HeatPoint { lon: number; lat: number; weight: number; }
 // ATH-001-H/M/L: approximate erosion-risk zones derived from DEM terrain analysis
 //                (no public point-sensor network for soil erosion in Jasper NP)
 const SECTORS = [
-  { id: "ATH-001-H", label: "High Erosion Zone",          lat: 52.858,  lon: -118.092,  elevation: 1380, defaultScore: 0.87, defaultRisk: "High",   source: ""                      },
-  { id: "ATH-001-M", label: "Mid Erosion Zone",            lat: 52.870,  lon: -118.070,  elevation: 1180, defaultScore: 0.52, defaultRisk: "Medium", source: ""                      },
-  { id: "ATH-001-L", label: "Low Erosion Zone",            lat: 52.884,  lon: -118.045,  elevation: 1090, defaultScore: 0.22, defaultRisk: "Low",    source: ""                      },
+  { id: "ATH-001-H", label: "Steep Valley Slope",           lat: 52.858,  lon: -118.092,  elevation: 1380, defaultScore: 0.87, defaultRisk: "High",   source: ""                      },
+  { id: "ATH-001-M", label: "Mid-Slope Terrace",            lat: 52.870,  lon: -118.070,  elevation: 1180, defaultScore: 0.52, defaultRisk: "Medium", source: ""                      },
+  { id: "ATH-001-L", label: "Lower Valley Bench",           lat: 52.884,  lon: -118.045,  elevation: 1090, defaultScore: 0.22, defaultRisk: "Low",    source: ""                      },
   { id: "ATH-001-A", label: "2024 Wildfire Burn Scar",     lat: 52.848,  lon: -118.083,  elevation: 1080, defaultScore: 0.75, defaultRisk: "High",   source: "Alberta Wildfire 2024" },
   { id: "ATH-001-W", label: "Miette River (WSC 07AA001)",  lat: 52.8639, lon: -118.1069, elevation: 1062, defaultScore: 0.44, defaultRisk: "Medium", source: "WSC 07AA001"           },
 ] as const;
@@ -171,16 +171,188 @@ interface OsmBuilding {
   height:  number;
 }
 
+interface ElevationZoneDatum {
+  category: number;
+  label:    string;
+  sublabel: string;
+  fill:     [number, number, number, number];
+  line:     [number, number, number, number];
+  polygon:  [number, number, number][];
+}
+
+interface ErosionZoneDatum {
+  kind:        "erosion-zone";
+  sectorId:    string;
+  label:       string;
+  slopeDeg:    number;
+  riskLabel:   string;
+  riskScore:   number | null;
+  confidence:  number | null;
+  polygon:     [number, number, number][];
+  fillColor:   [number, number, number, number];
+  lineColor:   [number, number, number, number];
+}
+
+// Static polygon configs for the three erosion monitoring zones.
+// Coordinates are [lon, lat, elevation] — deck.gl format (swapped from Leaflet).
+// Elevations float ~80 m above typical terrain so slabs clear the mesh surface.
+const EROSION_ZONE_CONFIGS = [
+  { sectorId: "ATH-001-H", label: "Steep Valley Slope",  slopeDeg: 38.5, rainfallMm: 82.0,
+    polygon: [
+      [-118.110, 52.866, 1460], [-118.121, 52.860, 1460], [-118.113, 52.846, 1460],
+      [-118.094, 52.840, 1460], [-118.076, 52.845, 1460], [-118.074, 52.860, 1460],
+      [-118.087, 52.870, 1460],
+    ] as [number, number, number][],
+  },
+  { sectorId: "ATH-001-M", label: "Mid-Slope Terrace",   slopeDeg: 22.0, rainfallMm: 82.0,
+    polygon: [
+      [-118.082, 52.880, 1280], [-118.062, 52.875, 1280], [-118.056, 52.862, 1280],
+      [-118.064, 52.854, 1280], [-118.080, 52.858, 1280], [-118.088, 52.870, 1280],
+    ] as [number, number, number][],
+  },
+  { sectorId: "ATH-001-L", label: "Lower Valley Bench",  slopeDeg: 12.0, rainfallMm: 82.0,
+    polygon: [
+      [-118.058, 52.894, 1170], [-118.040, 52.890, 1170], [-118.032, 52.878, 1170],
+      [-118.040, 52.868, 1170], [-118.056, 52.872, 1170], [-118.064, 52.884, 1170],
+    ] as [number, number, number][],
+  },
+];
+
+// RGBA colour lookup for each ML risk_label — fill and border variants
+const EROSION_RISK_RGBA: Record<string, {
+  fill: [number, number, number, number];
+  line: [number, number, number, number];
+}> = {
+  High:    { fill: [220, 38,  38,  140], line: [153, 27,  27,  200] },
+  Medium:  { fill: [245, 158, 11,  130], line: [217, 119, 6,   200] },
+  Low:     { fill: [34,  197, 94,  120], line: [22,  163, 74,  200] },
+  Unknown: { fill: [156, 163, 175, 100], line: [107, 114, 128, 150] },
+};
+
+// What each ML risk_label means in the field — shown in the 3D tooltip
+const EROSION_RISK_DESC: Record<string, string> = {
+  High:    "Active soil loss · burn scar destabilisation · urgent slope stabilisation needed",
+  Medium:  "Moderate sediment transport · elevated runoff · monitoring & revegetation advised",
+  Low:     "Minimal surface loss · stable vegetation cover · routine observation only",
+  Unknown: "Awaiting ML model response",
+};
+
+// 3D elevation flood risk zones — same 5-class system as the 2D ElevationRiskLayer.
+// Coordinates are [lon, lat, baseElevation] in deck.gl format (swapped from Leaflet's [lat, lon]).
+// Each zone floats ~100 m above its typical terrain elevation so it clears the terrain mesh.
+const ELEVATION_ZONE_DATA: ElevationZoneDatum[] = [
+  // ── Category 1 — Minimal (Gray) — high-elevation bedrock ridges ──────────────
+  {
+    category: 1, label: "Category 1 — Minimal Risk", sublabel: "High ridges · stable bedrock",
+    fill: [156, 163, 175, 100], line: [107, 114, 128, 140],
+    polygon: [
+      [-118.245, 52.972, 2200], [-118.175, 52.988, 2200], [-118.095, 52.978, 2200],
+      [-118.058, 52.958, 2200], [-118.075, 52.938, 2200], [-118.145, 52.936, 2200],
+      [-118.210, 52.950, 2200],
+    ],
+  },
+  {
+    category: 1, label: "Category 1 — Minimal Risk", sublabel: "High ridges · stable bedrock",
+    fill: [156, 163, 175, 100], line: [107, 114, 128, 140],
+    polygon: [
+      [-117.942, 52.962, 2200], [-117.895, 52.974, 2200], [-117.848, 52.952, 2200],
+      [-117.838, 52.918, 2200], [-117.862, 52.898, 2200], [-117.902, 52.893, 2200],
+      [-117.932, 52.914, 2200], [-117.942, 52.942, 2200],
+    ],
+  },
+  // ── Category 2 — Low (Orange) — upper forested slopes ────────────────────────
+  {
+    category: 2, label: "Category 2 — Low Risk", sublabel: "Upper slopes · stable terrain",
+    fill: [245, 158, 11, 100], line: [217, 119, 6, 140],
+    polygon: [
+      [-118.210, 52.942, 1900], [-118.158, 52.958, 1900], [-118.105, 52.952, 1900],
+      [-118.078, 52.935, 1900], [-118.068, 52.920, 1900], [-118.092, 52.906, 1900],
+      [-118.132, 52.913, 1900], [-118.172, 52.928, 1900],
+    ],
+  },
+  {
+    category: 2, label: "Category 2 — Low Risk", sublabel: "Upper slopes · stable terrain",
+    fill: [245, 158, 11, 100], line: [217, 119, 6, 140],
+    polygon: [
+      [-118.012, 52.942, 1900], [-117.970, 52.953, 1900], [-117.930, 52.936, 1900],
+      [-117.920, 52.912, 1900], [-117.938, 52.893, 1900], [-117.965, 52.884, 1900],
+      [-117.985, 52.896, 1900], [-117.997, 52.920, 1900], [-118.018, 52.934, 1900],
+    ],
+  },
+  // ── Category 3 — Moderate (Green) — mid-elevation transitional ───────────────
+  {
+    category: 3, label: "Category 3 — Moderate Risk", sublabel: "Transitional terrain · partial burn",
+    fill: [34, 197, 94, 100], line: [22, 163, 74, 140],
+    polygon: [
+      [-118.052, 52.902, 1500], [-118.020, 52.915, 1500], [-117.988, 52.906, 1500],
+      [-117.972, 52.888, 1500], [-117.965, 52.868, 1500], [-117.975, 52.852, 1500],
+      [-118.005, 52.845, 1500], [-118.024, 52.858, 1500], [-118.038, 52.877, 1500],
+      [-118.044, 52.892, 1500],
+    ],
+  },
+  {
+    category: 3, label: "Category 3 — Moderate Risk", sublabel: "Transitional terrain · partial burn",
+    fill: [34, 197, 94, 100], line: [22, 163, 74, 140],
+    polygon: [
+      [-118.105, 52.922, 1500], [-118.072, 52.933, 1500], [-118.038, 52.922, 1500],
+      [-118.033, 52.904, 1500], [-118.058, 52.896, 1500], [-118.092, 52.904, 1500],
+    ],
+  },
+  // ── Category 4 — High (Blue) — Athabasca / Miette river corridors ────────────
+  {
+    category: 4, label: "Category 4 — High Risk", sublabel: "River corridor · flood-prone lowlands",
+    fill: [59, 130, 246, 110], line: [29, 78, 216, 150],
+    polygon: [
+      [-118.188, 52.898, 1180], [-118.145, 52.907, 1180], [-118.098, 52.902, 1180],
+      [-118.062, 52.889, 1180], [-118.042, 52.876, 1180], [-118.044, 52.862, 1180],
+      [-118.068, 52.860, 1180], [-118.092, 52.874, 1180], [-118.122, 52.886, 1180],
+      [-118.160, 52.894, 1180],
+    ],
+  },
+  {
+    category: 4, label: "Category 4 — High Risk", sublabel: "River corridor · flood-prone lowlands",
+    fill: [59, 130, 246, 110], line: [29, 78, 216, 150],
+    polygon: [
+      [-118.222, 52.884, 1180], [-118.205, 52.872, 1180], [-118.215, 52.862, 1180],
+      [-118.238, 52.865, 1180], [-118.248, 52.876, 1180], [-118.238, 52.887, 1180],
+    ],
+  },
+  // ── Category 5 — Extreme (Red) — 2024 wildfire burn scar ─────────────────────
+  {
+    category: 5, label: "Category 5 — Extreme Risk", sublabel: "Active burn scar · extreme erosion",
+    fill: [239, 68, 68, 110], line: [185, 28, 28, 150],
+    polygon: [
+      [-118.110, 52.872, 1200], [-118.128, 52.862, 1200], [-118.135, 52.846, 1200],
+      [-118.120, 52.830, 1200], [-118.098, 52.816, 1200], [-118.068, 52.812, 1200],
+      [-118.044, 52.824, 1200], [-118.035, 52.842, 1200], [-118.046, 52.860, 1200],
+      [-118.065, 52.874, 1200], [-118.088, 52.876, 1200],
+    ],
+  },
+  {
+    category: 5, label: "Category 5 — Extreme Risk", sublabel: "Active burn scar · extreme erosion",
+    fill: [239, 68, 68, 110], line: [185, 28, 28, 150],
+    polygon: [
+      [-118.032, 52.857, 1200], [-118.015, 52.846, 1200], [-118.022, 52.830, 1200],
+      [-118.044, 52.820, 1200], [-118.058, 52.834, 1200], [-118.050, 52.852, 1200],
+    ],
+  },
+];
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 interface Props {
-  centerDate:        string;
-  activeSectorId:    string | null;
-  onSectorClick:     (id: string) => void;
-  showErosion:       boolean;
-  showContaminant:   boolean;
-  showBurnScar:      boolean;
-  simulationResults: SimulationResults | null;
+  centerDate:          string;
+  activeSectorId:      string | null;
+  onSectorClick:       (id: string) => void;
+  showErosion:         boolean;
+  showContaminant:     boolean;
+  showBurnScar:        boolean;
+  showElevation:       boolean;
+  simulationResults:   SimulationResults | null;
+  /** Scenario panel: contamination level 0–1 (drives plume colour + length) */
+  contaminationLevel?: number;
+  /** Scenario panel: hours to project forward (extends plume path) */
+  projectionHours?:    number;
 }
 
 /**
@@ -202,7 +374,10 @@ export function ThreeDView({
   showErosion,
   showContaminant,
   showBurnScar,
+  showElevation,
   simulationResults,
+  contaminationLevel = 0.72,
+  projectionHours    = 24,
 }: Props) {
 
   const [viewState, setViewState] = useState(INITIAL_VIEW_STATE);
@@ -242,6 +417,16 @@ export function ThreeDView({
   }, [centerDate, sectorScans]);
 
   const [buildings, setBuildings] = useState<OsmBuilding[]>([]);
+
+  // Fetch ML erosion simulation for each of the three monitored zones
+  const [erosionML, setErosionML] = useState<Record<string, ModelOutput | null>>({});
+  useEffect(() => {
+    EROSION_ZONE_CONFIGS.forEach((cfg) => {
+      fetchErosionSimulation(cfg.sectorId, cfg.slopeDeg, cfg.rainfallMm)
+        .then((data) => setErosionML((prev) => ({ ...prev, [cfg.sectorId]: data })))
+        .catch(()  => setErosionML((prev) => ({ ...prev, [cfg.sectorId]: null })));
+    });
+  }, []);
 
   // Contaminant plume animation
   const [plumeTime, setPlumeTime] = useState(0);
@@ -287,6 +472,25 @@ export function ThreeDView({
       })
       .catch(() => { /* Overpass unavailable — render without buildings */ });
   }, []);
+
+  // Build erosion zone polygons from static configs + live ML risk_label
+  const erosionZoneData: ErosionZoneDatum[] = EROSION_ZONE_CONFIGS.map((cfg) => {
+    const ml         = erosionML[cfg.sectorId];
+    const riskLabel  = ml?.risk_label ?? "Unknown";
+    const colors     = EROSION_RISK_RGBA[riskLabel] ?? EROSION_RISK_RGBA.Unknown;
+    return {
+      kind:       "erosion-zone" as const,
+      sectorId:   cfg.sectorId,
+      label:      cfg.label,
+      slopeDeg:   cfg.slopeDeg,
+      riskLabel,
+      riskScore:  ml?.risk_score   ?? null,
+      confidence: ml?.confidence   ?? null,
+      polygon:    cfg.polygon,
+      fillColor:  colors.fill,
+      lineColor:  colors.line,
+    };
+  });
 
   const layerVisible: Record<string, boolean> = {
     erosion:     showErosion,
@@ -342,9 +546,25 @@ export function ThreeDView({
   ];
 
   const directionDeg = simulationResults?.contaminant?.contaminant_vector?.direction_deg ?? 180;
+
+  // Scale plume waypoints and step size from the scenario sliders.
+  // More contamination → more waypoints (longer visible trail).
+  // More hours → larger step size (plume front reaches further downstream).
+  const plumeNumPts = Math.max(4, Math.round(4 + contaminationLevel * 18)); // 4–22 pts
+  const plumeStepKm = Math.min(1.8, 0.35 + (projectionHours / 72) * 1.45); // 0.35–1.8 km
+
+  // Plume colour and opacity shift blue → amber → red as contamination rises
+  const plumeColor: [number, number, number] =
+    contaminationLevel >= 0.7 ? [239, 68,  68]  // red
+    : contaminationLevel >= 0.4 ? [245, 158, 11]  // amber
+    : [0, 163, 224];                              // sky blue
+
+  const plumeOpacity     = 0.45 + contaminationLevel * 0.45; // 0.45–0.90
+  const plumeTrailLength = 150  + Math.round(contaminationLevel * 280); // 150–430
+
   const plumeData = showContaminant ? [{
-    path:       computePlumePath(-118.1069, 52.8639, directionDeg),
-    timestamps: Array.from({ length: 12 }, (_, i) => i * (PLUME_LOOP / 12)),
+    path:       computePlumePath(-118.1069, 52.8639, directionDeg, plumeNumPts, plumeStepKm),
+    timestamps: Array.from({ length: plumeNumPts }, (_, i) => i * (PLUME_LOOP / plumeNumPts)),
   }] : [];
 
   const layers = [
@@ -381,17 +601,59 @@ export function ThreeDView({
       ],
     }),
 
-    // Contaminant plume — animated trail following ML-predicted flow direction
+    // Contaminant plume — colour, opacity, and length driven by scenario sliders
     new TripsLayer({
-      id:           "contaminant-plume",
-      data:         plumeData,
-      getPath:      (d) => d.path,
-      getTimestamps:(d) => d.timestamps,
-      getColor:     [0, 163, 224],   // SAIT Sky blue
-      opacity:      0.85,
+      id:             "contaminant-plume",
+      data:           plumeData,
+      getPath:        (d) => d.path,
+      getTimestamps:  (d) => d.timestamps,
+      getColor:       plumeColor,
+      opacity:        plumeOpacity,
       widthMinPixels: 4,
-      trailLength:  280,
-      currentTime:  plumeTime,
+      trailLength:    plumeTrailLength,
+      currentTime:    plumeTime,
+    }),
+
+    // Elevation flood risk zones — same 5-class system as the 2D map, floating as thin slabs
+    // above their respective terrain elevations (cat1 ridges at 2200m, cat5 burn scar at 1200m)
+    new PolygonLayer<ElevationZoneDatum>({
+      id:                 "elevation-risk-zones",
+      data:               showElevation ? ELEVATION_ZONE_DATA : [],
+      getPolygon:         (d) => d.polygon,
+      getElevation:       30,
+      getFillColor:       (d) => d.fill,
+      getLineColor:       (d) => d.line,
+      lineWidthMinPixels: 1,
+      extruded:           true,
+      pickable:           true,
+      opacity:            0.75,
+      material: {
+        ambient:       0.55,
+        diffuse:       0.45,
+        shininess:     4,
+        specularColor: [255, 255, 255],
+      },
+    }),
+
+    // Soil erosion risk zones — ML-coloured extruded slabs, one per monitored sector
+    new PolygonLayer<ErosionZoneDatum>({
+      id:                 "erosion-risk-zones",
+      data:               showErosion ? erosionZoneData : [],
+      getPolygon:         (d) => d.polygon,
+      getElevation:       25,
+      getFillColor:       (d) => d.fillColor,
+      getLineColor:       (d) => d.lineColor,
+      lineWidthMinPixels: 1,
+      extruded:           true,
+      pickable:           true,
+      opacity:            0.80,
+      updateTriggers: { getFillColor: [erosionML] },
+      material: {
+        ambient:       0.55,
+        diffuse:       0.45,
+        shininess:     4,
+        specularColor: [255, 255, 255],
+      },
     }),
 
     // OSM 3D buildings — extruded footprints from Overpass API
@@ -419,13 +681,11 @@ export function ThreeDView({
       data:                sensorDots,
       getPosition:         (d) => [d.lon, d.lat, d.elevation],
       getFillColor:        (d) => SENSOR_COLOR[d.layerType],
-      getLineColor:        [255, 255, 255, 220],
       getRadius:           160,
       radiusMinPixels:     6,
       radiusMaxPixels:     12,
       filled:              true,
-      stroked:             true,
-      lineWidthMinPixels:  2,
+      stroked:             false,
       pickable:            false,
     }),
 
@@ -433,8 +693,8 @@ export function ThreeDView({
     new ColumnLayer<SectorDatum>({
       id:             "sector-columns",
       data,
-      diskResolution: 32,
-      radius:         650,
+      diskResolution: 24,
+      radius:         200,
       extruded:       true,
       pickable:       true,
       opacity:        0.88,
@@ -480,7 +740,7 @@ export function ThreeDView({
         controller
         layers={layers}
         effects={[LIGHTING]}
-        getTooltip={({ object }: { object?: SectorDatum | SensorDot }) => {
+        getTooltip={({ object }: { object?: SectorDatum | SensorDot | ElevationZoneDatum | ErosionZoneDatum }) => {
           if (!object) return null;
 
           const SENSOR_TYPE_LABEL: Record<"erosion" | "contaminant" | "burnScar", string> = {
@@ -488,6 +748,75 @@ export function ThreeDView({
             contaminant: "River Water Quality Sensor",
             burnScar:    "Forest Regrowth Sensor",
           };
+
+          // Erosion zone hover — show ML risk level + description
+          if ("kind" in object && object.kind === "erosion-zone") {
+            const z = object as ErosionZoneDatum;
+            const hexFill: Record<string, string> = {
+              High: "#dc2626", Medium: "#f59e0b", Low: "#22c55e", Unknown: "#9ca3af",
+            };
+            const hexBadgeBg: Record<string, string> = {
+              High: "#fee2e2", Medium: "#fef3c7", Low: "#dcfce7", Unknown: "#f3f4f6",
+            };
+            const hex    = hexFill[z.riskLabel]    ?? hexFill.Unknown;
+            const badgeBg = hexBadgeBg[z.riskLabel] ?? hexBadgeBg.Unknown;
+            const desc   = EROSION_RISK_DESC[z.riskLabel] ?? EROSION_RISK_DESC.Unknown;
+            const scoreStr = z.riskScore !== null ? ` · ${(z.riskScore * 100).toFixed(0)}%` : "";
+            const confStr  = z.confidence !== null ? `Model confidence ${(z.confidence * 100).toFixed(0)}%` : "";
+            return {
+              html: `
+                <div style="
+                  background:#1e293b;color:#f1f5f9;
+                  padding:10px 14px;border-radius:10px;
+                  font-size:12px;line-height:1.7;min-width:220px;
+                  box-shadow:0 4px 20px rgba(0,0,0,.4);
+                ">
+                  <div style="font-weight:700;margin-bottom:2px;">${z.label}</div>
+                  <div style="color:#64748b;font-size:10px;margin-bottom:8px;">
+                    ${z.sectorId} · ${z.slopeDeg}° slope · 82 mm rain
+                  </div>
+                  <div style="
+                    display:inline-flex;align-items:center;gap:6px;
+                    padding:3px 8px;border-radius:4px;margin-bottom:8px;
+                    background:${badgeBg};border:1px solid ${hex};
+                  ">
+                    <span style="width:8px;height:8px;border-radius:50%;background:${hex};flex-shrink:0;"></span>
+                    <span style="font-size:11px;font-weight:700;color:${hex};">
+                      ${z.riskLabel} Erosion Risk${scoreStr}
+                    </span>
+                  </div>
+                  <div style="font-size:10px;color:#94a3b8;line-height:1.5;margin-bottom:4px;">${desc}</div>
+                  ${confStr ? `<div style="font-size:10px;color:#64748b;">${confStr}</div>` : ""}
+                </div>`,
+              style: { background: "none" },
+            };
+          }
+
+          // Elevation zone hover — show risk class + description
+          if ("category" in object) {
+            const zone = object as ElevationZoneDatum;
+            const HEX: Record<number, string> = {
+              1: "#9ca3af", 2: "#f59e0b", 3: "#22c55e", 4: "#3b82f6", 5: "#ef4444",
+            };
+            const hex = HEX[zone.category] ?? "#9ca3af";
+            return {
+              html: `
+                <div style="
+                  background:#1e293b;color:#f1f5f9;
+                  padding:10px 14px;border-radius:10px;
+                  font-size:12px;line-height:1.7;
+                  box-shadow:0 4px 20px rgba(0,0,0,.4);
+                ">
+                  <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                    <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${hex};flex-shrink:0;"></span>
+                    <div style="font-weight:700;">${zone.label}</div>
+                  </div>
+                  <div style="color:#94a3b8;font-size:11px;">${zone.sublabel}</div>
+                  <div style="color:#64748b;font-size:10px;margin-top:4px;">Elevation Flood Risk Class ${zone.category} · hover to identify</div>
+                </div>`,
+              style: { background: "none" },
+            };
+          }
 
           // Sensor dot hover — show name + coordinates
           if ("layerType" in object) {
@@ -511,26 +840,29 @@ export function ThreeDView({
             };
           }
 
-          // Column hover — show full risk detail
-          return {
-            html: `
-              <div style="
-                background:#1e293b;color:#f1f5f9;
-                padding:10px 14px;border-radius:10px;
-                font-size:12px;line-height:1.7;
-                box-shadow:0 4px 20px rgba(0,0,0,.4);
-              ">
-                <div style="font-weight:700;margin-bottom:4px;">${object.label}</div>
-                <div>Risk: <span style="font-weight:600">${object.risk}</span></div>
-                <div>Score: <span style="font-weight:600">${(object.score * 100).toFixed(0)} %</span></div>
-                <div>Terrain: <span style="color:#94a3b8">${object.elevation.toLocaleString()} m asl</span></div>
-                <div>ID: <span style="color:#94a3b8">${object.id}</span></div>
-                ${object.source      ? `<div style="color:#34d399;font-size:10px;margin-top:4px;">★ ${object.source}</div>` : '<div style="color:#94a3b8;font-size:10px;margin-top:4px;">○ Estimated position</div>'}
-                ${object.isEstimated ? '<div style="color:#00A3E0;font-size:10px;">● Timeline interpolated</div>' : ""}
-                ${object.isActive    ? '<div style="color:#6D2077;font-size:10px;">★ Selected</div>' : ""}
-              </div>`,
-            style: { background: "none" },
-          };
+          // Column hover — "score" is unique to SectorDatum; this narrows the type
+          if ("score" in object) {
+            return {
+              html: `
+                <div style="
+                  background:#1e293b;color:#f1f5f9;
+                  padding:10px 14px;border-radius:10px;
+                  font-size:12px;line-height:1.7;
+                  box-shadow:0 4px 20px rgba(0,0,0,.4);
+                ">
+                  <div style="font-weight:700;margin-bottom:4px;">${object.label}</div>
+                  <div>Risk: <span style="font-weight:600">${object.risk}</span></div>
+                  <div>Score: <span style="font-weight:600">${(object.score * 100).toFixed(0)} %</span></div>
+                  <div>Terrain: <span style="color:#94a3b8">${object.elevation.toLocaleString()} m asl</span></div>
+                  <div>ID: <span style="color:#94a3b8">${object.id}</span></div>
+                  ${object.source      ? `<div style="color:#34d399;font-size:10px;margin-top:4px;">★ ${object.source}</div>` : '<div style="color:#94a3b8;font-size:10px;margin-top:4px;">○ Estimated position</div>'}
+                  ${object.isEstimated ? '<div style="color:#00A3E0;font-size:10px;">● Timeline interpolated</div>' : ""}
+                  ${object.isActive    ? '<div style="color:#6D2077;font-size:10px;">★ Selected</div>' : ""}
+                </div>`,
+              style: { background: "none" },
+            };
+          }
+          return null;
         }}
       />
 

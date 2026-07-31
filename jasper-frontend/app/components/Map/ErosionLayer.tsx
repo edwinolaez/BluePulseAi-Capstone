@@ -1,119 +1,209 @@
 /**
- * ErosionLayer.tsx — Multi-zone soil erosion risk overlay for the Leaflet map.
+ * ErosionLayer.tsx — Soil erosion risk zones for the Jasper watershed.
  *
- * Renders three HazardZone circles at different terrain positions in the
- * Athabasca watershed — each zone represents a distinct slope/rainfall scenario.
+ * Fetches Richard's ML erosion model for each of the three monitored zones
+ * (ATH-001-H, ATH-001-M, ATH-001-L) using real SRTM-derived slope values.
+ * Renders terrain polygons whose fill colour is driven by the model's
+ * risk_label ("High" / "Medium" / "Low"), so the map reflects live ML output
+ * rather than static class labels.
  *
- * Data flow:
- *   1. On mount, fires three erosion simulation requests in parallel (Promise.allSettled).
- *   2. Each zone independently shows a sensor dot + hazard circle.
- *   3. Colour and label are driven by the ML model's risk_label for that zone.
- *   4. If any single zone's API call fails, that zone falls back to its DEFAULT_RISK entry.
+ * Each zone also shows a sensor dot (matching the purple used across the app)
+ * and a tooltip with risk score, confidence, and slope used.
  *
- * Zone definitions (in ZONES constant):
- *   ATH-001-H — steep slope 42°, 95 mm rainfall → typically High risk
- *   ATH-001-M — moderate 28°, 68 mm            → typically Medium risk
- *   ATH-001-L — gentle 16°, 40 mm              → typically Low risk
+ * Falls back to grey with an "Unknown" label if the fetch fails.
  */
 
 "use client";
 
-import { useEffect, useState } from "react";
-import { CircleMarker, Tooltip } from "react-leaflet";
+import { Fragment, useEffect, useState } from "react";
+import { CircleMarker, Polygon, Tooltip } from "react-leaflet";
 import { fetchErosionSimulation, ModelOutput } from "../../../lib/api";
-import { HazardZone } from "./HazardZone";
 
-// The three erosion monitoring zones — different terrain positions with different conditions.
-// Higher slope and more rainfall = higher erosion risk.
-const ZONES = [
-  { sectorId: "ATH-001-H", center: [52.858, -118.092] as [number, number], radius: 1400, slopeDeg: 42, rainfallMm: 95 },
-  { sectorId: "ATH-001-M", center: [52.870, -118.070] as [number, number], radius: 1100, slopeDeg: 28, rainfallMm: 68 },
-  { sectorId: "ATH-001-L", center: [52.884, -118.045] as [number, number], radius: 900,  slopeDeg: 16, rainfallMm: 40 },
+// ── Zone definitions ──────────────────────────────────────────────────────────
+// slopeDeg comes from USGS SRTM elevation data for each terrain cell;
+// rainfallMm is the watershed seasonal average (Environment Canada).
+interface ZoneConfig {
+  sectorId:   string;
+  label:      string;
+  slopeDeg:   number;
+  rainfallMm: number;
+  center:     [number, number];
+  polygon:    [number, number][];
+}
+
+const EROSION_ZONES: ZoneConfig[] = [
+  {
+    sectorId:   "ATH-001-H",
+    label:      "Steep Valley Slope",
+    slopeDeg:   38.5,  // steep valley-side slope, SRTM-derived
+    rainfallMm: 82.0,
+    center:     [52.858, -118.092],
+    polygon: [
+      [52.866, -118.110], [52.860, -118.121], [52.846, -118.113],
+      [52.840, -118.094], [52.845, -118.076], [52.860, -118.074],
+      [52.870, -118.087],
+    ],
+  },
+  {
+    sectorId:   "ATH-001-M",
+    label:      "Mid-Slope Terrace",
+    slopeDeg:   22.0,  // mid-elevation transitional slope
+    rainfallMm: 82.0,
+    center:     [52.870, -118.070],
+    polygon: [
+      [52.880, -118.082], [52.875, -118.062], [52.862, -118.056],
+      [52.854, -118.064], [52.858, -118.080], [52.870, -118.088],
+    ],
+  },
+  {
+    sectorId:   "ATH-001-L",
+    label:      "Lower Valley Bench",
+    slopeDeg:   12.0,  // lower slope, more stable terrain
+    rainfallMm: 82.0,
+    center:     [52.884, -118.045],
+    polygon: [
+      [52.894, -118.058], [52.890, -118.040], [52.878, -118.032],
+      [52.868, -118.040], [52.872, -118.056], [52.884, -118.064],
+    ],
+  },
 ];
 
-// Colour and label for each risk level — purple tones to visually separate erosion from burn scar
-const STYLE_BY_LABEL = {
-  High:   { borderColor: "#6D2077", fillColor: "#8c31a2", label: "Landslide & Soil Risk" },
-  Medium: { borderColor: "#5c1570", fillColor: "#7a2590", label: "Landslide & Soil Risk" },
-  Low:    { borderColor: "#4D0B5C", fillColor: "#6D2077", label: "Soil Erosion Risk"     },
-} as const;
+// ── Risk level metadata ───────────────────────────────────────────────────────
+// What each ML label actually means in the field for post-wildfire soil erosion.
+const RISK_META: Record<string, { fill: string; border: string; opacity: number; badge: string; description: string }> = {
+  High: {
+    fill:        "#dc2626",
+    border:      "#991b1b",
+    opacity:     0.45,
+    badge:       "#fee2e2",
+    description: "Active soil loss · burn scar destabilisation · urgent slope stabilisation needed",
+  },
+  Medium: {
+    fill:        "#f59e0b",
+    border:      "#d97706",
+    opacity:     0.42,
+    badge:       "#fef3c7",
+    description: "Moderate sediment transport · elevated runoff · monitoring & revegetation advised",
+  },
+  Low: {
+    fill:        "#22c55e",
+    border:      "#16a34a",
+    opacity:     0.40,
+    badge:       "#dcfce7",
+    description: "Minimal surface loss · stable vegetation cover · routine observation only",
+  },
+  Unknown: {
+    fill:        "#9ca3af",
+    border:      "#6b7280",
+    opacity:     0.35,
+    badge:       "#f3f4f6",
+    description: "Awaiting ML model response",
+  },
+};
 
-// Default risk order if the API hasn't responded yet — High for the steepest zone, Low for the flattest
-const DEFAULT_RISK = ["High", "Medium", "Low"] as const;
-
-/**
- * ErosionLayer — react-leaflet layer that renders all three erosion zones.
- *
- * Fires parallel API requests for each zone on mount and maps the results
- * to HazardZone overlays with colour-coded risk styling.  Sensor dots use
- * purple (#6D2077) to visually distinguish erosion from burn scar (blue)
- * and contaminant (cyan) layers.
- * No props required.
- */
+// ── Component ─────────────────────────────────────────────────────────────────
 export function ErosionLayer() {
-  // One result slot per zone — starts as null until each API call resolves
-  const [results, setResults] = useState<(ModelOutput | null)[]>([null, null, null]);
+  const [results, setResults] = useState<Record<string, ModelOutput | null>>({});
 
-  // Fetch all three erosion predictions at the same time when the layer loads.
-  // Promise.allSettled means a failure in one zone doesn't affect the other two.
   useEffect(() => {
-    Promise.allSettled(
-      ZONES.map((z) => fetchErosionSimulation(z.sectorId, z.slopeDeg, z.rainfallMm))
-    ).then((settled) => {
-      // If a call failed, store null for that zone so we fall back to the default risk
-      setResults(
-        settled.map((r) => (r.status === "fulfilled" ? r.value : null))
-      );
+    EROSION_ZONES.forEach((zone) => {
+      fetchErosionSimulation(zone.sectorId, zone.slopeDeg, zone.rainfallMm)
+        .then((data) => setResults((prev) => ({ ...prev, [zone.sectorId]: data })))
+        .catch(() => setResults((prev) => ({ ...prev, [zone.sectorId]: null })));
     });
   }, []);
 
   return (
     <>
-      {ZONES.map((zone, i) => {
-        const risk  = results[i]?.risk_label ?? DEFAULT_RISK[i];
-        const style = STYLE_BY_LABEL[risk as keyof typeof STYLE_BY_LABEL] ?? STYLE_BY_LABEL.Medium;
-        const score = results[i]?.risk_score;
+      {EROSION_ZONES.map((zone) => {
+        const result    = results[zone.sectorId];
+        const riskLabel = result?.risk_label ?? "Unknown";
+        const riskScore = result?.risk_score ?? null;
+        const confidence = result?.confidence ?? null;
+        const meta      = RISK_META[riskLabel] ?? RISK_META.Unknown;
+
         return (
-          <HazardZone
-            key={zone.sectorId}
-            center={zone.center}
-            radius={zone.radius}
-            borderColor={style.borderColor}
-            fillColor={style.fillColor}
-            fillOpacity={0.12}
-            label={style.label}
-            badgeIcon="mountain"
-            dotColor={risk === "High" ? "#ef4444" : risk === "Medium" ? "#f59e0b" : "#22c55e"}
-            popupIcon="⛰️"
-            popupTitle="Soil Erosion Analysis"
-            status={risk === "High" ? "CRITICAL" : risk === "Medium" ? "WARNING" : "OPERATIONAL"}
-            name={`Slope Area ${zone.sectorId}`}
-            fields={[
-              { label: "Area ID",        value: zone.sectorId },
-              { label: "Risk Level",     value: risk, valueColor: risk === "High" ? "text-red-600" : risk === "Medium" ? "text-amber-600" : "text-green-600" },
-              { label: "Risk Score",     value: score != null ? score.toFixed(3) : "—" },
-              { label: "Slope Angle",    value: `${zone.slopeDeg}°`, valueColor: "text-purple-600" },
-              { label: "Rainfall Input", value: `${zone.rainfallMm} mm` },
-            ]}
-          />
+          <Fragment key={zone.sectorId}>
+            {/* Terrain polygon — fill colour driven by ML risk_label */}
+            <Polygon
+              positions={zone.polygon}
+              interactive
+              pathOptions={{
+                color:       meta.border,
+                fillColor:   meta.fill,
+                fillOpacity: meta.opacity,
+                weight:      1.5,
+                opacity:     0.8,
+              }}
+            >
+              <Tooltip sticky direction="top" opacity={0.97}>
+                <div style={{ minWidth: 200, fontFamily: "sans-serif" }}>
+
+                  {/* Zone name + sector ID */}
+                  <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 1 }}>
+                    {zone.label}
+                  </div>
+                  <div style={{ fontSize: 10, color: "#9ca3af", marginBottom: 6 }}>
+                    {zone.sectorId} · {zone.slopeDeg}° slope · {zone.rainfallMm} mm rain
+                  </div>
+
+                  {/* Colour-coded risk badge */}
+                  <div style={{
+                    display:        "inline-flex",
+                    alignItems:     "center",
+                    gap:            5,
+                    padding:        "3px 8px",
+                    borderRadius:   4,
+                    background:     meta.badge,
+                    border:         `1px solid ${meta.fill}`,
+                    marginBottom:   6,
+                  }}>
+                    <span style={{
+                      width: 8, height: 8, borderRadius: "50%",
+                      background: meta.fill, flexShrink: 0,
+                    }} />
+                    <span style={{ fontSize: 11, fontWeight: 700, color: meta.border }}>
+                      {riskLabel} Erosion Risk
+                    </span>
+                    {riskScore !== null && (
+                      <span style={{ fontSize: 10, color: meta.border, opacity: 0.75 }}>
+                        {(riskScore * 100).toFixed(0)}%
+                      </span>
+                    )}
+                  </div>
+
+                  {/* What this risk level means */}
+                  <div style={{ fontSize: 10, color: "#374151", lineHeight: 1.4, marginBottom: 4 }}>
+                    {meta.description}
+                  </div>
+
+                  {/* Model confidence */}
+                  {confidence !== null && (
+                    <div style={{ fontSize: 10, color: "#9ca3af" }}>
+                      Model confidence {(confidence * 100).toFixed(0)}%
+                    </div>
+                  )}
+                </div>
+              </Tooltip>
+            </Polygon>
+
+            {/* Sensor dot — always purple, sits on top of the polygon */}
+            <CircleMarker
+              center={zone.center}
+              radius={6}
+              pathOptions={{ color: "#ffffff", fillColor: "#6D2077", fillOpacity: 1, weight: 2 }}
+            >
+              <Tooltip direction="top" offset={[0, -8]} opacity={1}>
+                <div className="text-xs font-semibold">{zone.sectorId}</div>
+                <div className="text-xs text-gray-500">Soil Erosion Sensor</div>
+                <div className="text-xs text-gray-400">
+                  {zone.center[0].toFixed(4)}°N, {Math.abs(zone.center[1]).toFixed(4)}°W
+                </div>
+              </Tooltip>
+            </CircleMarker>
+          </Fragment>
         );
       })}
-
-      {/* Soil Erosion sensor dots — purple #a855f7, matches 3D map colour */}
-      {ZONES.map((zone) => (
-        <CircleMarker
-          key={`dot-${zone.sectorId}`}
-          center={zone.center}
-          radius={7}
-          pathOptions={{ color: "#ffffff", fillColor: "#6D2077", fillOpacity: 1, weight: 2 }}
-        >
-          <Tooltip direction="top" offset={[0, -8]} opacity={1}>
-            <div className="text-xs font-semibold">{zone.sectorId}</div>
-            <div className="text-xs text-gray-500">Soil Erosion Sensor</div>
-            <div className="text-xs text-gray-400">{zone.center[0].toFixed(4)}°N, {Math.abs(zone.center[1]).toFixed(4)}°W</div>
-          </Tooltip>
-        </CircleMarker>
-      ))}
     </>
   );
 }
