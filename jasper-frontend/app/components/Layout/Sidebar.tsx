@@ -39,12 +39,6 @@ const PAGE_NAV: { id: AppTab; icon: typeof MapPinIcon; label: string }[] = [
   { id: "archives",  icon: FolderIcon,    label: "Archives" },
 ];
 
-const RISK_COLORS = [
-  { color: "#ef4444", label: "High" },
-  { color: "#f59e0b", label: "Med" },
-  { color: "#22c55e", label: "Low" },
-];
-
 const LAYER_LEGEND = [
   { color: "#6D2077", label: "Soil Erosion"    },
   { color: "#00A3E0", label: "Water Quality"   },

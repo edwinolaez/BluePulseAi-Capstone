@@ -59,10 +59,10 @@ interface Props {
  */
 export function HazardZone({
   center,
-  radius,
+  radius: _radius,
   borderColor,
-  fillColor,
-  fillOpacity,
+  fillColor: _fillColor,
+  fillOpacity: _fillOpacity,
   label,
   badgeIcon,
   badgeBg,
