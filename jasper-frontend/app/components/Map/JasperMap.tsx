@@ -49,6 +49,10 @@ interface Props {
   contaminationLevel?: number;
   /** Scenario panel: projection hours passed through to ContaminantLayer */
   projectionHours?:    number;
+  /** Forest growth panel: years since the Jasper wildfire (drives regrowth colour) */
+  yearsSinceFire?:     number;
+  /** Forest growth panel: annual precipitation in mm/yr (drives regrowth rate) */
+  precipMmYr?:         number;
 }
 
 /**
@@ -110,6 +114,8 @@ export default function JasperMap({
   flyTo,
   contaminationLevel = 0.72,
   projectionHours    = 24,
+  yearsSinceFire     = 2,
+  precipMmYr         = 450,
 }: Props) {
   return (
     <MapContainer
@@ -140,7 +146,7 @@ export default function JasperMap({
           projectionHours={projectionHours}
         />
       )}
-      {showBurnScar    && <BurnScarLayer />}
+      {showBurnScar    && <BurnScarLayer yearsSinceFire={yearsSinceFire} precipMmYr={precipMmYr} />}
 
       <TelemetryStation />
     </MapContainer>

@@ -60,18 +60,33 @@ function LiveModelData({
  * the mock animation.  Renders the F1 score, training loss, and a "last updated"
  * counter that increments every second.
  */
+/** Isolated ticker — owns its own secondsAgo state so its 1s re-renders stay local. */
+function AgeDisplay({ resetSignal }: { resetSignal: number }) {
+  const [secondsAgo, setSecondsAgo] = useState(0);
+
+  useEffect(() => {
+    setSecondsAgo(0);
+  }, [resetSignal]);
+
+  useEffect(() => {
+    const id = setInterval(() => setSecondsAgo((s) => s + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const label =
+    secondsAgo < 60   ? `${secondsAgo}s ago`
+    : secondsAgo < 3600 ? `${Math.floor(secondsAgo / 60)}m ago`
+    : `${Math.floor(secondsAgo / 3600)}h ago`;
+
+  return <span className="text-gray-700 dark:text-gray-200 font-medium">{label}</span>;
+}
+
 export function ModelPerformanceWidget() {
   const isConvexReady = useContext(ConvexAvailableContext);
 
   const [f1Score, setF1Score]          = useState(0.884);
   const [trainingLoss, setTrainingLoss] = useState(0.0032);
-  const [secondsAgo, setSecondsAgo]    = useState(0);
-
-  // Clock that ticks up every second to show time since last model update
-  useEffect(() => {
-    const ticker = setInterval(() => setSecondsAgo((s) => s + 1), 1000);
-    return () => clearInterval(ticker);
-  }, []);
+  const [resetSignal, setResetSignal]  = useState(0);
 
   // Mock data animation — gently varies F1 and loss when Convex isn't set up
   useEffect(() => {
@@ -79,7 +94,7 @@ export function ModelPerformanceWidget() {
     const updater = setInterval(() => {
       setF1Score((f) => Math.round(clamp(f + (Math.random() - 0.5) * 0.008, 0.84, 0.96) * 1000) / 1000);
       setTrainingLoss((l) => Math.round(clamp(l + (Math.random() - 0.5) * 0.0004, 0.001, 0.008) * 10000) / 10000);
-      setSecondsAgo(0);
+      setResetSignal((n) => n + 1);
     }, 6000);
     return () => clearInterval(updater);
   }, [isConvexReady]);
@@ -87,14 +102,8 @@ export function ModelPerformanceWidget() {
   const handleLiveData = useCallback((f1: number, loss: number) => {
     setF1Score(f1);
     setTrainingLoss(loss);
-    setSecondsAgo(0);
+    setResetSignal((n) => n + 1);
   }, []);
-
-  function formatAge(s: number) {
-    if (s < 60)   return `${s}s ago`;
-    if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-    return `${Math.floor(s / 3600)}h ago`;
-  }
 
   return (
     <div className="rounded-xl border border-gray-200/60 dark:border-gray-700/40 bg-surface p-3.5">
@@ -126,8 +135,7 @@ export function ModelPerformanceWidget() {
           </span>
         </p>
         <p>
-          Last Update:{" "}
-          <span className="text-gray-700 dark:text-gray-200 font-medium">{formatAge(secondsAgo)}</span>
+          Last Update: <AgeDisplay resetSignal={resetSignal} />
         </p>
       </div>
     </div>

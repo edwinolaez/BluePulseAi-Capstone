@@ -19,7 +19,7 @@
  */
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import DeckGL from "@deck.gl/react";
 import { LightingEffect, AmbientLight, DirectionalLight } from "@deck.gl/core";
 import { ColumnLayer, ScatterplotLayer, PolygonLayer } from "@deck.gl/layers";
@@ -474,60 +474,72 @@ export function ThreeDView({
   }, []);
 
   // Build erosion zone polygons from static configs + live ML risk_label
-  const erosionZoneData: ErosionZoneDatum[] = EROSION_ZONE_CONFIGS.map((cfg) => {
-    const ml         = erosionML[cfg.sectorId];
-    const riskLabel  = ml?.risk_label ?? "Unknown";
-    const colors     = EROSION_RISK_RGBA[riskLabel] ?? EROSION_RISK_RGBA.Unknown;
-    return {
-      kind:       "erosion-zone" as const,
-      sectorId:   cfg.sectorId,
-      label:      cfg.label,
-      slopeDeg:   cfg.slopeDeg,
-      riskLabel,
-      riskScore:  ml?.risk_score   ?? null,
-      confidence: ml?.confidence   ?? null,
-      polygon:    cfg.polygon,
-      fillColor:  colors.fill,
-      lineColor:  colors.line,
-    };
-  });
-
-  const layerVisible: Record<string, boolean> = {
-    erosion:     showErosion,
-    contaminant: showContaminant,
-    burnScar:    showBurnScar,
-  };
-
-  const data: SectorDatum[] = SECTORS
-    .filter(s => layerVisible[SECTOR_LAYER[s.id]])
-    .map((s) => {
-      const interp = sectorInterps[s.id];
+  const erosionZoneData = useMemo<ErosionZoneDatum[]>(
+    () => EROSION_ZONE_CONFIGS.map((cfg) => {
+      const ml         = erosionML[cfg.sectorId];
+      const riskLabel  = ml?.risk_label ?? "Unknown";
+      const colors     = EROSION_RISK_RGBA[riskLabel] ?? EROSION_RISK_RGBA.Unknown;
       return {
-        id:          s.id,
-        label:       s.label,
-        lat:         s.lat,
-        lon:         s.lon,
-        elevation:   s.elevation,
-        score:       interp ? interp.erosion_risk_score : s.defaultScore,
-        risk:        interp ? interp.erosion_risk       : s.defaultRisk,
-        isActive:    s.id === activeSectorId,
-        isEstimated: interp ? interp.is_estimated : false,
-        source:      s.source,
+        kind:       "erosion-zone" as const,
+        sectorId:   cfg.sectorId,
+        label:      cfg.label,
+        slopeDeg:   cfg.slopeDeg,
+        riskLabel,
+        riskScore:  ml?.risk_score   ?? null,
+        confidence: ml?.confidence   ?? null,
+        polygon:    cfg.polygon,
+        fillColor:  colors.fill,
+        lineColor:  colors.line,
       };
-    });
+    }),
+    [erosionML]
+  );
 
-  const liveCount = SECTORS.filter(s => (sectorScans[s.id]?.length ?? 0) > 0).length;
+  const data = useMemo<SectorDatum[]>(
+    () => {
+      const visible: Record<string, boolean> = {
+        erosion:     showErosion,
+        contaminant: showContaminant,
+        burnScar:    showBurnScar,
+      };
+      return SECTORS
+        .filter(s => visible[SECTOR_LAYER[s.id]])
+        .map((s) => {
+          const interp = sectorInterps[s.id];
+          return {
+            id:          s.id,
+            label:       s.label,
+            lat:         s.lat,
+            lon:         s.lon,
+            elevation:   s.elevation,
+            score:       interp ? interp.erosion_risk_score : s.defaultScore,
+            risk:        interp ? interp.erosion_risk       : s.defaultRisk,
+            isActive:    s.id === activeSectorId,
+            isEstimated: interp ? interp.is_estimated : false,
+            source:      s.source,
+          };
+        });
+    },
+    [sectorInterps, showErosion, showContaminant, showBurnScar, activeSectorId]
+  );
 
-  // Sensor dots — always visible regardless of layer toggles
-  const sensorDots: SensorDot[] = SECTORS
-    .map(s => ({
+  const liveCount = useMemo(
+    () => SECTORS.filter(s => (sectorScans[s.id]?.length ?? 0) > 0).length,
+    [sectorScans]
+  );
+
+  // Sensor dots — SECTORS and SECTOR_LAYER are module-level constants so deps are empty
+  const sensorDots = useMemo<SensorDot[]>(
+    () => SECTORS.map(s => ({
       id:        s.id,
       label:     s.label,
       lon:       s.lon,
       lat:       s.lat,
       elevation: s.elevation + 50,
       layerType: SECTOR_LAYER[s.id],
-    }));
+    })),
+    []
+  );
 
   // ── Simulation layer data ─────────────────────────────────────────────────
   // Use AI simulation score for the High zone; derive Medium/Low proportionally.
@@ -535,15 +547,18 @@ export function ThreeDView({
   const erosionScore = simulationResults?.erosion?.risk_score
     ?? (sectorInterps["ATH-001-H"]?.erosion_risk_score ?? 0.87);
 
-  const heatPoints: HeatPoint[] = [
-    { lon: -118.092, lat: 52.858, weight: erosionScore },
-    { lon: -118.100, lat: 52.851, weight: erosionScore * 0.80 },
-    { lon: -118.085, lat: 52.862, weight: erosionScore * 0.70 },
-    { lon: -118.070, lat: 52.870, weight: erosionScore * 0.55 },
-    { lon: -118.078, lat: 52.865, weight: erosionScore * 0.45 },
-    { lon: -118.057, lat: 52.877, weight: erosionScore * 0.35 },
-    { lon: -118.045, lat: 52.884, weight: erosionScore * 0.22 },
-  ];
+  const heatPoints = useMemo<HeatPoint[]>(
+    () => [
+      { lon: -118.092, lat: 52.858, weight: erosionScore },
+      { lon: -118.100, lat: 52.851, weight: erosionScore * 0.80 },
+      { lon: -118.085, lat: 52.862, weight: erosionScore * 0.70 },
+      { lon: -118.070, lat: 52.870, weight: erosionScore * 0.55 },
+      { lon: -118.078, lat: 52.865, weight: erosionScore * 0.45 },
+      { lon: -118.057, lat: 52.877, weight: erosionScore * 0.35 },
+      { lon: -118.045, lat: 52.884, weight: erosionScore * 0.22 },
+    ],
+    [erosionScore]
+  );
 
   const directionDeg = simulationResults?.contaminant?.contaminant_vector?.direction_deg ?? 180;
 
@@ -562,10 +577,13 @@ export function ThreeDView({
   const plumeOpacity     = 0.45 + contaminationLevel * 0.45; // 0.45–0.90
   const plumeTrailLength = 150  + Math.round(contaminationLevel * 280); // 150–430
 
-  const plumeData = showContaminant ? [{
-    path:       computePlumePath(-118.1069, 52.8639, directionDeg, plumeNumPts, plumeStepKm),
-    timestamps: Array.from({ length: plumeNumPts }, (_, i) => i * (PLUME_LOOP / plumeNumPts)),
-  }] : [];
+  const plumeData = useMemo(
+    () => showContaminant ? [{
+      path:       computePlumePath(-118.1069, 52.8639, directionDeg, plumeNumPts, plumeStepKm),
+      timestamps: Array.from({ length: plumeNumPts }, (_, i) => i * (PLUME_LOOP / plumeNumPts)),
+    }] : [],
+    [showContaminant, directionDeg, plumeNumPts, plumeStepKm]
+  );
 
   const layers = [
     // 3D terrain — high-res elevation mesh with satellite imagery draped on top

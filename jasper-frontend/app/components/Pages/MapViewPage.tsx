@@ -35,6 +35,9 @@ import type { FlyToTarget } from "../Map/JasperMap";
 import { fetchTimeline } from "../../../lib/api";
 import type { TimelineScan, SimulationResults, FieldPhoto } from "../../../lib/api";
 import { ContaminantScenarioPanel } from "../Map/ContaminantScenarioPanel";
+import { ForestGrowthPanel } from "../Map/ForestGrowthPanel";
+import { SoilErosionPanel } from "../Map/SoilErosionPanel";
+import { FloodElevationPanel } from "../Map/FloodElevationPanel";
 import { interpolateScans } from "../../../lib/interpolation";
 import type { InterpolatedState } from "../../../lib/interpolation";
 
@@ -70,6 +73,21 @@ export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBur
   // Digital twin scenario panel state — drives ContaminantLayer + ThreeDView plume
   const [contaminationLevel, setContaminationLevel] = useState(0.72);
   const [projectionHours,    setProjectionHours]    = useState(24);
+
+  // Forest growth digital twin state — drives BurnScarLayer marker colour
+  // Default: 2 yr post-fire (2023 Jasper wildfire), Jasper baseline precipitation
+  const [yearsSinceFire, setYearsSinceFire] = useState(2);
+  const [precipMmYr,     setPrecipMmYr]     = useState(450);
+
+  // Soil erosion digital twin state (RUSLE)
+  // Defaults: ATH-001-M mid-slope (22°) + Jasper seasonal rainfall (82 mm)
+  const [slopeDeg,    setSlopeDeg]    = useState(22);
+  const [rainfallMm,  setRainfallMm]  = useState(82);
+
+  // Flood elevation digital twin state
+  // Defaults: 1.5 m water level rise (2–10 yr return), 24 hr storm
+  const [waterLevelM,      setWaterLevelM]      = useState(1.5);
+  const [stormDurationHr,  setStormDurationHr]  = useState(24);
 
   // Timeline scans fetched from Feven's backend for the selected sector
   const [timelineScans, setTimelineScans] = useState<TimelineScan[]>([]);
@@ -132,6 +150,8 @@ export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBur
               flyTo={flyTo}
               contaminationLevel={contaminationLevel}
               projectionHours={projectionHours}
+              yearsSinceFire={yearsSinceFire}
+              precipMmYr={precipMmYr}
             />
           )}
 
@@ -142,6 +162,36 @@ export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBur
               onContaminationLevelChange={setContaminationLevel}
               projectionHours={projectionHours}
               onProjectionHoursChange={setProjectionHours}
+            />
+          )}
+
+          {/* Forest growth digital twin panel — visible when burn scar layer is on */}
+          {showBurnScar && (
+            <ForestGrowthPanel
+              yearsSinceFire={yearsSinceFire}
+              onYearsSinceFireChange={setYearsSinceFire}
+              precipMmYr={precipMmYr}
+              onPrecipMmYrChange={setPrecipMmYr}
+            />
+          )}
+
+          {/* Soil erosion digital twin panel — visible when erosion layer is on */}
+          {showErosion && (
+            <SoilErosionPanel
+              slopeDeg={slopeDeg}
+              onSlopeDegChange={setSlopeDeg}
+              rainfallMm={rainfallMm}
+              onRainfallMmChange={setRainfallMm}
+            />
+          )}
+
+          {/* Flood elevation digital twin panel — visible when elevation layer is on */}
+          {showElevation && (
+            <FloodElevationPanel
+              waterLevelM={waterLevelM}
+              onWaterLevelMChange={setWaterLevelM}
+              stormDurationHr={stormDurationHr}
+              onStormDurationHrChange={setStormDurationHr}
             />
           )}
         </div>
