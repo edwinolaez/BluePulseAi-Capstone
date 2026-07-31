@@ -6,40 +6,23 @@
  * ssr:false because Leaflet and WebGL require browser APIs not available on the server.
  *
  * Layout:
- *   - Left/main: the full-screen map with zoom buttons and mobile "Live" button overlaid
- *   - Right sidebar: TemporalSlider, SectorPanel, and four live sensor widgets
- *     (on mobile this sidebar is hidden off-screen and slides in when "Live" is tapped)
+ *   - Left: the Jasper Watch sidebar (rendered by page.tsx) with all collapsible panels
+ *   - Right/main: the full-screen map with digital twin overlays and zoom buttons
  *
- * Data flow:
- *   1. User clicks a sector on the map → sectorId state updates
- *   2. useEffect fetches timeline scans for that sector from Feven's backend
- *   3. Slider position (centerDate) feeds into interpolateScans() to blend values
- *   4. Blended InterpolatedState is passed to SectorPanel for display
- *
- * A fetchIdRef prevents stale responses from an older sector fetch overwriting
- * a newer one if the user clicks sectors quickly.
+ * Sector selection, date range, and interpolation state are owned by page.tsx so the
+ * Sidebar and this component can share them without prop-drilling through extra layers.
  */
 
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback } from "react";
 import dynamic from "next/dynamic";
-import { TemporalSlider } from "../Controls/TemporalSlider";
-import { SectorPanel } from "../Controls/SectorPanel";
-import { ChartLineIcon } from "../Layout/icons";
-import { WaterQualityWidget } from "../Widgets/WaterQualityWidget";
-import { PipelineStatusWidget } from "../Widgets/PipelineStatusWidget";
-import { ModelPerformanceWidget } from "../Widgets/ModelPerformanceWidget";
-import { FieldPhotosWidget } from "../Widgets/FieldPhotosWidget";
 import type { FlyToTarget } from "../Map/JasperMap";
-import { fetchTimeline } from "../../../lib/api";
-import type { TimelineScan, SimulationResults, FieldPhoto } from "../../../lib/api";
+import type { SimulationResults } from "../../../lib/api";
 import { ContaminantScenarioPanel } from "../Map/ContaminantScenarioPanel";
 import { ForestGrowthPanel } from "../Map/ForestGrowthPanel";
 import { SoilErosionPanel } from "../Map/SoilErosionPanel";
 import { FloodElevationPanel } from "../Map/FloodElevationPanel";
-import { interpolateScans } from "../../../lib/interpolation";
-import type { InterpolatedState } from "../../../lib/interpolation";
 
 // Both map components are loaded dynamically with ssr:false — Leaflet and deck.gl
 // both use browser/WebGL APIs that don't exist on the server.
@@ -58,58 +41,33 @@ interface Props {
   showBurnScar:       boolean;
   showElevation:      boolean;
   simulationResults?: SimulationResults | null;
-  photos?:            FieldPhoto[];
+  /** Lifted to page.tsx so the Sidebar's Sector Details panel can read it */
+  sectorId:           string | null;
+  onSectorClick:      (id: string | null) => void;
+  dateFrom:           string;
+  dateTo:             string;
+  centerDate:         string;
 }
 
-export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBurnScar, showElevation, simulationResults, photos }: Props) {
-  const [sectorId, setSectorId]               = useState<string | null>(null);
-  const [dateFrom, setDateFrom]               = useState("2024-06-01");
-  const [dateTo, setDateTo]                   = useState("2024-07-24");
-  const [centerDate, setCenterDate]           = useState("2024-06-24");
-  const [zoomIn, setZoomIn]   = useState<(() => void) | null>(null);
+export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBurnScar, showElevation, simulationResults, sectorId, onSectorClick, dateFrom, dateTo, centerDate }: Props) {
+  const [zoomIn,  setZoomIn]  = useState<(() => void) | null>(null);
   const [zoomOut, setZoomOut] = useState<(() => void) | null>(null);
-  const [panelOpen, setPanelOpen] = useState(false);
 
   // Digital twin scenario panel state — drives ContaminantLayer + ThreeDView plume
   const [contaminationLevel, setContaminationLevel] = useState(0.72);
   const [projectionHours,    setProjectionHours]    = useState(24);
 
   // Forest growth digital twin state — drives BurnScarLayer marker colour
-  // Default: 2 yr post-fire (2023 Jasper wildfire), Jasper baseline precipitation
   const [yearsSinceFire, setYearsSinceFire] = useState(2);
   const [precipMmYr,     setPrecipMmYr]     = useState(450);
 
   // Soil erosion digital twin state (RUSLE)
-  // Defaults: ATH-001-M mid-slope (22°) + Jasper seasonal rainfall (82 mm)
-  const [slopeDeg,    setSlopeDeg]    = useState(22);
-  const [rainfallMm,  setRainfallMm]  = useState(82);
+  const [slopeDeg,   setSlopeDeg]   = useState(22);
+  const [rainfallMm, setRainfallMm] = useState(82);
 
   // Flood elevation digital twin state
-  // Defaults: 1.5 m water level rise (2–10 yr return), 24 hr storm
-  const [waterLevelM,      setWaterLevelM]      = useState(1.5);
-  const [stormDurationHr,  setStormDurationHr]  = useState(24);
-
-  // Timeline scans fetched from Feven's backend for the selected sector
-  const [timelineScans, setTimelineScans] = useState<TimelineScan[]>([]);
-  // Interpolated values for the current slider position — passed to SectorPanel
-  const [interpolated, setInterpolated]   = useState<InterpolatedState | null>(null);
-  // Prevents stale fetches from overwriting a newer sector's data
-  const fetchIdRef = useRef(0);
-
-  // Fetch timeline scans whenever the user selects a different sector
-  useEffect(() => {
-    if (!sectorId) { setTimelineScans([]); setInterpolated(null); return; }
-    const id = ++fetchIdRef.current;
-    fetchTimeline(sectorId)
-      .then(data => { if (id === fetchIdRef.current) setTimelineScans(data.scans); })
-      .catch(() => { if (id === fetchIdRef.current) setTimelineScans([]); });
-  }, [sectorId]);
-
-  // Re-interpolate whenever the slider moves or new scans arrive
-  useEffect(() => {
-    const ms = new Date(centerDate).getTime();
-    setInterpolated(interpolateScans(timelineScans, ms));
-  }, [centerDate, timelineScans]);
+  const [waterLevelM,     setWaterLevelM]     = useState(1.5);
+  const [stormDurationHr, setStormDurationHr] = useState(24);
 
   const handleMapInit = useCallback((zi: () => void, zo: () => void) => {
     setZoomIn(() => zi);
@@ -117,195 +75,104 @@ export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBur
   }, []);
 
   return (
-    <div className="flex-1 flex min-h-0 relative">
+    <div className="relative flex-1 overflow-hidden">
+      <div className="absolute inset-0">
+        {/* Toggle between 2D Leaflet and 3D deck.gl view */}
+        {is3D ? (
+          <ThreeDView
+            centerDate={centerDate}
+            activeSectorId={sectorId}
+            onSectorClick={onSectorClick}
+            showErosion={showErosion}
+            showContaminant={showContaminant}
+            showBurnScar={showBurnScar}
+            showElevation={showElevation}
+            simulationResults={simulationResults ?? null}
+            contaminationLevel={contaminationLevel}
+            projectionHours={projectionHours}
+          />
+        ) : (
+          <JasperMap
+            onSectorClick={onSectorClick}
+            activeSectorId={sectorId}
+            dateFrom={dateFrom}
+            dateTo={dateTo}
+            showBurnScar={showBurnScar}
+            showErosion={showErosion}
+            showContaminant={showContaminant}
+            showElevation={showElevation}
+            onMapInit={handleMapInit}
+            flyTo={flyTo}
+            contaminationLevel={contaminationLevel}
+            projectionHours={projectionHours}
+            yearsSinceFire={yearsSinceFire}
+            precipMmYr={precipMmYr}
+          />
+        )}
 
-      {/* ── Map area — takes up all available space ── */}
-      <div className="relative flex-1 overflow-hidden">
-        <div className="absolute inset-0">
-          {/* Toggle between 2D Leaflet and 3D deck.gl view */}
-          {is3D ? (
-            <ThreeDView
-              centerDate={centerDate}
-              activeSectorId={sectorId}
-              onSectorClick={setSectorId}
-              showErosion={showErosion}
-              showContaminant={showContaminant}
-              showBurnScar={showBurnScar}
-              showElevation={showElevation}
-              simulationResults={simulationResults ?? null}
-              contaminationLevel={contaminationLevel}
-              projectionHours={projectionHours}
-            />
-          ) : (
-            <JasperMap
-              onSectorClick={setSectorId}
-              activeSectorId={sectorId}
-              dateFrom={dateFrom}
-              dateTo={dateTo}
-              showBurnScar={showBurnScar}
-              showErosion={showErosion}
-              showContaminant={showContaminant}
-              showElevation={showElevation}
-              onMapInit={handleMapInit}
-              flyTo={flyTo}
-              contaminationLevel={contaminationLevel}
-              projectionHours={projectionHours}
-              yearsSinceFire={yearsSinceFire}
-              precipMmYr={precipMmYr}
-            />
-          )}
+        {/* Digital twin scenario panel — visible when contaminant layer is on */}
+        {showContaminant && (
+          <ContaminantScenarioPanel
+            contaminationLevel={contaminationLevel}
+            onContaminationLevelChange={setContaminationLevel}
+            projectionHours={projectionHours}
+            onProjectionHoursChange={setProjectionHours}
+          />
+        )}
 
-          {/* Digital twin scenario panel — visible when contaminant layer is on */}
-          {showContaminant && (
-            <ContaminantScenarioPanel
-              contaminationLevel={contaminationLevel}
-              onContaminationLevelChange={setContaminationLevel}
-              projectionHours={projectionHours}
-              onProjectionHoursChange={setProjectionHours}
-            />
-          )}
+        {/* Forest growth digital twin panel — visible when burn scar layer is on */}
+        {showBurnScar && (
+          <ForestGrowthPanel
+            yearsSinceFire={yearsSinceFire}
+            onYearsSinceFireChange={setYearsSinceFire}
+            precipMmYr={precipMmYr}
+            onPrecipMmYrChange={setPrecipMmYr}
+          />
+        )}
 
-          {/* Forest growth digital twin panel — visible when burn scar layer is on */}
-          {showBurnScar && (
-            <ForestGrowthPanel
-              yearsSinceFire={yearsSinceFire}
-              onYearsSinceFireChange={setYearsSinceFire}
-              precipMmYr={precipMmYr}
-              onPrecipMmYrChange={setPrecipMmYr}
-            />
-          )}
+        {/* Soil erosion digital twin panel — visible when erosion layer is on */}
+        {showErosion && (
+          <SoilErosionPanel
+            slopeDeg={slopeDeg}
+            onSlopeDegChange={setSlopeDeg}
+            rainfallMm={rainfallMm}
+            onRainfallMmChange={setRainfallMm}
+          />
+        )}
 
-          {/* Soil erosion digital twin panel — visible when erosion layer is on */}
-          {showErosion && (
-            <SoilErosionPanel
-              slopeDeg={slopeDeg}
-              onSlopeDegChange={setSlopeDeg}
-              rainfallMm={rainfallMm}
-              onRainfallMmChange={setRainfallMm}
-            />
-          )}
-
-          {/* Flood elevation digital twin panel — visible when elevation layer is on */}
-          {showElevation && (
-            <FloodElevationPanel
-              waterLevelM={waterLevelM}
-              onWaterLevelMChange={setWaterLevelM}
-              stormDurationHr={stormDurationHr}
-              onStormDurationHrChange={setStormDurationHr}
-            />
-          )}
-        </div>
-
-        {/* Bottom bar: [mobile: live data button] + [desktop: zoom buttons] */}
-        <div className="absolute bottom-4 left-4 right-4 z-[1001] flex items-end gap-3">
-
-          {/* Live Data button — mobile only.
-              On desktop the Live Readings sidebar is always visible so this is hidden. */}
-          <button
-            onClick={() => setPanelOpen(true)}
-            className="md:hidden flex items-center gap-1.5 px-3 py-2 rounded-full bg-sait-red text-white text-xs font-semibold shadow-lg active:scale-95 transition-transform shrink-0"
-          >
-            <ChartLineIcon className="w-3.5 h-3.5" />
-            Live
-          </button>
-
-          <div className="flex-1" />
-
-          {/* Zoom buttons — desktop only, 2D mode only (3D uses deck.gl orbit controls). */}
-          <div className={["hidden md:flex flex-col gap-2 shrink-0", is3D ? "invisible" : ""].join(" ")}>
-            <button
-              onClick={() => zoomIn?.()}
-              title="Zoom in"
-              className="w-9 h-9 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 text-gray-800 dark:text-white shadow-lg hover:scale-105 hover:bg-sait-sky/10 dark:hover:bg-gray-700 transition-transform border border-gray-200/60 dark:border-gray-600"
-            >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                <line x1="8" y1="2" x2="8" y2="14" />
-                <line x1="2" y1="8" x2="14" y2="8" />
-              </svg>
-            </button>
-            <button
-              onClick={() => zoomOut?.()}
-              title="Zoom out"
-              className="w-9 h-9 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 text-gray-800 dark:text-white shadow-lg hover:scale-105 hover:bg-sait-sky/10 dark:hover:bg-gray-700 transition-transform border border-gray-200/60 dark:border-gray-600"
-            >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                <line x1="2" y1="8" x2="14" y2="8" />
-              </svg>
-            </button>
-          </div>
-        </div>
+        {/* Flood elevation digital twin panel — visible when elevation layer is on */}
+        {showElevation && (
+          <FloodElevationPanel
+            waterLevelM={waterLevelM}
+            onWaterLevelMChange={setWaterLevelM}
+            stormDurationHr={stormDurationHr}
+            onStormDurationHrChange={setStormDurationHr}
+          />
+        )}
       </div>
 
-      {/* Dark backdrop behind the drawer — tapping it closes the panel on mobile */}
-      {panelOpen && (
-        <div
-          className="md:hidden fixed inset-0 bg-black/40 z-[1100]"
-          onClick={() => setPanelOpen(false)}
-        />
-      )}
-
-      {/* ── Live Readings panel ──────────────────────────────────────────────
-          On desktop: always-visible sidebar on the right.
-          On mobile: hidden off-screen to the right, slides in when panelOpen is true. */}
-      <aside className={[
-        "bg-surface border-l border-gray-200/60 dark:border-gray-700/40 flex flex-col gap-3 p-4 overflow-y-auto transition-transform duration-300",
-        // desktop — stays in place as a normal sidebar column
-        "md:static md:w-72 md:shrink-0 md:translate-x-0",
-        // mobile — fixed full-height drawer that slides in from the right
-        "fixed right-0 top-0 bottom-0 w-72 z-[1200]",
-        panelOpen ? "translate-x-0" : "translate-x-full md:translate-x-0",
-      ].join(" ")}>
-
-        {/* Mobile-only header row with a close button */}
-        <div className="flex items-center justify-between md:hidden">
-          <div className="flex items-center gap-2">
-            <ChartLineIcon className="w-4 h-4 text-sait-sky" />
-            <span className="text-xs font-bold uppercase tracking-widest text-gray-700 dark:text-gray-200">
-              Live Readings
-            </span>
-          </div>
-          <button
-            onClick={() => setPanelOpen(false)}
-            className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-surface-alt text-gray-500 text-sm"
-          >
-            ✕
-          </button>
-        </div>
-
-        {/* Time History slider — controls the date range shown on the map and in SectorPanel */}
-        <TemporalSlider
-          onDateRangeChange={(from, to, center) => {
-            setDateFrom(from);
-            setDateTo(to);
-            setCenterDate(center);
-          }}
-        />
-
-        {/* Shows data for the sector the user clicked on the map.
-            interpolated carries blended values from the timeline slider — null
-            when no sector is selected or the backend has no scan data yet. */}
-        <SectorPanel
-          sectorId={sectorId}
-          dateFrom={dateFrom}
-          dateTo={dateTo}
-          interpolated={interpolated}
-        />
-
-        {/* Desktop-only section label */}
-        <div className="hidden md:flex items-center gap-2 px-0.5 mt-1">
-          <ChartLineIcon className="w-4 h-4 text-sait-sky" />
-          <h2 className="text-xs font-bold uppercase tracking-widest text-gray-700 dark:text-gray-200">
-            Live Readings
-          </h2>
-        </div>
-
-        {/* Real-time sensor widgets — each one connects to a different data source */}
-        <WaterQualityWidget />
-        <PipelineStatusWidget />
-        <ModelPerformanceWidget />
-        <FieldPhotosWidget photos={photos} />
-      </aside>
-
+      {/* Zoom buttons — desktop only, 2D mode only (3D uses deck.gl orbit controls) */}
+      <div className={["absolute bottom-4 right-4 z-[1001] hidden md:flex flex-col gap-2", is3D ? "invisible" : ""].join(" ")}>
+        <button
+          onClick={() => zoomIn?.()}
+          title="Zoom in"
+          className="w-9 h-9 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 text-gray-800 dark:text-white shadow-lg hover:scale-105 hover:bg-sait-sky/10 dark:hover:bg-gray-700 transition-transform border border-gray-200/60 dark:border-gray-600"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <line x1="8" y1="2" x2="8" y2="14" />
+            <line x1="2" y1="8" x2="14" y2="8" />
+          </svg>
+        </button>
+        <button
+          onClick={() => zoomOut?.()}
+          title="Zoom out"
+          className="w-9 h-9 flex items-center justify-center rounded-full bg-white dark:bg-gray-800 text-gray-800 dark:text-white shadow-lg hover:scale-105 hover:bg-sait-sky/10 dark:hover:bg-gray-700 transition-transform border border-gray-200/60 dark:border-gray-600"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <line x1="2" y1="8" x2="14" y2="8" />
+          </svg>
+        </button>
+      </div>
     </div>
   );
 }

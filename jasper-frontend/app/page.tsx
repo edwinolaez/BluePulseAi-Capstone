@@ -16,7 +16,7 @@
 
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "./contexts/AuthContext";
 import { TopNav, AppTab } from "./components/Layout/TopNav";
 import { Sidebar } from "./components/Layout/Sidebar";
@@ -32,7 +32,10 @@ import { ArchivesPage } from "./components/Pages/ArchivesPage";
 import { AdminPage } from "./components/Pages/AdminPage";
 import { AiOverviewPage } from "./components/Pages/AiOverviewPage";
 import type { FlyToTarget } from "./components/Map/JasperMap";
-import type { SimulationResults, FieldPhoto } from "../lib/api";
+import { fetchTimeline } from "../lib/api";
+import type { SimulationResults, FieldPhoto, TimelineScan } from "../lib/api";
+import { interpolateScans } from "../lib/interpolation";
+import type { InterpolatedState } from "../lib/interpolation";
 
 /**
  * Home — the root page component mounted at "/".
@@ -65,6 +68,27 @@ export default function Home() {
   const [showElevation, setShowElevation]     = useState(true);
   const [simulationResults, setSimulationResults] = useState<SimulationResults | null>(null);
   const [fieldPhotos, setFieldPhotos]             = useState<FieldPhoto[]>([]);
+
+  // Sector / timeline state — lifted here so Sidebar and MapViewPage share it
+  const [sectorId, setSectorId]         = useState<string | null>(null);
+  const [dateFrom, setDateFrom]         = useState("2024-06-01");
+  const [dateTo, setDateTo]             = useState("2024-07-24");
+  const [centerDate, setCenterDate]     = useState("2024-06-24");
+  const [timelineScans, setTimelineScans] = useState<TimelineScan[]>([]);
+  const [interpolated, setInterpolated]   = useState<InterpolatedState | null>(null);
+  const fetchIdRef = useRef(0);
+
+  useEffect(() => {
+    if (!sectorId) { setTimelineScans([]); setInterpolated(null); return; }
+    const id = ++fetchIdRef.current;
+    fetchTimeline(sectorId)
+      .then(data => { if (id === fetchIdRef.current) setTimelineScans(data.scans); })
+      .catch(() => { if (id === fetchIdRef.current) setTimelineScans([]); });
+  }, [sectorId]);
+
+  useEffect(() => {
+    setInterpolated(interpolateScans(timelineScans, new Date(centerDate).getTime()));
+  }, [centerDate, timelineScans]);
 
   // The superadmin confirmation modal — only shows after a superadmin logs in
   const [showSuperConfirm, setShowSuperConfirm] = useState(false);
@@ -157,10 +181,16 @@ export default function Home() {
           onToggleBurnScar={setShowBurnScar}
           showElevation={showElevation}
           onToggleElevation={setShowElevation}
+          sectorId={sectorId}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          interpolated={interpolated}
+          onDateRangeChange={(from, to, center) => { setDateFrom(from); setDateTo(to); setCenterDate(center); }}
+          photos={fieldPhotos}
         />}
 
         {/* Only one of these pages renders at a time depending on the active tab */}
-        {activeTab === "map"       && <MapViewPage flyTo={flyTo} is3D={is3D} showErosion={showErosion} showContaminant={showContaminant} showBurnScar={showBurnScar} showElevation={showElevation} simulationResults={simulationResults} photos={fieldPhotos} />}
+        {activeTab === "map"       && <MapViewPage flyTo={flyTo} is3D={is3D} showErosion={showErosion} showContaminant={showContaminant} showBurnScar={showBurnScar} showElevation={showElevation} simulationResults={simulationResults} sectorId={sectorId} onSectorClick={setSectorId} dateFrom={dateFrom} dateTo={dateTo} centerDate={centerDate} />}
         {activeTab === "dashboard" && <DashboardPage photos={fieldPhotos} onPhotosChange={setFieldPhotos} simulationResults={simulationResults} />}
         {activeTab === "ai"        && <AiOverviewPage onResultsUpdate={setSimulationResults} onNavigateToMap={() => handleTabChange("map")} />}
         {activeTab === "reports"   && <ReportsPage />}

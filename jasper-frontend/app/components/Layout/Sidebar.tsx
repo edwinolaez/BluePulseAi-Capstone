@@ -20,6 +20,7 @@ import { useState } from "react";
 import {
   ArrowUpRightIcon,
   ChartLineIcon,
+  ClockIcon,
   DownloadIcon,
   FolderIcon,
   HelpCircleIcon,
@@ -27,9 +28,18 @@ import {
   InfoCircleIcon,
   LayersIcon,
   MapPinIcon,
+  TargetIcon,
 } from "./icons";
 import { AppTab } from "./TopNav";
 import { ToggleSwitch } from "../Controls/ToggleSwitch";
+import { TemporalSlider } from "../Controls/TemporalSlider";
+import { SectorPanel } from "../Controls/SectorPanel";
+import { WaterQualityWidget } from "../Widgets/WaterQualityWidget";
+import { PipelineStatusWidget } from "../Widgets/PipelineStatusWidget";
+import { ModelPerformanceWidget } from "../Widgets/ModelPerformanceWidget";
+import { FieldPhotosWidget } from "../Widgets/FieldPhotosWidget";
+import type { InterpolatedState } from "../../../lib/interpolation";
+import type { FieldPhoto } from "../../../lib/api";
 
 const PAGE_NAV: { id: AppTab; icon: typeof MapPinIcon; label: string }[] = [
   { id: "dashboard", icon: ChartLineIcon, label: "Dashboard" },
@@ -52,7 +62,7 @@ const SECTORS = [
   { id: "SEC-V9", name: "Forest Segment SEC-V9",     subtitle: "Forest regrowth monitoring zone",     status: "ELEVATED", statusColor: "bg-amber-600 text-white", lat: 52.882, lng: -118.065, zoom: 15 },
 ];
 
-type ExpandedPanel = "legend" | "sectors" | null;
+type ExpandedPanel = "legend" | "sectors" | "time-history" | "sector-details" | "live-readings" | null;
 
 interface Props {
   /** Currently active tab — used to highlight nav links and show map-only controls. */
@@ -80,6 +90,13 @@ interface Props {
   onToggleBurnScar: (v: boolean) => void;
   showElevation: boolean;
   onToggleElevation: (v: boolean) => void;
+  /** Sector selected on the map — drives Sector Details panel. */
+  sectorId: string | null;
+  dateFrom: string;
+  dateTo: string;
+  interpolated: InterpolatedState | null;
+  onDateRangeChange: (from: string, to: string, center: string) => void;
+  photos: FieldPhoto[];
 }
 
 /**
@@ -88,18 +105,16 @@ interface Props {
  * live here so the map canvas stays uncluttered.  Collapses to a narrow strip
  * on desktop; becomes a full-screen drawer on mobile.
  */
-export function Sidebar({ activeTab, onNavigate, onFocusSector, onOpenLogs, onOpenSupport, mobileOpen, onCloseMobile, is3D, onToggle3D, showErosion, onToggleErosion, showContaminant, onToggleContaminant, showBurnScar, onToggleBurnScar, showElevation, onToggleElevation }: Props) {
+export function Sidebar({ activeTab, onNavigate, onFocusSector, onOpenLogs, onOpenSupport, mobileOpen, onCloseMobile, is3D, onToggle3D, showErosion, onToggleErosion, showContaminant, onToggleContaminant, showBurnScar, onToggleBurnScar, showElevation, onToggleElevation, sectorId, dateFrom, dateTo, interpolated, onDateRangeChange, photos }: Props) {
   const [expandedPanel, setExpandedPanel] = useState<ExpandedPanel>(null);
   const [collapsed, setCollapsed] = useState(false);
 
-  // Tool buttons — these are map utilities, not page navigation.
-  // Page navigation is handled exclusively by the top nav tabs.
+  // Tool buttons — map utilities rendered as collapsible nav items.
   const toolItems = [
     {
       icon: MapPinIcon, label: "Live Sensors",
       isActive: expandedPanel === "sectors",
       onClick: () => {
-        // Switches to the map tab and opens the sector selector panel
         onNavigate("map");
         setExpandedPanel((p) => (p === "sectors" ? null : "sectors"));
       },
@@ -108,6 +123,21 @@ export function Sidebar({ activeTab, onNavigate, onFocusSector, onOpenLogs, onOp
       icon: InfoCircleIcon, label: "Legend Panel",
       isActive: expandedPanel === "legend",
       onClick: () => setExpandedPanel((p) => (p === "legend" ? null : "legend")),
+    },
+    {
+      icon: ClockIcon, label: "Time History",
+      isActive: expandedPanel === "time-history",
+      onClick: () => setExpandedPanel((p) => (p === "time-history" ? null : "time-history")),
+    },
+    {
+      icon: TargetIcon, label: "Sector Details",
+      isActive: expandedPanel === "sector-details",
+      onClick: () => setExpandedPanel((p) => (p === "sector-details" ? null : "sector-details")),
+    },
+    {
+      icon: ChartLineIcon, label: "Live Readings",
+      isActive: expandedPanel === "live-readings",
+      onClick: () => setExpandedPanel((p) => (p === "live-readings" ? null : "live-readings")),
     },
   ];
 
@@ -355,6 +385,32 @@ export function Sidebar({ activeTab, onNavigate, onFocusSector, onOpenLogs, onOp
               </button>
             </div>
           ))}
+        </div>
+      )}
+
+      {expandedPanel === "time-history" && (
+        <div className="mt-2 mx-1">
+          <TemporalSlider onDateRangeChange={onDateRangeChange} />
+        </div>
+      )}
+
+      {expandedPanel === "sector-details" && (
+        <div className="mt-2 mx-1">
+          <SectorPanel
+            sectorId={sectorId}
+            dateFrom={dateFrom}
+            dateTo={dateTo}
+            interpolated={interpolated}
+          />
+        </div>
+      )}
+
+      {expandedPanel === "live-readings" && (
+        <div className="mt-2 mx-1 flex flex-col gap-3">
+          <WaterQualityWidget />
+          <PipelineStatusWidget />
+          <ModelPerformanceWidget />
+          <FieldPhotosWidget photos={photos} />
         </div>
       )}
 
