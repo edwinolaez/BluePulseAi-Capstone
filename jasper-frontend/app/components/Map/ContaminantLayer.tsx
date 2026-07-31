@@ -6,6 +6,12 @@
  * plume is heading, and renders a HazardZone circle at the critical point
  * (WSC station 07AA001 — Miette River at Jasper).
  *
+ * Digital twin scenario mode (contaminationLevel / projectionHours props):
+ *   When the ContaminantScenarioPanel sliders are moved, the river lines change
+ *   colour to reflect contamination severity (blue → orange → red), a dashed
+ *   hazard-boundary polyline extends downstream to the point where concentration
+ *   falls to 5% of the source, and a marker labels that boundary.
+ *
  * Arrow behaviour:
  *   - Direction comes from contaminant_vector.direction_deg returned by Richard's API
  *   - Animation speed is inversely proportional to velocity (faster water = faster pulse)
@@ -48,25 +54,54 @@ const ARROW_POSITIONS: [number, number][] = [
   [52.905, -117.988],
 ];
 
+// Physics constants — must match contaminant_model.py exactly
+const DECAY_FACTOR = 0.05;       // km⁻¹ — exponential decay rate
+const SAFETY_THRESHOLD = 0.05;   // 5 % of source concentration = safe level
+
+/** Distance (km) at which concentration decays to the 5% safety threshold. */
+function impactDistKm(contamLevel: number): number {
+  if (contamLevel <= SAFETY_THRESHOLD) return 0;
+  return -Math.log(SAFETY_THRESHOLD / contamLevel) / DECAY_FACTOR;
+}
+
+/**
+ * Project a point `distKm` kilometres downstream of [lat, lon]
+ * along the given compass bearing (0° = north, 90° = east).
+ */
+function projectPoint(
+  lat: number, lon: number,
+  bearingDeg: number, distKm: number
+): [number, number] {
+  const rad = (bearingDeg * Math.PI) / 180;
+  const dlat = (Math.cos(rad) * distKm) / 111.0;
+  const dlon = (Math.sin(rad) * distKm) / (111.0 * Math.cos((lat * Math.PI) / 180));
+  return [lat + dlat, lon + dlon];
+}
+
 /**
  * arrowIcon — builds a Leaflet DivIcon shaped like a rotating directional arrow.
  *
  * The SVG arrow is rotated to directionDeg so it points the way the plume is
  * moving.  The CSS pulse animation duration is shortened for higher velocities
  * so faster-moving water produces a more urgent visual rhythm.
+ * Arrow colour shifts from sky-blue → amber → red as contamination increases.
  *
- * @param directionDeg - compass heading (0–360°) the arrow should point
- * @param velocity     - normalised plume speed (0–1); higher = faster animation
+ * @param directionDeg    - compass heading (0–360°) the arrow should point
+ * @param velocity        - normalised plume speed (0–1); higher = faster animation
+ * @param contamLevel     - 0–1 contamination level driving the colour shift
  * @returns a Leaflet DivIcon with inline SVG and CSS animation
  */
-function arrowIcon(directionDeg: number, velocity: number): L.DivIcon {
-  // Lower duration = faster animation = faster moving water
+function arrowIcon(directionDeg: number, velocity: number, contamLevel: number): L.DivIcon {
   const duration = Math.max(0.6, 2.5 - velocity * 2).toFixed(1);
+  const color =
+    contamLevel >= 0.7 ? "#EF4444"
+    : contamLevel >= 0.4 ? "#F59E0B"
+    : "#00A3E0";
   return L.divIcon({
     className: "",
     html: `
       <div style="transform:rotate(${directionDeg}deg);width:28px;height:28px;display:flex;align-items:center;justify-content:center;animation:jasper-arrow-pulse ${duration}s ease-in-out infinite;">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#00A3E0" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.9">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity="0.9">
           <path d="M5 12h14M13 6l6 6-6 6"/>
         </svg>
       </div>
@@ -80,11 +115,19 @@ function arrowIcon(directionDeg: number, velocity: number): L.DivIcon {
  * ContaminantLayer — react-leaflet layer component for the river contamination visualisation.
  *
  * Fetches contaminant simulation data from Richard's API on mount, then renders
- * the river polylines, animated flow arrows, sensor dot, and hazard zone.
+ * the river polylines, animated flow arrows, sensor dot, hazard zone, and (when
+ * the scenario panel is active) a downstream impact boundary marker.
  * Subscribes to map zoom changes so arrow density adjusts as the user zooms.
- * No props required.
+ *
+ * @param contaminationLevel - 0–1 scenario slider value (default 0.72)
+ * @param projectionHours    - scenario hours slider (unused in 2D, passed for parity)
  */
-export function ContaminantLayer() {
+export function ContaminantLayer({
+  contaminationLevel = 0.72,
+}: {
+  contaminationLevel?: number;
+  projectionHours?: number;
+}) {
   const [result, setResult] = useState<ModelOutput | null>(null);
   const map = useMap();
   const [zoom, setZoom] = useState(() => map.getZoom());
@@ -104,6 +147,7 @@ export function ContaminantLayer() {
   const directionDeg = result?.contaminant_vector.direction_deg ?? 180;
   const velocity     = result?.contaminant_vector.velocity     ?? 0.65;
   const risk         = result?.risk_label ?? "Warning";
+  void risk;
 
   // Scale arrow count and river line weight with zoom level
   const arrowPositions = zoom >= 12 ? ARROW_POSITIONS
@@ -111,24 +155,48 @@ export function ContaminantLayer() {
     : [];
   const lineWeight = zoom >= 11 ? 5 : zoom >= 9 ? 3 : 2;
 
+  // River line colour shifts from sky-blue → amber → red as contamination rises
+  const riverColor =
+    contaminationLevel >= 0.7 ? "#EF4444"
+    : contaminationLevel >= 0.4 ? "#F59E0B"
+    : "#00A3E0";
+
+  const branchColor =
+    contaminationLevel >= 0.7 ? "#FCA5A5"
+    : contaminationLevel >= 0.4 ? "#FCD34D"
+    : "#55CAF0";
+
+  // Scenario: hazard boundary marker and dashed line
+  const hazardDist = impactDistKm(contaminationLevel);
+  const [hazardLat, hazardLon] = projectPoint(
+    CRITICAL_CENTER[0], CRITICAL_CENTER[1], directionDeg, hazardDist
+  );
+
+  const hazardColor =
+    contaminationLevel >= 0.7 ? "#EF4444"
+    : contaminationLevel >= 0.4 ? "#F59E0B"
+    : "#22C55E";
+
   return (
     <>
+      {/* Main river channel — colour reflects current contamination level */}
       <Polyline
         positions={RIVER_MAIN}
         interactive={false}
-        pathOptions={{ color: "#00A3E0", weight: lineWeight, opacity: 0.8, lineCap: "round", lineJoin: "round" }}
+        pathOptions={{ color: riverColor, weight: lineWeight, opacity: 0.85, lineCap: "round", lineJoin: "round" }}
       />
       <Polyline
         positions={RIVER_BRANCH}
         interactive={false}
-        pathOptions={{ color: "#55CAF0", weight: Math.max(1, lineWeight - 2), opacity: 0.7, lineCap: "round", lineJoin: "round" }}
+        pathOptions={{ color: branchColor, weight: Math.max(1, lineWeight - 2), opacity: 0.7, lineCap: "round", lineJoin: "round" }}
       />
 
+      {/* Animated flow-direction arrows */}
       {arrowPositions.map((pos, i) => (
-        <Marker key={i} position={pos} icon={arrowIcon(directionDeg, velocity)} />
+        <Marker key={i} position={pos} icon={arrowIcon(directionDeg, velocity, contaminationLevel)} />
       ))}
 
-      {/* River Water Quality sensor dot — cyan #00A3E0, matches 3D map colour */}
+      {/* River Water Quality sensor dot — cyan #00A3E0 matches 3D map colour */}
       <CircleMarker
         center={CRITICAL_CENTER}
         radius={7}
@@ -141,6 +209,49 @@ export function ContaminantLayer() {
         </Tooltip>
       </CircleMarker>
 
+      {/* ── Scenario: downstream hazard boundary ──────────────────────────
+          Shown whenever the contamination level is above the safety threshold.
+          A dashed line projects downstream from the sensor to the point where
+          concentration decays to 5% of the source level. */}
+      {hazardDist > 0 && (
+        <>
+          {/* Dashed line from source to hazard boundary */}
+          <Polyline
+            positions={[CRITICAL_CENTER, [hazardLat, hazardLon]]}
+            interactive={false}
+            pathOptions={{
+              color: hazardColor,
+              weight: 2,
+              opacity: 0.6,
+              dashArray: "6 5",
+            }}
+          />
+
+          {/* Hazard boundary marker */}
+          <CircleMarker
+            center={[hazardLat, hazardLon]}
+            radius={8}
+            pathOptions={{
+              color: "#ffffff",
+              fillColor: hazardColor,
+              fillOpacity: 0.9,
+              weight: 2,
+            }}
+          >
+            <Tooltip direction="top" offset={[0, -10]} opacity={1} permanent={false}>
+              <div className="text-xs font-bold" style={{ color: hazardColor }}>
+                Hazard Boundary
+              </div>
+              <div className="text-xs text-gray-600">
+                {hazardDist.toFixed(1)} km downstream
+              </div>
+              <div className="text-xs text-gray-400">
+                Concentration drops to 5% here
+              </div>
+            </Tooltip>
+          </CircleMarker>
+        </>
+      )}
     </>
   );
 }

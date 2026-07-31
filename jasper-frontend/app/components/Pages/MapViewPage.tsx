@@ -34,6 +34,7 @@ import { FieldPhotosWidget } from "../Widgets/FieldPhotosWidget";
 import type { FlyToTarget } from "../Map/JasperMap";
 import { fetchTimeline } from "../../../lib/api";
 import type { TimelineScan, SimulationResults, FieldPhoto } from "../../../lib/api";
+import { ContaminantScenarioPanel } from "../Map/ContaminantScenarioPanel";
 import { interpolateScans } from "../../../lib/interpolation";
 import type { InterpolatedState } from "../../../lib/interpolation";
 
@@ -65,6 +66,10 @@ export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBur
   const [zoomIn, setZoomIn]   = useState<(() => void) | null>(null);
   const [zoomOut, setZoomOut] = useState<(() => void) | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
+
+  // Digital twin scenario panel state — drives ContaminantLayer + ThreeDView plume
+  const [contaminationLevel, setContaminationLevel] = useState(0.72);
+  const [projectionHours,    setProjectionHours]    = useState(24);
 
   // Timeline scans fetched from Feven's backend for the selected sector
   const [timelineScans, setTimelineScans] = useState<TimelineScan[]>([]);
@@ -110,6 +115,8 @@ export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBur
               showBurnScar={showBurnScar}
               showElevation={showElevation}
               simulationResults={simulationResults ?? null}
+              contaminationLevel={contaminationLevel}
+              projectionHours={projectionHours}
             />
           ) : (
             <JasperMap
@@ -123,6 +130,18 @@ export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBur
               showElevation={showElevation}
               onMapInit={handleMapInit}
               flyTo={flyTo}
+              contaminationLevel={contaminationLevel}
+              projectionHours={projectionHours}
+            />
+          )}
+
+          {/* Digital twin scenario panel — visible when contaminant layer is on */}
+          {showContaminant && (
+            <ContaminantScenarioPanel
+              contaminationLevel={contaminationLevel}
+              onContaminationLevelChange={setContaminationLevel}
+              projectionHours={projectionHours}
+              onProjectionHoursChange={setProjectionHours}
             />
           )}
         </div>

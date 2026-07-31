@@ -341,14 +341,18 @@ const ELEVATION_ZONE_DATA: ElevationZoneDatum[] = [
 // ── Component ─────────────────────────────────────────────────────────────────
 
 interface Props {
-  centerDate:        string;
-  activeSectorId:    string | null;
-  onSectorClick:     (id: string) => void;
-  showErosion:       boolean;
-  showContaminant:   boolean;
-  showBurnScar:      boolean;
-  showElevation:     boolean;
-  simulationResults: SimulationResults | null;
+  centerDate:          string;
+  activeSectorId:      string | null;
+  onSectorClick:       (id: string) => void;
+  showErosion:         boolean;
+  showContaminant:     boolean;
+  showBurnScar:        boolean;
+  showElevation:       boolean;
+  simulationResults:   SimulationResults | null;
+  /** Scenario panel: contamination level 0–1 (drives plume colour + length) */
+  contaminationLevel?: number;
+  /** Scenario panel: hours to project forward (extends plume path) */
+  projectionHours?:    number;
 }
 
 /**
@@ -372,6 +376,8 @@ export function ThreeDView({
   showBurnScar,
   showElevation,
   simulationResults,
+  contaminationLevel = 0.72,
+  projectionHours    = 24,
 }: Props) {
 
   const [viewState, setViewState] = useState(INITIAL_VIEW_STATE);
@@ -540,9 +546,25 @@ export function ThreeDView({
   ];
 
   const directionDeg = simulationResults?.contaminant?.contaminant_vector?.direction_deg ?? 180;
+
+  // Scale plume waypoints and step size from the scenario sliders.
+  // More contamination → more waypoints (longer visible trail).
+  // More hours → larger step size (plume front reaches further downstream).
+  const plumeNumPts = Math.max(4, Math.round(4 + contaminationLevel * 18)); // 4–22 pts
+  const plumeStepKm = Math.min(1.8, 0.35 + (projectionHours / 72) * 1.45); // 0.35–1.8 km
+
+  // Plume colour and opacity shift blue → amber → red as contamination rises
+  const plumeColor: [number, number, number] =
+    contaminationLevel >= 0.7 ? [239, 68,  68]  // red
+    : contaminationLevel >= 0.4 ? [245, 158, 11]  // amber
+    : [0, 163, 224];                              // sky blue
+
+  const plumeOpacity     = 0.45 + contaminationLevel * 0.45; // 0.45–0.90
+  const plumeTrailLength = 150  + Math.round(contaminationLevel * 280); // 150–430
+
   const plumeData = showContaminant ? [{
-    path:       computePlumePath(-118.1069, 52.8639, directionDeg),
-    timestamps: Array.from({ length: 12 }, (_, i) => i * (PLUME_LOOP / 12)),
+    path:       computePlumePath(-118.1069, 52.8639, directionDeg, plumeNumPts, plumeStepKm),
+    timestamps: Array.from({ length: plumeNumPts }, (_, i) => i * (PLUME_LOOP / plumeNumPts)),
   }] : [];
 
   const layers = [
@@ -579,17 +601,17 @@ export function ThreeDView({
       ],
     }),
 
-    // Contaminant plume — animated trail following ML-predicted flow direction
+    // Contaminant plume — colour, opacity, and length driven by scenario sliders
     new TripsLayer({
-      id:           "contaminant-plume",
-      data:         plumeData,
-      getPath:      (d) => d.path,
-      getTimestamps:(d) => d.timestamps,
-      getColor:     [0, 163, 224],   // SAIT Sky blue
-      opacity:      0.85,
+      id:             "contaminant-plume",
+      data:           plumeData,
+      getPath:        (d) => d.path,
+      getTimestamps:  (d) => d.timestamps,
+      getColor:       plumeColor,
+      opacity:        plumeOpacity,
       widthMinPixels: 4,
-      trailLength:  280,
-      currentTime:  plumeTime,
+      trailLength:    plumeTrailLength,
+      currentTime:    plumeTime,
     }),
 
     // Elevation flood risk zones — same 5-class system as the 2D map, floating as thin slabs
@@ -818,26 +840,29 @@ export function ThreeDView({
             };
           }
 
-          // Column hover — show full risk detail
-          return {
-            html: `
-              <div style="
-                background:#1e293b;color:#f1f5f9;
-                padding:10px 14px;border-radius:10px;
-                font-size:12px;line-height:1.7;
-                box-shadow:0 4px 20px rgba(0,0,0,.4);
-              ">
-                <div style="font-weight:700;margin-bottom:4px;">${object.label}</div>
-                <div>Risk: <span style="font-weight:600">${object.risk}</span></div>
-                <div>Score: <span style="font-weight:600">${(object.score * 100).toFixed(0)} %</span></div>
-                <div>Terrain: <span style="color:#94a3b8">${object.elevation.toLocaleString()} m asl</span></div>
-                <div>ID: <span style="color:#94a3b8">${object.id}</span></div>
-                ${object.source      ? `<div style="color:#34d399;font-size:10px;margin-top:4px;">★ ${object.source}</div>` : '<div style="color:#94a3b8;font-size:10px;margin-top:4px;">○ Estimated position</div>'}
-                ${object.isEstimated ? '<div style="color:#00A3E0;font-size:10px;">● Timeline interpolated</div>' : ""}
-                ${object.isActive    ? '<div style="color:#6D2077;font-size:10px;">★ Selected</div>' : ""}
-              </div>`,
-            style: { background: "none" },
-          };
+          // Column hover — "score" is unique to SectorDatum; this narrows the type
+          if ("score" in object) {
+            return {
+              html: `
+                <div style="
+                  background:#1e293b;color:#f1f5f9;
+                  padding:10px 14px;border-radius:10px;
+                  font-size:12px;line-height:1.7;
+                  box-shadow:0 4px 20px rgba(0,0,0,.4);
+                ">
+                  <div style="font-weight:700;margin-bottom:4px;">${object.label}</div>
+                  <div>Risk: <span style="font-weight:600">${object.risk}</span></div>
+                  <div>Score: <span style="font-weight:600">${(object.score * 100).toFixed(0)} %</span></div>
+                  <div>Terrain: <span style="color:#94a3b8">${object.elevation.toLocaleString()} m asl</span></div>
+                  <div>ID: <span style="color:#94a3b8">${object.id}</span></div>
+                  ${object.source      ? `<div style="color:#34d399;font-size:10px;margin-top:4px;">★ ${object.source}</div>` : '<div style="color:#94a3b8;font-size:10px;margin-top:4px;">○ Estimated position</div>'}
+                  ${object.isEstimated ? '<div style="color:#00A3E0;font-size:10px;">● Timeline interpolated</div>' : ""}
+                  ${object.isActive    ? '<div style="color:#6D2077;font-size:10px;">★ Selected</div>' : ""}
+                </div>`,
+              style: { background: "none" },
+            };
+          }
+          return null;
         }}
       />
 

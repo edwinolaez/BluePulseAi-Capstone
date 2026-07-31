@@ -35,16 +35,20 @@ export interface FlyToTarget {
 }
 
 interface Props {
-  onSectorClick?:   (sectorId: string) => void;
-  activeSectorId?:  string | null;
-  dateFrom?:        string;
-  dateTo?:          string;
-  showBurnScar?:    boolean;
-  showErosion?:     boolean;
-  showContaminant?: boolean;
-  showElevation?:   boolean;
-  onMapInit?:       (zoomIn: () => void, zoomOut: () => void) => void;
-  flyTo?:           FlyToTarget | null;
+  onSectorClick?:      (sectorId: string) => void;
+  activeSectorId?:     string | null;
+  dateFrom?:           string;
+  dateTo?:             string;
+  showBurnScar?:       boolean;
+  showErosion?:        boolean;
+  showContaminant?:    boolean;
+  showElevation?:      boolean;
+  onMapInit?:          (zoomIn: () => void, zoomOut: () => void) => void;
+  flyTo?:              FlyToTarget | null;
+  /** Scenario panel: contamination level 0–1 passed through to ContaminantLayer */
+  contaminationLevel?: number;
+  /** Scenario panel: projection hours passed through to ContaminantLayer */
+  projectionHours?:    number;
 }
 
 /**
@@ -98,12 +102,14 @@ function FlyToController({ target }: { target: FlyToTarget }) {
  */
 export default function JasperMap({
   onSectorClick,
-  showBurnScar    = false,
-  showErosion     = false,
-  showContaminant = false,
-  showElevation   = true,
+  showBurnScar       = false,
+  showErosion        = false,
+  showContaminant    = false,
+  showElevation      = true,
   onMapInit,
   flyTo,
+  contaminationLevel = 0.72,
+  projectionHours    = 24,
 }: Props) {
   return (
     <MapContainer
@@ -128,7 +134,12 @@ export default function JasperMap({
 
       {/* Sensor-specific layers render on top of the risk surface */}
       {showErosion     && <ErosionLayer />}
-      {showContaminant && <ContaminantLayer />}
+      {showContaminant && (
+        <ContaminantLayer
+          contaminationLevel={contaminationLevel}
+          projectionHours={projectionHours}
+        />
+      )}
       {showBurnScar    && <BurnScarLayer />}
 
       <TelemetryStation />
