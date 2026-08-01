@@ -22,7 +22,7 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import { CircleMarker, Marker, Polyline, Tooltip, useMap } from "react-leaflet";
 import { fetchContaminantSimulation, ModelOutput } from "../../../lib/api";
@@ -131,6 +131,7 @@ export function ContaminantLayer({
   const [result, setResult] = useState<ModelOutput | null>(null);
   const map = useMap();
   const [zoom, setZoom] = useState(() => map.getZoom());
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const onZoomEnd = () => setZoom(map.getZoom());
@@ -139,10 +140,14 @@ export function ContaminantLayer({
   }, [map]);
 
   useEffect(() => {
-    fetchContaminantSimulation("ATH-001-W", 180, 2.1, 0.72)
-      .then(setResult)
-      .catch(() => setResult(null));
-  }, []);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      fetchContaminantSimulation("ATH-001-W", 180, 2.1, contaminationLevel)
+        .then(setResult)
+        .catch(() => setResult(null));
+    }, 400);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [contaminationLevel]);
 
   const directionDeg = result?.contaminant_vector.direction_deg ?? 180;
   const velocity     = result?.contaminant_vector.velocity     ?? 0.65;

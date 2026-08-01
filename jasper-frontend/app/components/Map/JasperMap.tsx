@@ -53,6 +53,12 @@ interface Props {
   yearsSinceFire?:     number;
   /** Forest growth panel: annual precipitation in mm/yr (drives regrowth rate) */
   precipMmYr?:         number;
+  /** Soil erosion panel: slope angle in degrees — passed to ErosionLayer for live ML re-fetch */
+  slopeDeg?:           number;
+  /** Soil erosion panel: rainfall in mm — passed to ErosionLayer for live ML re-fetch */
+  rainfallMm?:         number;
+  /** Flood elevation panel: water level rise in metres — drives ElevationRiskLayer highlight */
+  waterLevelM?:        number;
 }
 
 /**
@@ -116,6 +122,9 @@ export default function JasperMap({
   projectionHours    = 24,
   yearsSinceFire     = 2,
   precipMmYr         = 450,
+  slopeDeg           = 22,
+  rainfallMm         = 82,
+  waterLevelM        = 1.5,
 }: Props) {
   return (
     <MapContainer
@@ -136,10 +145,10 @@ export default function JasperMap({
       {flyTo         && <FlyToController target={flyTo} />}
 
       {/* Elevation flood risk zones — toggleable via Sidebar */}
-      {showElevation && <ElevationRiskLayer />}
+      {showElevation && <ElevationRiskLayer waterLevelM={waterLevelM} />}
 
       {/* Sensor-specific layers render on top of the risk surface */}
-      {showErosion     && <ErosionLayer />}
+      {showErosion     && <ErosionLayer slopeDeg={slopeDeg} rainfallMm={rainfallMm} />}
       {showContaminant && (
         <ContaminantLayer
           contaminationLevel={contaminationLevel}

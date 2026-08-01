@@ -107,6 +107,9 @@ export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBur
             projectionHours={projectionHours}
             yearsSinceFire={yearsSinceFire}
             precipMmYr={precipMmYr}
+            slopeDeg={slopeDeg}
+            rainfallMm={rainfallMm}
+            waterLevelM={waterLevelM}
           />
         )}
 

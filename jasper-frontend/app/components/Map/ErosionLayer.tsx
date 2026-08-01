@@ -15,7 +15,7 @@
 
 "use client";
 
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { CircleMarker, Polygon, Tooltip } from "react-leaflet";
 import { fetchErosionSimulation, ModelOutput } from "../../../lib/api";
 
@@ -102,16 +102,27 @@ const RISK_META: Record<string, { fill: string; border: string; opacity: number;
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export function ErosionLayer() {
+export function ErosionLayer({
+  slopeDeg   = 22,
+  rainfallMm = 82,
+}: {
+  slopeDeg?:   number;
+  rainfallMm?: number;
+}) {
   const [results, setResults] = useState<Record<string, ModelOutput | null>>({});
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    EROSION_ZONES.forEach((zone) => {
-      fetchErosionSimulation(zone.sectorId, zone.slopeDeg, zone.rainfallMm)
-        .then((data) => setResults((prev) => ({ ...prev, [zone.sectorId]: data })))
-        .catch(() => setResults((prev) => ({ ...prev, [zone.sectorId]: null })));
-    });
-  }, []);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      EROSION_ZONES.forEach((zone) => {
+        fetchErosionSimulation(zone.sectorId, slopeDeg, rainfallMm)
+          .then((data) => setResults((prev) => ({ ...prev, [zone.sectorId]: data })))
+          .catch(() => setResults((prev) => ({ ...prev, [zone.sectorId]: null })));
+      });
+    }, 500);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [slopeDeg, rainfallMm]);
 
   return (
     <>
@@ -144,7 +155,7 @@ export function ErosionLayer() {
                     {zone.label}
                   </div>
                   <div style={{ fontSize: 10, color: "#9ca3af", marginBottom: 6 }}>
-                    {zone.sectorId} · {zone.slopeDeg}° slope · {zone.rainfallMm} mm rain
+                    {zone.sectorId} · {slopeDeg}° slope · {rainfallMm} mm rain
                   </div>
 
                   {/* Colour-coded risk badge */}

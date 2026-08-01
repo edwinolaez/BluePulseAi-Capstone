@@ -154,23 +154,37 @@ export const RISK_CATEGORY_COLORS: Record<number, { fill: string; label: string 
   5: { fill: "#ef4444", label: "Extreme" },
 };
 
+// ── Flood inundation threshold ────────────────────────────────────────────────
+// Returns the lowest risk category that becomes inundated at a given water level.
+// Categories at or above this threshold are highlighted as flood zones.
+function floodedFromCategory(waterLevelM: number): number {
+  if (waterLevelM >= 4.5) return 2;
+  if (waterLevelM >= 3.0) return 3;
+  if (waterLevelM >= 1.5) return 4;
+  if (waterLevelM >= 0.5) return 5;
+  return 6; // nothing flooded
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function ElevationRiskLayer() {
+export function ElevationRiskLayer({ waterLevelM = 0 }: { waterLevelM?: number }) {
+  const floodCat = floodedFromCategory(waterLevelM);
+
   return (
     <>
-      {RISK_ZONES.map((zone) =>
-        zone.polygons.map((coords, polyIdx) => (
+      {RISK_ZONES.map((zone) => {
+        const flooded = zone.category >= floodCat;
+        return zone.polygons.map((coords, polyIdx) => (
           <Polygon
             key={`risk-${zone.category}-${polyIdx}`}
             positions={coords}
             interactive
             pathOptions={{
-              color:       zone.border,
-              fillColor:   zone.fill,
-              fillOpacity: zone.opacity,
-              weight:      1,
-              opacity:     0.7,
+              color:       flooded ? "#1d4ed8" : zone.border,
+              fillColor:   flooded ? "#3b82f6" : zone.fill,
+              fillOpacity: flooded ? Math.min(zone.opacity + 0.25, 0.80) : zone.opacity,
+              weight:      flooded ? 2 : 1,
+              opacity:     flooded ? 1 : 0.7,
             }}
           >
             <Tooltip sticky direction="top" opacity={0.95}>
@@ -181,22 +195,31 @@ export function ElevationRiskLayer() {
                 <div style={{ fontSize: 11, color: "#6b7280" }}>
                   {zone.sublabel}
                 </div>
+                {flooded && (
+                  <div style={{
+                    marginTop: 5, padding: "2px 6px", borderRadius: 4,
+                    background: "#dbeafe", border: "1px solid #3b82f6",
+                    fontSize: 10, fontWeight: 700, color: "#1d4ed8",
+                  }}>
+                    ⚠ Flood Inundation Zone · +{waterLevelM.toFixed(1)} m
+                  </div>
+                )}
                 <div style={{
                   marginTop: 6, display: "flex", alignItems: "center", gap: 6,
                   fontSize: 11, fontWeight: 600,
-                  color: zone.fill,
+                  color: flooded ? "#1d4ed8" : zone.fill,
                 }}>
                   <span style={{
                     display: "inline-block", width: 10, height: 10,
-                    borderRadius: 2, background: zone.fill,
+                    borderRadius: 2, background: flooded ? "#3b82f6" : zone.fill,
                   }} />
                   Elevation Risk Class {zone.category}
                 </div>
               </div>
             </Tooltip>
           </Polygon>
-        ))
-      )}
+        ));
+      })}
     </>
   );
 }
