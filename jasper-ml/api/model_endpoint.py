@@ -1,12 +1,14 @@
 """
 model_endpoint.py — Project Jasper ML Model API
 
-FastAPI endpoints for change detection, erosion simulation, and contaminant tracking.
+FastAPI endpoints for change detection, erosion simulation, contaminant
+tracking, and flood elevation simulation.
 
 Endpoints:
 - POST /predict/change-detection
 - POST /simulate/erosion
 - POST /simulate/contaminant
+- POST /simulate/flood
 
 Rate limit: 20 req/min (configured by Kong Gateway)
 """
@@ -34,7 +36,16 @@ from models.simulations.erosion_model import (
 from models.simulations.contaminant_model import (
     calculate_contaminant_vector as calc_contaminant,
 )
+from models.simulations.flood_model import (
+    calculate_flood_risk as calc_flood,
+)
 from api.sensor_fetch import live_water_velocity, live_rainfall_mm, live_slope_deg, sector_coords
+
+# TODO(real imagery): once real Landsat GeoTIFFs land in data/{sector_id}_{pre,post}.tif,
+# wire up real inference in predict_change_detection() below using:
+#   sys.path.insert(0, str(Path(__file__).parent.parent / "models" / "change_detection"))
+#   from predict import get_sector_features, predict as cd_predict
+
 
 
 # ============================================================================
@@ -168,6 +179,29 @@ class ContaminantSimulationRequest(BaseModel):
     source_point: SourcePoint = Field(..., description="Source point coordinates with lat/lon")
 
 
+class FloodSimulationRequest(BaseModel):
+    """Validate flood elevation simulation request."""
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "sector_id": "ATH-001-W",
+                "water_level_m": 1.5,
+                "storm_duration_hr": 24
+            }
+        }
+    )
+
+    sector_id: str = Field(..., description="Grid sector ID")
+    water_level_m: float = Field(
+        ..., ge=0, le=10,
+        description="River water level above normal stage, in metres (0-10)",
+    )
+    storm_duration_hr: float = Field(
+        ..., ge=0, le=168,
+        description="Storm duration in hours (0-168, i.e. up to one week)",
+    )
+
+
 class ChangeDetectionResponse(BaseModel):
     """Response model for change detection predictions."""
     sector_id: str
@@ -278,7 +312,8 @@ async def health_check():
             "components": {
                 "model": model_status,
                 "erosion_model": "ready",
-                "contaminant_model": "ready"
+                "contaminant_model": "ready",
+                "flood_model": "ready"
             }
         }
     except Exception as e:
@@ -307,8 +342,8 @@ async def metrics():
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "info": {
             "model_version": "v1.0",
-            "endpoints": 3,
-            "simulation_types": ["change_detection", "erosion", "contaminant"]
+            "endpoints": 4,
+            "simulation_types": ["change_detection", "erosion", "contaminant", "flood"]
         }
     }
 
@@ -348,7 +383,27 @@ async def predict_change_detection(request: ChangeDetectionRequest):
     try:
         logger.info("Processing change detection for sector: %s", request.sector_id)
 
-        # Calculate risk
+        # PLACEHOLDER: this never calls load_change_detection_model() or reads sector imagery — it's a random score regardless of whether model_v1.pkl exists.
+        # TODO(real imagery): replace this block with:
+        #
+        #     model = load_change_detection_model()
+        #     data_dir = Path(__file__).parent.parent / "data"
+        #
+        #     if model is not None:
+        #         features = get_sector_features(request.sector_id, str(data_dir))
+        #         prediction, confidence, _ = cd_predict(model, features)
+        #         label_map = {0: "Low", 1: "Medium", 2: "High"}
+        #         risk_label = label_map.get(int(prediction), "Unknown")
+        #         risk_score = float(confidence)
+        #     else:
+        #         # keep this fallback for when no trained model is deployed yet
+        #         risk_score = np.random.uniform(0.6, 0.95)
+        #         confidence = np.random.uniform(0.7, 1.0)
+        #         risk_label = "High" if risk_score >= 0.7 else "Medium" if risk_score >= 0.4 else "Low"
+        #         # (then skip the "Classify risk" block below, it's now redundant)
+        #
+        # Requires the import at the top of this file:
+        #     from predict import get_sector_features, predict as cd_predict
         risk_score = np.random.uniform(0.6, 0.95)
         confidence = np.random.uniform(0.7, 1.0)
 
@@ -602,6 +657,88 @@ async def simulate_contaminant(request: ContaminantSimulationRequest):
         raise HTTPException(
             status_code=500,
             detail="Contaminant simulation failed"
+        ) from e
+
+@app.post("/simulate/flood", response_model=ModelOutput)
+async def simulate_flood(request: FloodSimulationRequest):
+    """
+    Simulate flood elevation risk for a given sector, water level, and storm duration.
+
+    **Endpoint:** `POST /simulate/flood`
+
+    **Input:**
+    - sector_id: Grid cell identifier
+    - water_level_m: River water level above normal stage (0-10 metres)
+    - storm_duration_hr: Storm duration (0-168 hours)
+
+    **Output:**
+    - sector_id: Grid sector identifier
+    - risk_score: Risk score [0, 1]
+    - risk_label: High/Medium/Low classification
+    - simulation_type: "flood"
+    - model_version: "v1.0"
+    - timestamp: ISO timestamp
+    - confidence: Model confidence [0, 1]
+
+    **Status Codes:**
+    - 200: Successful simulation
+    - 422: Invalid parameters (out of range)
+    - 500: Simulation failed
+
+    **Example:**
+    ```
+    curl -X POST http://localhost:8000/simulate/flood \
+      -H "Content-Type: application/json" \
+      -d '{"sector_id": "ATH-001-W", "water_level_m": 1.5, "storm_duration_hr": 24}'
+    ```
+    """
+    try:
+        logger.info(
+            "Processing flood simulation for %s: water_level=%.2fm duration=%.1fh",
+            request.sector_id, request.water_level_m, request.storm_duration_hr,
+        )
+
+        try:
+            model_result = calc_flood(request.water_level_m, request.storm_duration_hr)
+            risk_score = model_result.get("risk_score", 0.0)
+            risk_label = model_result.get("risk_label", "Low")
+        except Exception as model_err:
+            logger.warning(
+                "Flood model failed for %s: %s, using fallback",
+                request.sector_id, str(model_err),
+            )
+            risk_score = min(request.water_level_m / 3.0, 1.0)
+            if risk_score >= 0.7:
+                risk_label = "High"
+            elif risk_score >= 0.4:
+                risk_label = "Medium"
+            else:
+                risk_label = "Low"
+
+        result = ModelOutput(
+            sector_id=request.sector_id,
+            model_version="v1.0",
+            simulation_type="flood",
+            risk_score=float(risk_score),
+            risk_label=risk_label,
+            contaminant_vector=None,
+            timestamp=datetime.now(timezone.utc).isoformat(),
+            confidence=0.87,
+            live_inputs={
+                "water_level_m": request.water_level_m,
+                "storm_duration_hr": request.storm_duration_hr,
+            },
+        )
+
+        logger.info("✓ Flood simulation complete for %s", request.sector_id)
+        return result
+    except Exception as e:
+        logger.error(
+            "Flood simulation failed for %s: %s", request.sector_id, str(e)
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Flood simulation failed"
         ) from e
 
 
