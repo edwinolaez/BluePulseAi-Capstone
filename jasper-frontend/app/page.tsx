@@ -69,6 +69,11 @@ export default function Home() {
   const [simulationResults, setSimulationResults] = useState<SimulationResults | null>(null);
   const [fieldPhotos, setFieldPhotos]             = useState<FieldPhoto[]>([]);
 
+  // Digital twin slider state — lifted so Map tab and AI Overview tab stay in sync
+  const [slopeDeg,           setSlopeDeg]           = useState(22);
+  const [rainfallMm,         setRainfallMm]         = useState(82);
+  const [contaminationLevel, setContaminationLevel] = useState(0.72);
+
   // Sector / timeline state — lifted here so Sidebar and MapViewPage share it
   const [sectorId, setSectorId]         = useState<string | null>(null);
   const [dateFrom, setDateFrom]         = useState("2024-06-01");
@@ -190,9 +195,9 @@ export default function Home() {
         />}
 
         {/* Only one of these pages renders at a time depending on the active tab */}
-        {activeTab === "map"       && <MapViewPage flyTo={flyTo} is3D={is3D} showErosion={showErosion} showContaminant={showContaminant} showBurnScar={showBurnScar} showElevation={showElevation} simulationResults={simulationResults} sectorId={sectorId} onSectorClick={setSectorId} dateFrom={dateFrom} dateTo={dateTo} centerDate={centerDate} />}
+        {activeTab === "map"       && <MapViewPage flyTo={flyTo} is3D={is3D} showErosion={showErosion} showContaminant={showContaminant} showBurnScar={showBurnScar} showElevation={showElevation} simulationResults={simulationResults} sectorId={sectorId} onSectorClick={setSectorId} dateFrom={dateFrom} dateTo={dateTo} centerDate={centerDate} slopeDeg={slopeDeg} onSlopeDegChange={setSlopeDeg} rainfallMm={rainfallMm} onRainfallMmChange={setRainfallMm} contaminationLevel={contaminationLevel} onContaminationLevelChange={setContaminationLevel} />}
         {activeTab === "dashboard" && <DashboardPage photos={fieldPhotos} onPhotosChange={setFieldPhotos} simulationResults={simulationResults} />}
-        {activeTab === "ai"        && <AiOverviewPage onResultsUpdate={setSimulationResults} onNavigateToMap={() => handleTabChange("map")} />}
+        {activeTab === "ai"        && <AiOverviewPage onResultsUpdate={setSimulationResults} onNavigateToMap={() => handleTabChange("map")} slopeDeg={slopeDeg} rainfallMm={rainfallMm} contaminationLevel={contaminationLevel} />}
         {activeTab === "reports"   && <ReportsPage />}
         {activeTab === "archives"  && <ArchivesPage />}
         {/* Admin page only renders for superadmin — extra safety check here */}

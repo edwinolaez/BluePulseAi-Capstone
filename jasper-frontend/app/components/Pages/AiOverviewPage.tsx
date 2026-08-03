@@ -1,25 +1,6 @@
-/**
- * AiOverviewPage.tsx — AI Model Overview page showing live ML predictions.
- *
- * Calls all three of Richard's ML models in parallel on mount and displays
- * each result as a card with:
- *   - Risk level badge and confidence score
- *   - Risk score bar
- *   - Collapsible "observed sensor inputs" section showing what data fed the model
- *   - Data provenance footer (source, last refresh, quality flag)
- *
- * Falls back to hardcoded mock values when the ML backend is unreachable,
- * so the page always shows something rather than going blank.
- *
- * Below the three cards is a summary table with all three results side by side,
- * and below that the ResearcherChatPanel for interactive AI simulations.
- *
- * Displays a prominent AI disclaimer banner reminding users that all outputs
- * require expert validation before use in official reporting.
- */
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { fetchChangeDetection, fetchErosionSimulation, fetchContaminantSimulation } from "../../../lib/api";
 import type { ModelOutput, SimulationResults } from "../../../lib/api";
 import { ResearcherChatPanel } from "../Widgets/ResearcherChatPanel";
@@ -34,13 +15,11 @@ const MODELS = [
     accentColor: "text-rose-500",
     accentBg: "bg-rose-500/10",
     borderActive: "border-rose-500",
-    // Data provenance — where the inputs came from and how fresh they are
     provenance: {
       source: "Canadian Wildfire Registry + Sentinel-2 Imagery",
       qualityFlag: "Good",
       lastRefreshLabel: "Sentinel-2 overpass",
     },
-    // The specific sensor/dataset inputs that drive this model's prediction
     inputs: [
       { label: "Spectral Bands",     value: "Sentinel-2 B4, B8A, B12" },
       { label: "NDVI Change Delta",  value: "−0.34 (pre vs post-fire)" },
@@ -63,8 +42,8 @@ const MODELS = [
       lastRefreshLabel: "Terrain + rainfall sync",
     },
     inputs: [
-      { label: "Slope Angle",    value: "42°" },
-      { label: "Rainfall",       value: "95 mm / day" },
+      { label: "Slope Angle",    value: "__slope__" },
+      { label: "Rainfall",       value: "__rainfall__" },
       { label: "RUSLE K-factor", value: "0.32 (silty loam)" },
       { label: "DEM Resolution", value: "30 m SRTM v3" },
     ],
@@ -86,7 +65,7 @@ const MODELS = [
     inputs: [
       { label: "Flow Direction",       value: "180° (south)" },
       { label: "Water Velocity",       value: "2.1 m/s" },
-      { label: "Contamination Level",  value: "0.72 (normalised 0–1)" },
+      { label: "Contamination Level",  value: "__contamLevel__" },
       { label: "Hydrocarbon Baseline", value: "18.4 NTU turbidity" },
     ],
   },
@@ -98,12 +77,6 @@ const RISK_BADGE: Record<string, string> = {
   Low:    "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400",
 };
 
-/**
- * ScoreBar — horizontal progress bar showing a risk score as a percentage.
- * Colour changes from green → amber → red as risk increases past 40% and 70%.
- *
- * @param value - normalised risk score (0.0 – 1.0)
- */
 function ScoreBar({ value }: { value: number }) {
   const pct = Math.round(value * 100);
   const color = pct >= 70 ? "bg-red-500" : pct >= 40 ? "bg-amber-500" : "bg-green-500";
@@ -121,32 +94,73 @@ function ScoreBar({ value }: { value: number }) {
 }
 
 interface Props {
-  onResultsUpdate:  (results: SimulationResults) => void;
-  onNavigateToMap:  () => void;
+  onResultsUpdate:       (results: SimulationResults) => void;
+  onNavigateToMap:       () => void;
+  /** Live values from the map digital twin sliders */
+  slopeDeg:              number;
+  rainfallMm:            number;
+  contaminationLevel:    number;
 }
 
-export function AiOverviewPage({ onResultsUpdate, onNavigateToMap }: Props) {
+export function AiOverviewPage({ onResultsUpdate, onNavigateToMap, slopeDeg, rainfallMm, contaminationLevel }: Props) {
   const [results, setResults] = useState<Record<string, ModelOutput | null>>({
     burn: null, erosion: null, contaminant: null,
   });
-  const [loading, setLoading] = useState(true);
-  // Tracks which model card has its "sensor inputs" section expanded
+  const [loading, setLoading]     = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [expandedInputs, setExpandedInputs] = useState<Record<string, boolean>>({});
 
-  useEffect(() => {
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasMounted  = useRef(false);
+  const fetchIdRef  = useRef(0);
+
+  function runFetch(slope: number, rainfall: number, contamLevel: number) {
+    const id = ++fetchIdRef.current;
     Promise.allSettled([
       fetchChangeDetection("ATH-001-A"),
-      fetchErosionSimulation("ATH-001-H", 42, 95),
-      fetchContaminantSimulation("ATH-001-W", 180, 2.1, 0.72),
+      fetchErosionSimulation("ATH-001-H", slope, rainfall),
+      fetchContaminantSimulation("ATH-001-W", 180, 2.1, contamLevel),
     ]).then(([burn, erosion, contaminant]) => {
+      if (id !== fetchIdRef.current) return;
       const burnVal        = burn.status        === "fulfilled" ? burn.value        : null;
       const erosionVal     = erosion.status     === "fulfilled" ? erosion.value     : null;
       const contaminantVal = contaminant.status === "fulfilled" ? contaminant.value : null;
       setResults({ burn: burnVal, erosion: erosionVal, contaminant: contaminantVal });
       onResultsUpdate({ burn: burnVal, erosion: erosionVal, contaminant: contaminantVal });
       setLoading(false);
+      setRefreshing(false);
     });
-  }, [onResultsUpdate]);
+  }
+
+  // Initial fetch on mount with current slider values
+  useEffect(() => {
+    runFetch(slopeDeg, rainfallMm, contaminationLevel);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Re-fetch (debounced 800 ms) whenever a slider changes after mount
+  useEffect(() => {
+    if (!hasMounted.current) { hasMounted.current = true; return; }
+    setRefreshing(true);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => runFetch(slopeDeg, rainfallMm, contaminationLevel), 800);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slopeDeg, rainfallMm, contaminationLevel]);
+
+  // Resolve live input values for erosion + contaminant cards
+  function resolveInputs(modelKey: string, staticInputs: readonly { readonly label: string; readonly value: string }[]) {
+    return staticInputs.map((inp) => {
+      if (modelKey === "erosion") {
+        if (inp.value === "__slope__")    return { label: inp.label, value: `${slopeDeg}°` };
+        if (inp.value === "__rainfall__") return { label: inp.label, value: `${rainfallMm} mm / day` };
+      }
+      if (modelKey === "contaminant" && inp.value === "__contamLevel__") {
+        return { label: inp.label, value: `${contaminationLevel.toFixed(2)} (normalised 0–1)` };
+      }
+      return { label: inp.label, value: inp.value };
+    });
+  }
 
   const mockFallback: Record<string, Partial<ModelOutput>> = {
     burn:        { risk_label: "High",   risk_score: 0.82, confidence: 0.946, model_version: "v1.3.0", timestamp: new Date().toISOString() },
@@ -178,13 +192,23 @@ export function AiOverviewPage({ onResultsUpdate, onNavigateToMap }: Props) {
       </div>
 
       {/* Page header */}
-      <div className="mb-5">
-        <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1">
-          AI Model Overview
-        </h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          Live outputs from Richard&apos;s ML models — burn scar detection, erosion simulation, and contaminant tracking.
-        </p>
+      <div className="mb-5 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1">
+            AI Model Overview
+          </h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            Live outputs from Richard&apos;s ML models — burn scar detection, erosion simulation, and contaminant tracking.
+          </p>
+        </div>
+        {/* Sync indicator — shows current slider values driving the models */}
+        <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-sait-sky/10 border border-sait-sky/30 text-[11px] text-sait-sky font-medium whitespace-nowrap">
+          {refreshing
+            ? <span className="w-2 h-2 rounded-full bg-sait-sky animate-pulse" />
+            : <span className="w-2 h-2 rounded-full bg-green-500" />
+          }
+          {refreshing ? "Updating…" : "Synced from map sliders"}
+        </div>
       </div>
 
       {/* ── Three model cards ────────────────────────────────────────────────── */}
@@ -198,11 +222,12 @@ export function AiOverviewPage({ onResultsUpdate, onNavigateToMap }: Props) {
           const version    = data?.model_version ?? "—";
           const timestamp  = data?.timestamp ? new Date(data.timestamp).toLocaleString("en-CA", { hour12: false }) : "—";
           const showInputs = !!expandedInputs[model.key];
+          const liveInputs = resolveInputs(model.key, model.inputs);
 
           return (
             <div
               key={model.key}
-              className={`rounded-xl border bg-surface p-5 flex flex-col gap-3 ${isLive ? model.borderActive : "border-gray-200/60 dark:border-gray-700/40"}`}
+              className={`rounded-xl border bg-surface p-5 flex flex-col gap-3 transition-opacity duration-300 ${refreshing && model.key !== "burn" ? "opacity-70" : ""} ${isLive ? model.borderActive : "border-gray-200/60 dark:border-gray-700/40"}`}
             >
               {/* Top row: icon + live status + version */}
               <div className="flex items-start justify-between">
@@ -222,6 +247,13 @@ export function AiOverviewPage({ onResultsUpdate, onNavigateToMap }: Props) {
               <div>
                 <h2 className="text-sm font-bold text-gray-800 dark:text-gray-100 mb-0.5">{model.title}</h2>
                 <p className="text-xs text-gray-500 dark:text-gray-400">{model.subtitle}</p>
+                {/* Show live slider params for the two wired models */}
+                {model.key === "erosion" && (
+                  <p className="text-[10px] text-purple-400 mt-0.5">Slope {slopeDeg}° · Rainfall {rainfallMm} mm/day</p>
+                )}
+                {model.key === "contaminant" && (
+                  <p className="text-[10px] text-sait-sky mt-0.5">Contamination level {contaminationLevel.toFixed(2)}</p>
+                )}
               </div>
 
               {/* AI-generated pending review tag */}
@@ -245,7 +277,7 @@ export function AiOverviewPage({ onResultsUpdate, onNavigateToMap }: Props) {
 
               <ScoreBar value={score} />
 
-              {/* Contributing inputs — collapsible */}
+              {/* Contributing inputs — collapsible, shows live slider values */}
               <div>
                 <button
                   onClick={() => toggleInputs(model.key)}
@@ -259,7 +291,7 @@ export function AiOverviewPage({ onResultsUpdate, onNavigateToMap }: Props) {
                 </button>
                 {showInputs && (
                   <div className="mt-2 rounded-lg bg-gray-50 dark:bg-gray-800/50 p-2.5 space-y-1.5">
-                    {model.inputs.map((inp) => (
+                    {liveInputs.map((inp) => (
                       <div key={inp.label} className="flex justify-between gap-2">
                         <span className="text-[10px] text-gray-500 dark:text-gray-400">{inp.label}</span>
                         <span className="text-[10px] font-medium text-gray-700 dark:text-gray-300 text-right">{inp.value}</span>
@@ -294,7 +326,7 @@ export function AiOverviewPage({ onResultsUpdate, onNavigateToMap }: Props) {
         })}
       </div>
 
-      {/* ── View on Map CTA — appears once simulation results have loaded ─────── */}
+      {/* ── View on Map CTA ──────────────────────────────────────────────────── */}
       {!loading && (
         <div className="mb-6 flex items-center justify-between gap-4 p-4 rounded-xl border border-sait-sky/40 bg-sait-sky/5 dark:bg-sait-sky/10">
           <div>

@@ -47,23 +47,25 @@ interface Props {
   dateFrom:           string;
   dateTo:             string;
   centerDate:         string;
+  /** Lifted to page.tsx so AI Overview stays in sync with map sliders */
+  slopeDeg:               number;
+  onSlopeDegChange:       (v: number) => void;
+  rainfallMm:             number;
+  onRainfallMmChange:     (v: number) => void;
+  contaminationLevel:     number;
+  onContaminationLevelChange: (v: number) => void;
 }
 
-export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBurnScar, showElevation, simulationResults, sectorId, onSectorClick, dateFrom, dateTo, centerDate }: Props) {
+export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBurnScar, showElevation, simulationResults, sectorId, onSectorClick, dateFrom, dateTo, centerDate, slopeDeg, onSlopeDegChange, rainfallMm, onRainfallMmChange, contaminationLevel, onContaminationLevelChange }: Props) {
   const [zoomIn,  setZoomIn]  = useState<(() => void) | null>(null);
   const [zoomOut, setZoomOut] = useState<(() => void) | null>(null);
 
-  // Digital twin scenario panel state — drives ContaminantLayer + ThreeDView plume
-  const [contaminationLevel, setContaminationLevel] = useState(0.72);
+  // contaminationLevel, slopeDeg, rainfallMm are lifted to page.tsx — received as props
   const [projectionHours,    setProjectionHours]    = useState(24);
 
   // Forest growth digital twin state — drives BurnScarLayer marker colour
   const [yearsSinceFire, setYearsSinceFire] = useState(2);
   const [precipMmYr,     setPrecipMmYr]     = useState(450);
-
-  // Soil erosion digital twin state (RUSLE)
-  const [slopeDeg,   setSlopeDeg]   = useState(22);
-  const [rainfallMm, setRainfallMm] = useState(82);
 
   // Flood elevation digital twin state
   const [waterLevelM,     setWaterLevelM]     = useState(1.5);
@@ -117,7 +119,7 @@ export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBur
         {showContaminant && (
           <ContaminantScenarioPanel
             contaminationLevel={contaminationLevel}
-            onContaminationLevelChange={setContaminationLevel}
+            onContaminationLevelChange={onContaminationLevelChange}
             projectionHours={projectionHours}
             onProjectionHoursChange={setProjectionHours}
           />
@@ -137,9 +139,9 @@ export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBur
         {showErosion && (
           <SoilErosionPanel
             slopeDeg={slopeDeg}
-            onSlopeDegChange={setSlopeDeg}
+            onSlopeDegChange={onSlopeDegChange}
             rainfallMm={rainfallMm}
-            onRainfallMmChange={setRainfallMm}
+            onRainfallMmChange={onRainfallMmChange}
           />
         )}
 
