@@ -24,7 +24,7 @@ iniconfig==2.3.0
 isort==8.0.1
 mccabe==0.7.0
 multidict==6.7.1
-numpy==2.5.0
+numpy==2.5.1
 packaging==26.2
 platformdirs==4.11.0
 pluggy==1.6.0
