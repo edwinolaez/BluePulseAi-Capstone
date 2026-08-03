@@ -1,5 +1,5 @@
 affine==2.4.0
-annotated-doc==0.0.4
+annotated-doc==0.0.5
 annotated-types==0.7.0
 anyio==4.14.1
 astroid==4.0.4
