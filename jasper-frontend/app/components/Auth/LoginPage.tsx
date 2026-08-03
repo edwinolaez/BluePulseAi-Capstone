@@ -1,51 +1,19 @@
-/**
- * LoginPage.tsx — Sign-in screen shown to unauthenticated users.
- *
- * Renders a centred card with email + password fields.  On submit it calls
- * AuthContext.login() which validates against the in-memory user list.
- *
- * Special cases:
- *   - Superadmin accounts get a two-step confirmation modal instead of
- *     logging straight in — onSuperadminPending() triggers that flow.
- *   - A 600 ms artificial delay is added so sign-in doesn't feel instant
- *     (UX signal that a real request is happening).
- *
- * The "Demo credentials" collapsible at the bottom shows seed account
- * passwords for testing.  Remove it before any real deployment.
- */
-
 "use client";
 
 import { useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 
 interface Props {
-  /** Called after a non-superadmin successfully logs in. */
   onLoginSuccess: () => void;
-  /** Called when a superadmin submits valid credentials — parent should show the confirmation modal. */
   onSuperadminPending: () => void;
 }
 
-/**
- * LoginPage — full-screen sign-in form.
- *
- * Validates credentials via AuthContext.login().  Handles the superadmin
- * two-step flow by calling onSuperadminPending() instead of completing login
- * directly.  Shows inline error messages and a loading spinner during submission.
- *
- * @param onLoginSuccess      - called after a successful non-superadmin login
- * @param onSuperadminPending - called when superadmin credentials are correct
- *                              but confirmation modal must be shown next
- */
 export function LoginPage({ onLoginSuccess, onSuperadminPending }: Props) {
   const { login } = useAuth();
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
-  // Error message shown below the password field if login fails
   const [error, setError]       = useState("");
-  // Shows a spinner on the sign in button while the login is being processed
   const [loading, setLoading]   = useState(false);
-  // Toggles the password field between hidden dots and readable text
   const [showPw, setShowPw]     = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -54,10 +22,7 @@ export function LoginPage({ onLoginSuccess, onSuperadminPending }: Props) {
     setError("");
     setLoading(true);
 
-    // Small artificial delay so it feels like a real network call
-    await new Promise((r) => setTimeout(r, 600));
-
-    const result = login(email, password);
+    const result = await login(email, password);
     setLoading(false);
 
     if (!result.ok) { setError(result.error ?? "Sign-in failed."); return; }
@@ -67,14 +32,12 @@ export function LoginPage({ onLoginSuccess, onSuperadminPending }: Props) {
 
   return (
     <div className="min-h-screen w-full flex flex-col items-center justify-center bg-slate-100 dark:bg-gray-950 px-4 transition-colors duration-300">
-      {/* Subtle background grid — gray in light mode, white in dark mode */}
       <div
         className="absolute inset-0 pointer-events-none opacity-[0.06] dark:opacity-[0.04]"
         style={{ backgroundImage: "linear-gradient(#64748b 1px,transparent 1px),linear-gradient(90deg,#64748b 1px,transparent 1px)", backgroundSize: "40px 40px" }}
       />
 
       <div className="relative w-full max-w-sm">
-        {/* Logo / branding */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-sait-sky/15 border border-sait-sky/30 mb-4">
             <svg viewBox="0 0 24 24" className="w-7 h-7 stroke-sait-sky fill-none" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
@@ -87,7 +50,6 @@ export function LoginPage({ onLoginSuccess, onSuperadminPending }: Props) {
           <p className="text-sm text-gray-500 dark:text-gray-400">Sign in to access the monitoring dashboard</p>
         </div>
 
-        {/* Card */}
         <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-8 shadow-xl dark:shadow-2xl">
           <form onSubmit={handleSubmit} className="flex flex-col gap-5">
             <div>
@@ -151,18 +113,6 @@ export function LoginPage({ onLoginSuccess, onSuperadminPending }: Props) {
         <p className="text-center text-xs text-gray-400 dark:text-gray-600 mt-6">
           For access to this system, contact your administrator.
         </p>
-
-        {/* Demo hint — remove for production */}
-        <details className="mt-4 text-center">
-          <summary className="text-xs text-gray-400 dark:text-gray-700 cursor-pointer hover:text-gray-600 dark:hover:text-gray-500 transition-colors">
-            Demo credentials ▸
-          </summary>
-          <div className="mt-2 text-[11px] text-gray-500 dark:text-gray-600 space-y-1 font-mono">
-            <p>researcher@jasper.ca / Research@2024 (Researcher)</p>
-            <p>admin@jasper.ca / Admin@2024 (Admin)</p>
-            <p>superadmin@jasper.ca / Super@2024 (Superadmin)</p>
-          </div>
-        </details>
       </div>
     </div>
   );

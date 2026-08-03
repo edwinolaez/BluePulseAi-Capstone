@@ -46,7 +46,7 @@ export function AdminPage() {
   const [formSuccess, setFormSuccess] = useState("");
   const [removeError, setRemoveError] = useState<Record<string, string>>({});
 
-  function handleAdd(e: React.FormEvent) {
+  async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     setFormError(""); setFormSuccess("");
     if (!newName.trim() || !newEmail.trim() || !newPassword.trim()) {
@@ -55,16 +55,16 @@ export function AdminPage() {
     if (newPassword.length < 8) {
       setFormError("Password must be at least 8 characters."); return;
     }
-    const result = addUser({ name: newName, email: newEmail, password: newPassword, role: newRole });
+    const result = await addUser({ name: newName, email: newEmail, password: newPassword, role: newRole });
     if (!result.ok) { setFormError(result.error ?? "Failed to add user."); return; }
     setFormSuccess(`Account created for ${newName}.`);
     setNewName(""); setNewEmail(""); setNewPassword(""); setNewRole("researcher");
     setTimeout(() => setFormSuccess(""), 3000);
   }
 
-  function handleRemove(user: AppUser) {
+  async function handleRemove(user: AppUser) {
     setRemoveError({});
-    const result = removeUser(user.id);
+    const result = await removeUser(user.id);
     if (!result.ok) setRemoveError({ [user.id]: result.error ?? "Could not remove user." });
   }
 
