@@ -16,7 +16,7 @@
     "convex": "^1.42.1",
     "deck.gl": "^9.3.7",
     "leaflet": "^1.9.4",
-    "next": "14.2.35",
+    "next": "16.2.12",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-leaflet": "^4.2.1"
