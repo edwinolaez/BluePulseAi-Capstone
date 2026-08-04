@@ -3,6 +3,12 @@
 import { useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 
+const DEMO_ACCOUNTS = [
+  { role: "Researcher", email: "researcher@jasper.ca", password: "Research@2024" },
+  { role: "Admin",      email: "admin@jasper.ca",      password: "Admin@2024"    },
+  { role: "Superadmin", email: "superadmin@jasper.ca", password: "Super@2024"   },
+];
+
 interface Props {
   onLoginSuccess: () => void;
   onSuperadminPending: () => void;
@@ -15,6 +21,13 @@ export function LoginPage({ onLoginSuccess, onSuperadminPending }: Props) {
   const [error, setError]       = useState("");
   const [loading, setLoading]   = useState(false);
   const [showPw, setShowPw]     = useState(false);
+  const [demoOpen, setDemoOpen] = useState(false);
+
+  function fillDemo(acc: typeof DEMO_ACCOUNTS[number]) {
+    setEmail(acc.email);
+    setPassword(acc.password);
+    setError("");
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -110,7 +123,43 @@ export function LoginPage({ onLoginSuccess, onSuperadminPending }: Props) {
           </form>
         </div>
 
-        <p className="text-center text-xs text-gray-400 dark:text-gray-600 mt-6">
+        {/* Demo accounts collapsible */}
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={() => setDemoOpen((v) => !v)}
+            className="w-full text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 flex items-center justify-center gap-1.5 transition-colors"
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+              <circle cx="6" cy="6" r="5" />
+              <line x1="6" y1="4" x2="6" y2="6.5" />
+              <circle cx="6" cy="8.5" r="0.5" fill="currentColor" stroke="none" />
+            </svg>
+            Demo accounts
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" className={`transition-transform ${demoOpen ? "rotate-180" : ""}`}>
+              <polyline points="2,3.5 5,6.5 8,3.5" />
+            </svg>
+          </button>
+
+          {demoOpen && (
+            <div className="mt-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-3 shadow-sm flex flex-col gap-1.5">
+              {DEMO_ACCOUNTS.map((acc) => (
+                <button
+                  key={acc.role}
+                  type="button"
+                  onClick={() => fillDemo(acc)}
+                  className="flex items-center justify-between px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-800 hover:bg-sait-sky/10 dark:hover:bg-gray-700 transition-colors text-left w-full"
+                >
+                  <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">{acc.role}</span>
+                  <span className="text-xs text-gray-400 dark:text-gray-500 font-mono">{acc.email}</span>
+                </button>
+              ))}
+              <p className="text-center text-xs text-gray-400 dark:text-gray-600 mt-1">Click a row to fill credentials</p>
+            </div>
+          )}
+        </div>
+
+        <p className="text-center text-xs text-gray-400 dark:text-gray-600 mt-4">
           For access to this system, contact your administrator.
         </p>
       </div>
