@@ -219,6 +219,19 @@ const EROSION_ZONE_CONFIGS = [
   },
 ];
 
+// Flood inundation threshold — mirrors ElevationRiskLayer logic for 2D/3D parity
+function floodedFromCategory(waterLevelM: number): number {
+  if (waterLevelM >= 4.8) return 1; // catastrophic — all zones including high ridges
+  if (waterLevelM >= 4.5) return 2;
+  if (waterLevelM >= 3.0) return 3;
+  if (waterLevelM >= 1.5) return 4;
+  if (waterLevelM >= 0.5) return 5;
+  return 6; // nothing flooded
+}
+
+const FLOOD_FILL: [number, number, number, number] = [59,  130, 246, 180];
+const FLOOD_LINE: [number, number, number, number] = [29,  78,  216, 220];
+
 // RGBA colour lookup for each ML risk_label — fill and border variants
 const EROSION_RISK_RGBA: Record<string, {
   fill: [number, number, number, number];
@@ -358,6 +371,8 @@ interface Props {
   slopeDeg?:           number;
   /** Soil erosion panel: rainfall in mm — syncs polygon colors to panel */
   rainfallMm?:         number;
+  /** Flood elevation panel: water level rise in metres — drives elevation zone flood colors */
+  waterLevelM?:        number;
 }
 
 /**
@@ -385,7 +400,10 @@ export function ThreeDView({
   projectionHours    = 24,
   slopeDeg           = 22,
   rainfallMm         = 82,
+  waterLevelM        = 1.5,
 }: Props) {
+  const floodCat = floodedFromCategory(waterLevelM);
+
   // Same RUSLE formula as SoilErosionPanel so 3D polygon colors stay in sync with the panel
   const erosionRate = slopeDeg > 0 && rainfallMm > 0
     ? 2.0 * Math.pow(rainfallMm / 82, 1.2) * Math.pow(slopeDeg / 22, 1.4)
@@ -652,12 +670,13 @@ export function ThreeDView({
       data:               showElevation ? ELEVATION_ZONE_DATA : [],
       getPolygon:         (d) => d.polygon,
       getElevation:       30,
-      getFillColor:       (d) => d.fill,
-      getLineColor:       (d) => d.line,
+      getFillColor:       (d) => d.category >= floodCat ? FLOOD_FILL : d.fill,
+      getLineColor:       (d) => d.category >= floodCat ? FLOOD_LINE : d.line,
       lineWidthMinPixels: 1,
       extruded:           true,
       pickable:           true,
       opacity:            0.75,
+      updateTriggers:     { getFillColor: [floodCat], getLineColor: [floodCat] },
       material: {
         ambient:       0.55,
         diffuse:       0.45,
@@ -823,13 +842,14 @@ export function ThreeDView({
             };
           }
 
-          // Elevation zone hover — show risk class + description
+          // Elevation zone hover — show risk class + flood state
           if ("category" in object) {
-            const zone = object as ElevationZoneDatum;
+            const zone    = object as ElevationZoneDatum;
+            const flooded = zone.category >= floodCat;
             const HEX: Record<number, string> = {
               1: "#9ca3af", 2: "#f59e0b", 3: "#22c55e", 4: "#3b82f6", 5: "#ef4444",
             };
-            const hex = HEX[zone.category] ?? "#9ca3af";
+            const hex = flooded ? "#3b82f6" : (HEX[zone.category] ?? "#9ca3af");
             return {
               html: `
                 <div style="
@@ -843,6 +863,7 @@ export function ThreeDView({
                     <div style="font-weight:700;">${zone.label}</div>
                   </div>
                   <div style="color:#94a3b8;font-size:11px;">${zone.sublabel}</div>
+                  ${flooded ? `<div style="margin-top:5px;padding:2px 8px;border-radius:4px;background:#1e3a8a;border:1px solid #3b82f6;font-size:10px;font-weight:700;color:#93c5fd;">⚠ Flood Inundation Zone · +${waterLevelM.toFixed(1)} m</div>` : ""}
                   <div style="color:#64748b;font-size:10px;margin-top:4px;">Elevation Flood Risk Class ${zone.category} · hover to identify</div>
                 </div>`,
               style: { background: "none" },
