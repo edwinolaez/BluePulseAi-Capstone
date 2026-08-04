@@ -15,7 +15,7 @@
 
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import dynamic from "next/dynamic";
 import type { FlyToTarget } from "../Map/JasperMap";
 import type { SimulationResults } from "../../../lib/api";
@@ -75,6 +75,20 @@ export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBur
     setZoomIn(() => zi);
     setZoomOut(() => zo);
   }, []);
+
+  // Keyboard zoom — + zooms in, - zooms out (2D only; 3D uses deck.gl scroll)
+  useEffect(() => {
+    if (is3D) return;
+    const onKey = (e: KeyboardEvent) => {
+      const tgt = e.target as HTMLElement;
+      if (tgt.tagName === "INPUT" || tgt.tagName === "TEXTAREA" ||
+          tgt.tagName === "SELECT" || tgt.isContentEditable) return;
+      if (e.key === "=" || e.key === "+") zoomIn?.();
+      if (e.key === "-")                  zoomOut?.();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [is3D, zoomIn, zoomOut]);
 
   return (
     <div className="relative flex-1 overflow-hidden">
@@ -159,6 +173,13 @@ export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBur
             onStormDurationHrChange={setStormDurationHr}
           />
         )}
+      </div>
+
+      {/* Keyboard shortcut hint badge — bottom-left, always visible on desktop */}
+      <div className="absolute bottom-4 left-4 z-[1001] hidden md:block pointer-events-none">
+        <div className="bg-black/40 backdrop-blur-sm text-white/60 text-[10px] px-2 py-1 rounded-full font-mono">
+          Press <span className="text-white/90 font-semibold">?</span> for shortcuts
+        </div>
       </div>
 
       {/* Zoom buttons — desktop only, 2D mode only (3D uses deck.gl orbit controls) */}

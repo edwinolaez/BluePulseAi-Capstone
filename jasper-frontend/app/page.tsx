@@ -17,6 +17,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { KeyboardShortcutsHelp } from "./components/UI/KeyboardShortcutsHelp";
 import { useAuth } from "./contexts/AuthContext";
 import { TopNav, AppTab } from "./components/Layout/TopNav";
 import { Sidebar } from "./components/Layout/Sidebar";
@@ -66,6 +67,7 @@ export default function Home() {
   const [showContaminant, setShowContaminant] = useState(true);
   const [showBurnScar, setShowBurnScar]       = useState(true);
   const [showElevation, setShowElevation]     = useState(true);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [simulationResults, setSimulationResults] = useState<SimulationResults | null>(null);
   const [fieldPhotos, setFieldPhotos]             = useState<FieldPhoto[]>([]);
 
@@ -97,6 +99,43 @@ export default function Home() {
 
   // The superadmin confirmation modal — only shows after a superadmin logs in
   const [showSuperConfirm, setShowSuperConfirm] = useState(false);
+
+  // Stable ref so the keydown handler always sees the current activeTab
+  // without needing to re-register the listener on every tab change.
+  const activeTabRef = useRef(activeTab);
+  useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
+
+  // Global keyboard shortcuts — skipped when focus is inside any text input.
+  useEffect(() => {
+    if (!currentUser) return;
+    const onKey = (e: KeyboardEvent) => {
+      const tgt = e.target as HTMLElement;
+      if (
+        tgt.tagName === "INPUT" ||
+        tgt.tagName === "TEXTAREA" ||
+        tgt.tagName === "SELECT" ||
+        tgt.isContentEditable
+      ) return;
+
+      const onMap = activeTabRef.current === "map";
+      switch (e.key) {
+        case "?":                    setShortcutsOpen(v => !v);              break;
+        case "Escape":               setShortcutsOpen(false); setSidebarOpen(false); break;
+        case "m": case "M":  setActiveTab("map");       setSidebarOpen(false); break;
+        case "d": case "D":  setActiveTab("dashboard"); setSidebarOpen(false); break;
+        case "a": case "A":  setActiveTab("ai");        setSidebarOpen(false); break;
+        case "r": case "R":  setActiveTab("reports");   setSidebarOpen(false); break;
+        case "s": case "S":         setSidebarOpen(v => !v);                break;
+        case "3":      if (onMap)   setIs3D(v => !v);                       break;
+        case "e": case "E": if (onMap) setShowErosion(v => !v);             break;
+        case "f": case "F": if (onMap) setShowBurnScar(v => !v);            break;
+        case "w": case "W": if (onMap) setShowContaminant(v => !v);         break;
+        case "l": case "L": if (onMap) setShowElevation(v => !v);           break;
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [currentUser]);
 
   // Opens the logs panel and clears the unread indicator at the same time
   const openLogs = useCallback(() => {
@@ -210,6 +249,9 @@ export default function Home() {
       {/* Overlay panels — these slide in from the side when triggered */}
       <LiveGisLogsPanel    open={logsOpen}   onClose={() => setLogsOpen(false)} />
       <SupportRequestModal open={supportOpen} onClose={() => setSupportOpen(false)} />
+
+      {/* Keyboard shortcuts help — press ? to open */}
+      {shortcutsOpen && <KeyboardShortcutsHelp onClose={() => setShortcutsOpen(false)} />}
     </div>
   );
 }
