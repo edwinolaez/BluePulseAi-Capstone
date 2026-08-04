@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="160" viewBox="0 0 640 160">
+  <defs>
+    <linearGradient id="pulseGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00A3E0"/>
+      <stop offset="55%" stop-color="#005EB8"/>
+      <stop offset="100%" stop-color="#6D2077"/>
+    </linearGradient>
+  </defs>
+
+  <g transform="translate(20,20)">
+    <circle cx="60" cy="60" r="55.2" fill="none" stroke="#B7C4D6" stroke-width="2.4"/>
+    <circle cx="60" cy="60" r="40.8" fill="none" stroke="#8FA3BE" stroke-width="2.88"/>
+    <circle cx="60" cy="60" r="26.4" fill="none" stroke="url(#pulseGrad)" stroke-width="3.6"/>
+    <path d="M 7.2 60 L 38.4 60 L 48 33.6 L 60 86.4 L 69.6 60 L 112.8 60" fill="none" stroke="url(#pulseGrad)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="60" cy="60" r="5.4" fill="url(#pulseGrad)"/>
+  </g>
+
+  <text x="165" y="95" font-family="'Space Grotesk', 'Arial Narrow', Arial, sans-serif" font-weight="700" font-size="52" fill="url(#pulseGrad)">BluePulse<tspan fill="#00A3E0" dx="8">AI</tspan></text>
+</svg>

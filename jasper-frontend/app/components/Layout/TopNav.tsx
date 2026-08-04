@@ -193,9 +193,11 @@ export function TopNav({
           </button>
 
           {/* App name / branding */}
-          <h1 className="text-base md:text-lg font-bold text-sait-sky tracking-tight whitespace-nowrap shrink-0">
-            Jasper Environmental Twin
-          </h1>
+          <img
+            src="/bluepulse-logo.svg"
+            alt="BluePulse AI"
+            className="h-7 w-auto shrink-0"
+          />
 
           {/* Tab navigation — hidden on mobile (uses sidebar drawer instead) */}
           <nav className="hidden md:flex items-center gap-4 md:gap-6 overflow-x-auto hide-scrollbar">
