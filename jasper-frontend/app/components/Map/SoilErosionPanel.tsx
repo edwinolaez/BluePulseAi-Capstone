@@ -72,21 +72,31 @@ export function SoilErosionPanel({
     : erosionRate >= 1.5 ? "bg-amber-500"
     : "bg-green-500";
 
+  const headerBg =
+    erosionRate >= 4.0 ? "bg-red-500/10 hover:bg-red-500/20"
+    : erosionRate >= 1.5 ? "bg-amber-500/10 hover:bg-amber-500/20"
+    : "bg-green-500/10 hover:bg-green-500/20";
+
+  const panelBorder =
+    erosionRate >= 4.0 ? "border-red-300/60 dark:border-red-800/40"
+    : erosionRate >= 1.5 ? "border-amber-300/60 dark:border-amber-800/40"
+    : "border-green-300/60 dark:border-green-800/40";
+
   return (
     <div className={[
       "hidden md:flex flex-col",
       "absolute bottom-28 left-4 z-[1000]",
       "w-64 rounded-xl shadow-xl overflow-hidden",
       "bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm",
-      "border border-gray-200/60 dark:border-gray-700/40",
+      "border transition-colors duration-300", panelBorder,
     ].join(" ")}>
 
       {/* Header */}
       <button
         onClick={() => setCollapsed(v => !v)}
-        className="flex items-center gap-2 px-3 py-2 bg-sait-purple/10 border-b border-gray-200/60 dark:border-gray-700/40 w-full text-left hover:bg-sait-purple/20 transition-colors"
+        className={`flex items-center gap-2 px-3 py-2 border-b border-gray-200/60 dark:border-gray-700/40 w-full text-left transition-colors duration-300 ${headerBg}`}
       >
-        <div className="w-2 h-2 rounded-full bg-sait-purple animate-pulse flex-shrink-0" />
+        <div className={`w-2 h-2 rounded-full animate-pulse flex-shrink-0 transition-colors duration-300 ${accentColor}`} />
         <span className="flex-1 text-[11px] font-bold uppercase tracking-wider text-gray-700 dark:text-gray-200">
           Digital Twin · Soil Erosion
         </span>
@@ -223,6 +233,21 @@ export function SoilErosionPanel({
               </svg>
               <p className="text-[10px] text-red-700 dark:text-red-300 leading-relaxed">
                 Active soil loss — slope stabilisation and bioengineering required.
+              </p>
+            </div>
+          )}
+
+          {/* ── Medium erosion warning ──────────────────────────────── */}
+          {erosionRate >= 1.5 && erosionRate < 4.0 && (
+            <div className="flex items-start gap-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-lg p-2">
+              <svg
+                className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5"
+                viewBox="0 0 20 20" fill="currentColor"
+              >
+                <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+              </svg>
+              <p className="text-[10px] text-amber-700 dark:text-amber-300 leading-relaxed">
+                Elevated sediment transport — revegetation and runoff monitoring advised.
               </p>
             </div>
           )}

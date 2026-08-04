@@ -105,9 +105,11 @@ const RISK_META: Record<string, { fill: string; border: string; opacity: number;
 export function ErosionLayer({
   slopeDeg   = 22,
   rainfallMm = 82,
+  riskLabel: overrideLabel,
 }: {
   slopeDeg?:   number;
   rainfallMm?: number;
+  riskLabel?:  "High" | "Medium" | "Low";
 }) {
   const [results, setResults] = useState<Record<string, ModelOutput | null>>({});
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -127,11 +129,11 @@ export function ErosionLayer({
   return (
     <>
       {EROSION_ZONES.map((zone) => {
-        const result    = results[zone.sectorId];
-        const riskLabel = result?.risk_label ?? "Unknown";
-        const riskScore = result?.risk_score ?? null;
+        const result     = results[zone.sectorId];
+        const riskLabel  = overrideLabel ?? result?.risk_label ?? "Unknown";
+        const riskScore  = result?.risk_score ?? null;
         const confidence = result?.confidence ?? null;
-        const meta      = RISK_META[riskLabel] ?? RISK_META.Unknown;
+        const meta       = RISK_META[riskLabel] ?? RISK_META.Unknown;
 
         return (
           <Fragment key={zone.sectorId}>

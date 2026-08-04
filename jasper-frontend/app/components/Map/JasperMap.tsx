@@ -126,6 +126,13 @@ export default function JasperMap({
   rainfallMm         = 82,
   waterLevelM        = 1.5,
 }: Props) {
+  // Same RUSLE formula as SoilErosionPanel so polygon colors stay in sync
+  const erosionRate = slopeDeg > 0 && rainfallMm > 0
+    ? 2.0 * Math.pow(rainfallMm / 82, 1.2) * Math.pow(slopeDeg / 22, 1.4)
+    : 0;
+  const erosionRiskLabel: "High" | "Medium" | "Low" =
+    erosionRate >= 4.0 ? "High" : erosionRate >= 1.5 ? "Medium" : "Low";
+
   return (
     <MapContainer
       center={ATHABASCA_CENTER}
@@ -148,7 +155,7 @@ export default function JasperMap({
       {showElevation && <ElevationRiskLayer waterLevelM={waterLevelM} />}
 
       {/* Sensor-specific layers render on top of the risk surface */}
-      {showErosion     && <ErosionLayer slopeDeg={slopeDeg} rainfallMm={rainfallMm} />}
+      {showErosion     && <ErosionLayer slopeDeg={slopeDeg} rainfallMm={rainfallMm} riskLabel={erosionRiskLabel} />}
       {showContaminant && (
         <ContaminantLayer
           contaminationLevel={contaminationLevel}
