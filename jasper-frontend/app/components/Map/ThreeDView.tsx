@@ -27,6 +27,7 @@ import { TerrainLayer, TripsLayer } from "@deck.gl/geo-layers";
 import { HeatmapLayer } from "@deck.gl/aggregation-layers";
 import { fetchTimeline, fetchErosionSimulation } from "../../../lib/api";
 import type { TimelineScan, SimulationResults, ModelOutput } from "../../../lib/api";
+import type { PlacedSensor } from "../../../lib/terrainLookup";
 import { interpolateScans } from "../../../lib/interpolation";
 import type { InterpolatedState } from "../../../lib/interpolation";
 
@@ -400,6 +401,30 @@ const ELEVATION_ZONE_DATA: ElevationZoneDatum[] = [
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
+// Pin colours for stakeholder-placed sensors — one per sensor type
+const PLACED_COL_COLOR: Record<string, [number, number, number, number]> = {
+  forest:  [34,  197, 94,  220],
+  erosion: [245, 158, 11,  220],
+  water:   [0,   163, 224, 220],
+  flood:   [59,  130, 246, 220],
+};
+
+// Normalise sim results to a 0-1 risk score for column height
+function placedSensorScore(sensor: PlacedSensor): number {
+  const { erosionRateTPerHaYr, forestRecoveryPct, floodFlowM3s, contaminantConcNorm } =
+    sensor.simulationResults;
+  switch (sensor.sensorType) {
+    case "erosion": return Math.min(1, (erosionRateTPerHaYr ?? 0) / 6);
+    case "forest":  return 1 - (forestRecoveryPct ?? 100) / 100;
+    case "flood":   return Math.min(1, (floodFlowM3s ?? 0) / 50);
+    case "water":   return contaminantConcNorm ?? 0;
+  }
+}
+
+interface PlacedSensorDatum extends PlacedSensor {
+  score: number;
+}
+
 interface Props {
   centerDate:          string;
   activeSectorId:      string | null;
@@ -423,6 +448,8 @@ interface Props {
   yearsSinceFire?:     number;
   /** Forest growth panel: annual precipitation mm/yr — drives burn scar polygon color */
   precipMmYr?:         number;
+  /** Stakeholder-placed sensor pins from MapViewPage */
+  placedSensors?:      PlacedSensor[];
 }
 
 /**
@@ -453,6 +480,7 @@ export function ThreeDView({
   waterLevelM        = 1.5,
   yearsSinceFire     = 2,
   precipMmYr         = 450,
+  placedSensors      = [],
 }: Props) {
   const floodCat = floodedFromCategory(waterLevelM);
 
@@ -692,6 +720,12 @@ export function ThreeDView({
     [showContaminant, directionDeg, plumeNumPts, plumeStepKm]
   );
 
+  // Placed sensor columns + dots — scored for column height, colored by type
+  const placedSensorData = useMemo<PlacedSensorDatum[]>(
+    () => placedSensors.map((s) => ({ ...s, score: placedSensorScore(s) })),
+    [placedSensors]
+  );
+
   const layers = [
     // 3D terrain — high-res elevation mesh with satellite imagery draped on top
     new TerrainLayer({
@@ -872,6 +906,62 @@ export function ThreeDView({
         if (info.object) onSectorClick(info.object.id);
       },
     }),
+
+    // Placed sensor coverage rings — radius in metres matches the 2D dashed circle
+    new ScatterplotLayer<PlacedSensorDatum>({
+      id:                 "placed-sensor-rings",
+      data:               placedSensorData,
+      getPosition:        (d) => [d.lon, d.lat, d.elevationM],
+      getFillColor:       (d): [number, number, number, number] => {
+        const [r, g, b] = PLACED_COL_COLOR[d.sensorType] ?? PLACED_COL_COLOR.erosion;
+        return [r, g, b, 18];
+      },
+      getLineColor:       (d): [number, number, number, number] => {
+        const [r, g, b] = PLACED_COL_COLOR[d.sensorType] ?? PLACED_COL_COLOR.erosion;
+        return [r, g, b, 150];
+      },
+      getRadius:          (d) => d.radiusM,
+      radiusUnits:        "meters",
+      filled:             true,
+      stroked:            true,
+      lineWidthMinPixels: 1.5,
+      pickable:           false,
+      updateTriggers:     { getRadius: [placedSensors], getFillColor: [placedSensors], getLineColor: [placedSensors] },
+    }),
+
+    // Stakeholder-placed sensor columns — height driven by sim score, colour by sensor type
+    new ColumnLayer<PlacedSensorDatum>({
+      id:             "placed-sensor-columns",
+      data:           placedSensorData,
+      diskResolution: 20,
+      radius:         140,
+      extruded:       true,
+      pickable:       true,
+      opacity:        0.90,
+      getPosition:    (d) => [d.lon, d.lat, d.elevationM],
+      getElevation:   (d) => Math.max(80, d.score * 700),
+      getFillColor:   (d) => PLACED_COL_COLOR[d.sensorType] ?? PLACED_COL_COLOR.erosion,
+      getLineColor:   [20, 20, 20, 80],
+      lineWidthMinPixels: 1,
+      updateTriggers: { getElevation: [placedSensors], getFillColor: [placedSensors] },
+    }),
+
+    // Placed sensor dots — visual marker at column top
+    new ScatterplotLayer<PlacedSensorDatum>({
+      id:              "placed-sensor-dots",
+      data:            placedSensorData,
+      getPosition:     (d) => [d.lon, d.lat, d.elevationM + Math.max(80, d.score * 700) + 40],
+      getFillColor:    (d) => PLACED_COL_COLOR[d.sensorType] ?? PLACED_COL_COLOR.erosion,
+      getRadius:       130,
+      radiusMinPixels: 5,
+      radiusMaxPixels: 10,
+      filled:          true,
+      stroked:         true,
+      getLineColor:    [255, 255, 255, 200],
+      lineWidthMinPixels: 1.5,
+      pickable:        true,
+      updateTriggers:  { getPosition: [placedSensors], getFillColor: [placedSensors] },
+    }),
   ];
 
   return (
@@ -882,7 +972,7 @@ export function ThreeDView({
         controller
         layers={layers}
         effects={[LIGHTING]}
-        getTooltip={({ object }: { object?: SectorDatum | SensorDot | ElevationZoneDatum | ErosionZoneDatum | BurnScarZoneDatum }) => {
+        getTooltip={({ object }: { object?: SectorDatum | SensorDot | ElevationZoneDatum | ErosionZoneDatum | BurnScarZoneDatum | PlacedSensorDatum }) => {
           if (!object) return null;
 
           const SENSOR_TYPE_LABEL: Record<"erosion" | "contaminant" | "burnScar", string> = {
@@ -1018,8 +1108,71 @@ export function ThreeDView({
             };
           }
 
-          // Column hover — "score" is unique to SectorDatum; this narrows the type
+          // Placed sensor hover — localId is unique to PlacedSensorDatum; must check before "score"
+          if ("localId" in object) {
+            const p = object as PlacedSensorDatum;
+            const PLACED_TYPE_LABEL: Record<string, string> = {
+              forest: "Forest Regrowth", erosion: "Soil Erosion",
+              water: "Water Quality", flood: "Flood Monitor",
+            };
+            const PLACED_TYPE_HEX: Record<string, string> = {
+              forest: "#22c55e", erosion: "#f59e0b", water: "#00A3E0", flood: "#3b82f6",
+            };
+            const hex = PLACED_TYPE_HEX[p.sensorType] ?? "#94a3b8";
+            const sim = p.simulationResults;
+            const simLines = [
+              sim.erosionRateTPerHaYr !== undefined
+                ? `<div>Erosion: <span style="font-weight:600">${sim.erosionRateTPerHaYr.toFixed(2)} t/ha/yr</span> <span style="color:${sim.erosionRiskLabel === "High" ? "#ef4444" : sim.erosionRiskLabel === "Medium" ? "#f59e0b" : "#22c55e"}">(${sim.erosionRiskLabel})</span></div>`
+                : "",
+              sim.forestRecoveryPct !== undefined
+                ? `<div>Forest recovery: <span style="font-weight:600">${sim.forestRecoveryPct.toFixed(1)}%</span></div>`
+                : "",
+              sim.floodFlowM3s !== undefined
+                ? `<div>Flood flow (Q): <span style="font-weight:600">${sim.floodFlowM3s.toFixed(2)} m³/s</span></div>`
+                : "",
+              sim.contaminantConcNorm !== undefined
+                ? `<div>Contamination: <span style="font-weight:600">${(sim.contaminantConcNorm * 100).toFixed(0)}% of source</span></div>`
+                : "",
+            ].filter(Boolean).join("");
+            return {
+              html: `
+                <div style="
+                  background:#1e293b;color:#f1f5f9;
+                  padding:10px 14px;border-radius:10px;
+                  font-size:12px;line-height:1.7;min-width:210px;
+                  box-shadow:0 4px 20px rgba(0,0,0,.4);
+                ">
+                  <div style="font-weight:700;margin-bottom:2px;">${p.name}</div>
+                  <div style="
+                    display:inline-flex;align-items:center;gap:5px;
+                    font-size:10px;color:${hex};margin-bottom:6px;
+                  ">
+                    <span style="width:7px;height:7px;border-radius:50%;background:${hex};"></span>
+                    ${PLACED_TYPE_LABEL[p.sensorType] ?? p.sensorType} · Stakeholder Pin
+                  </div>
+                  <div style="font-size:11px;color:#94a3b8;margin-bottom:6px;">
+                    ${Math.abs(p.lat).toFixed(4)}°N, ${Math.abs(p.lon).toFixed(4)}°W ·
+                    ${p.elevationM} m asl · ${p.slopeDeg}° slope
+                  </div>
+                  <div style="border-top:1px solid #334155;padding-top:6px;font-size:11px;">
+                    ${simLines}
+                  </div>
+                  <div style="
+                    margin-top:8px;padding:5px 8px;border-radius:5px;
+                    background:#450a0a;border:1px solid #7f1d1d;
+                    font-size:9px;color:#fca5a5;line-height:1.5;
+                  ">
+                    ⚠ Not real sensor data. Model prediction only — not verified by a researcher.
+                    Do not use for environmental or policy decisions.
+                  </div>
+                </div>`,
+              style: { background: "none" },
+            };
+          }
+
+          // Column hover — cast to SectorDatum (PlacedSensorDatum already handled above via localId)
           if ("score" in object) {
+            const col = object as SectorDatum;
             return {
               html: `
                 <div style="
@@ -1028,14 +1181,14 @@ export function ThreeDView({
                   font-size:12px;line-height:1.7;
                   box-shadow:0 4px 20px rgba(0,0,0,.4);
                 ">
-                  <div style="font-weight:700;margin-bottom:4px;">${object.label}</div>
-                  <div>Risk: <span style="font-weight:600">${object.risk}</span></div>
-                  <div>Score: <span style="font-weight:600">${(object.score * 100).toFixed(0)} %</span></div>
-                  <div>Terrain: <span style="color:#94a3b8">${object.elevation.toLocaleString()} m asl</span></div>
-                  <div>ID: <span style="color:#94a3b8">${object.id}</span></div>
-                  ${object.source      ? `<div style="color:#34d399;font-size:10px;margin-top:4px;">★ ${object.source}</div>` : '<div style="color:#94a3b8;font-size:10px;margin-top:4px;">○ Estimated position</div>'}
-                  ${object.isEstimated ? '<div style="color:#00A3E0;font-size:10px;">● Timeline interpolated</div>' : ""}
-                  ${object.isActive    ? '<div style="color:#6D2077;font-size:10px;">★ Selected</div>' : ""}
+                  <div style="font-weight:700;margin-bottom:4px;">${col.label}</div>
+                  <div>Risk: <span style="font-weight:600">${col.risk}</span></div>
+                  <div>Score: <span style="font-weight:600">${(col.score * 100).toFixed(0)} %</span></div>
+                  <div>Terrain: <span style="color:#94a3b8">${col.elevation.toLocaleString()} m asl</span></div>
+                  <div>ID: <span style="color:#94a3b8">${col.id}</span></div>
+                  ${col.source      ? `<div style="color:#34d399;font-size:10px;margin-top:4px;">★ ${col.source}</div>` : '<div style="color:#94a3b8;font-size:10px;margin-top:4px;">○ Estimated position</div>'}
+                  ${col.isEstimated ? '<div style="color:#00A3E0;font-size:10px;">● Timeline interpolated</div>' : ""}
+                  ${col.isActive    ? '<div style="color:#6D2077;font-size:10px;">★ Selected</div>' : ""}
                 </div>`,
               style: { background: "none" },
             };

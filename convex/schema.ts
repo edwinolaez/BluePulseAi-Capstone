@@ -60,7 +60,7 @@ export default defineSchema({
    * Indexed by sector and date so the widget can list scans quickly.
    */
   droneScans: defineTable({
-    storageId:   v.id("_storage"),  // file stored in Convex's blob storage
+    storageId:   v.id("_storage"),  // file stored in Convex's built-in file storage
     filename:    v.string(),
     uploadedBy:  v.string(),        // e.g. "CIRUS Team"
     sectorId:    v.string(),        // which monitoring sector this scan covers
@@ -75,4 +75,34 @@ export default defineSchema({
   })
     .index("by_sector", ["sectorId"])
     .index("by_date",   ["scanDate"]),
+
+  /**
+   * Stakeholder-placed sensor simulations.
+   * Created when a user drops a custom sensor pin on the map and confirms the
+   * placement modal.  Always stored with needsVerification: true.
+   * Max 3 active rows (enforced on the frontend).
+   */
+  userSimulations: defineTable({
+    name:       v.string(),
+    lat:        v.number(),
+    lon:        v.number(),
+    sensorType: v.union(v.literal("forest"), v.literal("erosion"),
+                        v.literal("water"),  v.literal("flood")),
+    elevationM: v.number(),
+    slopeDeg:   v.number(),
+    radiusM:    v.number(),   // user-set monitoring radius in metres
+    simulationResults: v.object({
+      catchmentAreaHa:     v.optional(v.number()), // π·r²/10000
+      forestRecoveryPct:   v.optional(v.number()),
+      erosionRateTPerHaYr: v.optional(v.number()),
+      erosionRiskLabel:    v.optional(v.string()),
+      erosionTotalLoadTYr: v.optional(v.number()), // rate × catchmentAreaHa
+      floodFlowM3s:        v.optional(v.number()), // Q = C·i·π·r² (accurate)
+      contaminantConcNorm: v.optional(v.number()), // Gaussian at center
+      contaminantEdgeConc: v.optional(v.number()), // Gaussian at radius edge
+    }),
+    needsVerification: v.boolean(),
+    verificationNote:  v.string(),
+    placedAt:          v.number(),
+  }).index("by_placed_at", ["placedAt"]),
 });

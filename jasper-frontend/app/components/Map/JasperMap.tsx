@@ -8,6 +8,7 @@
  *
  * Three internal helper components are defined here:
  *   SectorClickHandler — converts map clicks to sector IDs
+ *   PlacementClickHandler — captures a single click in placement mode
  *   MapController      — exposes zoomIn/zoomOut callbacks to the parent
  *   FlyToController    — animates the map to a target when flyTo changes
  *
@@ -23,6 +24,8 @@ import { ErosionLayer } from "./ErosionLayer";
 import { ContaminantLayer } from "./ContaminantLayer";
 import { TelemetryStation } from "./TelemetryStation";
 import { ElevationRiskLayer } from "./ElevationRiskLayer";
+import { PlacedSensorLayer } from "./PlacedSensorLayer";
+import type { PlacedSensor } from "../../../lib/terrainLookup";
 
 const ATHABASCA_CENTER: [number, number] = [52.875, -118.08];
 const DEFAULT_ZOOM = 12;
@@ -45,31 +48,30 @@ interface Props {
   showElevation?:      boolean;
   onMapInit?:          (zoomIn: () => void, zoomOut: () => void) => void;
   flyTo?:              FlyToTarget | null;
-  /** Scenario panel: contamination level 0–1 passed through to ContaminantLayer */
   contaminationLevel?: number;
-  /** Scenario panel: projection hours passed through to ContaminantLayer */
   projectionHours?:    number;
-  /** Forest growth panel: years since the Jasper wildfire (drives regrowth colour) */
   yearsSinceFire?:     number;
-  /** Forest growth panel: annual precipitation in mm/yr (drives regrowth rate) */
   precipMmYr?:         number;
-  /** Soil erosion panel: slope angle in degrees — passed to ErosionLayer for live ML re-fetch */
   slopeDeg?:           number;
-  /** Soil erosion panel: rainfall in mm — passed to ErosionLayer for live ML re-fetch */
   rainfallMm?:         number;
-  /** Flood elevation panel: water level rise in metres — drives ElevationRiskLayer highlight */
   waterLevelM?:        number;
+  /** When true, the next map click places a sensor instead of selecting a sector */
+  placementMode?:      boolean;
+  /** Called with (lat, lon) when the user clicks in placement mode */
+  onPlaceSensor?:      (lat: number, lon: number) => void;
+  /** Stakeholder-placed sensor pins */
+  placedSensors?:      PlacedSensor[];
+  /** Called with localId when the user removes a placed sensor */
+  onRemoveSensor?:     (localId: string) => void;
 }
 
 /**
- * SectorClickHandler — invisible component that converts Leaflet map clicks
- * into a deterministic sector ID string by snapping the lat/lng to a 0.05°
- * grid cell.  This gives each area of the map a stable ID for the SectorPanel.
+ * SectorClickHandler — converts map clicks to sector IDs by snapping the
+ * lat/lng to a 0.05° grid cell.
  */
 function SectorClickHandler({ onClick }: { onClick: (id: string) => void }) {
   useMapEvents({
     click(e) {
-      // Snap to a ~5 km grid so nearby clicks resolve to the same sector
       const lat = Math.floor(e.latlng.lat / 0.05);
       const lng = Math.floor(e.latlng.lng / 0.05);
       onClick(`sector_${lat}_${lng}`);
@@ -79,9 +81,21 @@ function SectorClickHandler({ onClick }: { onClick: (id: string) => void }) {
 }
 
 /**
+ * PlacementClickHandler — captures the next map click and fires onPlace.
+ * Rendered in place of SectorClickHandler when placementMode is true.
+ */
+function PlacementClickHandler({ onPlace }: { onPlace: (lat: number, lon: number) => void }) {
+  useMapEvents({
+    click(e) {
+      onPlace(e.latlng.lat, e.latlng.lng);
+    },
+  });
+  return null;
+}
+
+/**
  * MapController — exposes the Leaflet map's zoomIn/zoomOut methods to the
- * parent via a callback.  This is the correct pattern for accessing the Leaflet
- * map instance from outside a react-leaflet component tree.
+ * parent via a callback.
  */
 function MapController({ onMapInit }: { onMapInit: (zi: () => void, zo: () => void) => void }) {
   const map = useMap();
@@ -93,22 +107,20 @@ function MapController({ onMapInit }: { onMapInit: (zi: () => void, zo: () => vo
 
 /**
  * FlyToController — animates the map to a new position whenever target changes.
- * Uses a nonce (timestamp) instead of comparing lat/lng so that clicking the
- * same sector twice still triggers the animation.
+ * Uses a nonce so clicking the same sector twice still triggers the animation.
  */
 function FlyToController({ target }: { target: FlyToTarget }) {
   const map = useMap();
   useEffect(() => {
     map.flyTo([target.lat, target.lng], target.zoom, { duration: 1.2 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target.nonce]); // intentionally only react to nonce, not lat/lng/zoom
+  }, [target.nonce]);
   return null;
 }
 
 /**
  * JasperMap (default export)
- * 2D Leaflet map centred on the Athabasca watershed.  Layer components are
- * mounted conditionally so they only request API data when their toggle is on.
+ * 2D Leaflet map centred on the Athabasca watershed.
  */
 export default function JasperMap({
   onSectorClick,
@@ -125,8 +137,11 @@ export default function JasperMap({
   slopeDeg           = 22,
   rainfallMm         = 82,
   waterLevelM        = 1.5,
+  placementMode      = false,
+  onPlaceSensor,
+  placedSensors      = [],
+  onRemoveSensor     = () => {},
 }: Props) {
-  // Same RUSLE formula as SoilErosionPanel so polygon colors stay in sync
   const erosionRate = slopeDeg > 0 && rainfallMm > 0
     ? 2.0 * Math.pow(rainfallMm / 82, 1.2) * Math.pow(slopeDeg / 22, 1.4)
     : 0;
@@ -141,20 +156,21 @@ export default function JasperMap({
       zoomControl={false}
       style={{ height: "100%", width: "100%" }}
     >
-      {/* Base map tiles — shows roads, rivers, and place names */}
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
 
-      {onSectorClick && <SectorClickHandler onClick={onSectorClick} />}
-      {onMapInit     && <MapController onMapInit={onMapInit} />}
-      {flyTo         && <FlyToController target={flyTo} />}
+      {/* Click handler: placement mode captures pin drop, otherwise selects sector */}
+      {placementMode && onPlaceSensor
+        ? <PlacementClickHandler onPlace={onPlaceSensor} />
+        : onSectorClick && <SectorClickHandler onClick={onSectorClick} />
+      }
 
-      {/* Elevation flood risk zones — toggleable via Sidebar */}
-      {showElevation && <ElevationRiskLayer waterLevelM={waterLevelM} />}
+      {onMapInit && <MapController onMapInit={onMapInit} />}
+      {flyTo     && <FlyToController target={flyTo} />}
 
-      {/* Sensor-specific layers render on top of the risk surface */}
+      {showElevation   && <ElevationRiskLayer waterLevelM={waterLevelM} />}
       {showErosion     && <ErosionLayer slopeDeg={slopeDeg} rainfallMm={rainfallMm} riskLabel={erosionRiskLabel} />}
       {showContaminant && (
         <ContaminantLayer
@@ -162,9 +178,16 @@ export default function JasperMap({
           projectionHours={projectionHours}
         />
       )}
-      {showBurnScar    && <BurnScarLayer yearsSinceFire={yearsSinceFire} precipMmYr={precipMmYr} />}
+      {showBurnScar && <BurnScarLayer yearsSinceFire={yearsSinceFire} precipMmYr={precipMmYr} />}
 
       <TelemetryStation />
+
+      {/* Stakeholder-placed sensor pins */}
+      <PlacedSensorLayer
+        placedSensors={placedSensors}
+        placementMode={placementMode}
+        onRemoveSensor={onRemoveSensor}
+      />
     </MapContainer>
   );
 }
