@@ -95,6 +95,8 @@ export function MapViewPage({ flyTo, is3D, showErosion, showContaminant, showBur
             slopeDeg={slopeDeg}
             rainfallMm={rainfallMm}
             waterLevelM={waterLevelM}
+            yearsSinceFire={yearsSinceFire}
+            precipMmYr={precipMmYr}
           />
         ) : (
           <JasperMap

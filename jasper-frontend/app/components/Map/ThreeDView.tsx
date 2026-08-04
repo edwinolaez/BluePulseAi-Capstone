@@ -180,6 +180,16 @@ interface ElevationZoneDatum {
   polygon:  [number, number, number][];
 }
 
+interface BurnScarZoneDatum {
+  kind:        "burn-scar-zone";
+  label:       string;
+  recovery:    number;
+  statusLabel: string;
+  polygon:     [number, number, number][];
+  fillColor:   [number, number, number, number];
+  lineColor:   [number, number, number, number];
+}
+
 interface ErosionZoneDatum {
   kind:        "erosion-zone";
   sectorId:    string;
@@ -250,6 +260,42 @@ const EROSION_RISK_DESC: Record<string, string> = {
   Low:     "Minimal surface loss · stable vegetation cover · routine observation only",
   Unknown: "Awaiting ML model response",
 };
+
+// ── Forest regrowth (burn scar perimeter) ────────────────────────────────────
+
+const FOREST_PRECIP_BASELINE = 450;
+const FOREST_GROWTH_RATE     = 0.12;
+const FOREST_INITIAL_RECOVERY = 0.02;
+
+function calcForestRecovery(yearsSinceFire: number, precipMmYr: number): number {
+  if (yearsSinceFire <= 0) return FOREST_INITIAL_RECOVERY;
+  const rEff = FOREST_GROWTH_RATE * Math.sqrt(precipMmYr / FOREST_PRECIP_BASELINE);
+  return 1 / (1 + ((1 - FOREST_INITIAL_RECOVERY) / FOREST_INITIAL_RECOVERY) * Math.exp(-rEff * yearsSinceFire));
+}
+
+// Simplified 2024 Jasper wildfire perimeter — ~35,000 ha.
+// Coordinates in deck.gl [lon, lat, elevation] format (note: lon first, opposite of Leaflet).
+// Floated at 1160 m (~80 m above the burn scar valley floor at ~1080 m).
+const BURN_SCAR_POLYGON_3D: [number, number, number][] = [
+  [-118.200, 52.938, 1160],
+  [-118.135, 52.920, 1160],
+  [-118.068, 52.905, 1160],
+  [-118.010, 52.893, 1160],
+  [-117.965, 52.872, 1160],
+  [-117.945, 52.848, 1160],
+  [-117.960, 52.822, 1160],
+  [-117.995, 52.800, 1160],
+  [-118.050, 52.778, 1160],
+  [-118.110, 52.762, 1160],
+  [-118.175, 52.758, 1160],
+  [-118.228, 52.770, 1160],
+  [-118.258, 52.795, 1160],
+  [-118.258, 52.828, 1160],
+  [-118.240, 52.862, 1160],
+  [-118.215, 52.898, 1160],
+  [-118.208, 52.925, 1160],
+  [-118.200, 52.938, 1160],
+];
 
 // 3D elevation flood risk zones — same 5-class system as the 2D ElevationRiskLayer.
 // Coordinates are [lon, lat, baseElevation] in deck.gl format (swapped from Leaflet's [lat, lon]).
@@ -373,6 +419,10 @@ interface Props {
   rainfallMm?:         number;
   /** Flood elevation panel: water level rise in metres — drives elevation zone flood colors */
   waterLevelM?:        number;
+  /** Forest growth panel: years since fire — drives burn scar polygon color */
+  yearsSinceFire?:     number;
+  /** Forest growth panel: annual precipitation mm/yr — drives burn scar polygon color */
+  precipMmYr?:         number;
 }
 
 /**
@@ -401,6 +451,8 @@ export function ThreeDView({
   slopeDeg           = 22,
   rainfallMm         = 82,
   waterLevelM        = 1.5,
+  yearsSinceFire     = 2,
+  precipMmYr         = 450,
 }: Props) {
   const floodCat = floodedFromCategory(waterLevelM);
 
@@ -503,6 +555,30 @@ export function ThreeDView({
       })
       .catch(() => { /* Overpass unavailable — render without buildings */ });
   }, []);
+
+  // Build burn scar perimeter polygon — color driven by logistic regrowth model
+  const burnScarZoneData = useMemo<BurnScarZoneDatum[]>(() => {
+    const recovery = calcForestRecovery(yearsSinceFire, precipMmYr);
+    const statusLabel =
+      recovery < 0.10 ? "Early Pioneer"
+      : recovery < 0.30 ? "Shrub · Herb"
+      : recovery < 0.60 ? "Sapling Stage"
+      : "Canopy Closure";
+    const rgb: [number, number, number] =
+      recovery < 0.10 ? [239, 68,  68]
+      : recovery < 0.30 ? [245, 158, 11]
+      : recovery < 0.60 ? [132, 204, 22]
+      : [34,  197, 94];
+    return [{
+      kind:        "burn-scar-zone" as const,
+      label:       "2024 Jasper Wildfire Perimeter",
+      recovery,
+      statusLabel,
+      polygon:     BURN_SCAR_POLYGON_3D,
+      fillColor:   [...rgb, 55]  as [number, number, number, number],
+      lineColor:   [...rgb, 200] as [number, number, number, number],
+    }];
+  }, [yearsSinceFire, precipMmYr]);
 
   // Build erosion zone polygons — color driven by RUSLE risk label for instant slider sync
   const erosionZoneData = useMemo<ErosionZoneDatum[]>(
@@ -685,6 +761,22 @@ export function ThreeDView({
       },
     }),
 
+    // 2024 Jasper wildfire perimeter — large semi-transparent slab, colour tracks forest recovery sliders
+    new PolygonLayer<BurnScarZoneDatum>({
+      id:                 "burn-scar-perimeter",
+      data:               showBurnScar ? burnScarZoneData : [],
+      getPolygon:         (d) => d.polygon,
+      getElevation:       15,
+      getFillColor:       (d) => d.fillColor,
+      getLineColor:       (d) => d.lineColor,
+      lineWidthMinPixels: 1,
+      extruded:           true,
+      pickable:           true,
+      opacity:            0.85,
+      updateTriggers:     { getFillColor: [yearsSinceFire, precipMmYr], getLineColor: [yearsSinceFire, precipMmYr] },
+      material: { ambient: 0.55, diffuse: 0.45, shininess: 4, specularColor: [255, 255, 255] },
+    }),
+
     // Soil erosion risk zones — ML-coloured extruded slabs, one per monitored sector
     new PolygonLayer<ErosionZoneDatum>({
       id:                 "erosion-risk-zones",
@@ -790,7 +882,7 @@ export function ThreeDView({
         controller
         layers={layers}
         effects={[LIGHTING]}
-        getTooltip={({ object }: { object?: SectorDatum | SensorDot | ElevationZoneDatum | ErosionZoneDatum }) => {
+        getTooltip={({ object }: { object?: SectorDatum | SensorDot | ElevationZoneDatum | ErosionZoneDatum | BurnScarZoneDatum }) => {
           if (!object) return null;
 
           const SENSOR_TYPE_LABEL: Record<"erosion" | "contaminant" | "burnScar", string> = {
@@ -798,6 +890,40 @@ export function ThreeDView({
             contaminant: "River Water Quality Sensor",
             burnScar:    "Forest Regrowth Sensor",
           };
+
+          // Burn scar perimeter hover — show regrowth stage + recovery %
+          if ("kind" in object && object.kind === "burn-scar-zone") {
+            const z = object as BurnScarZoneDatum;
+            const hex =
+              z.recovery < 0.10 ? "#ef4444"
+              : z.recovery < 0.30 ? "#f59e0b"
+              : z.recovery < 0.60 ? "#84cc16"
+              : "#22c55e";
+            return {
+              html: `
+                <div style="
+                  background:#1e293b;color:#f1f5f9;
+                  padding:10px 14px;border-radius:10px;
+                  font-size:12px;line-height:1.7;min-width:220px;
+                  box-shadow:0 4px 20px rgba(0,0,0,.4);
+                ">
+                  <div style="font-weight:700;margin-bottom:2px;">ATH-001-A · Forest Regrowth Sensor</div>
+                  <div style="color:#64748b;font-size:10px;margin-bottom:8px;">${z.label} · ~35,000 ha · Alberta Wildfire 2024</div>
+                  <div style="
+                    display:inline-flex;align-items:center;gap:6px;
+                    padding:3px 8px;border-radius:4px;margin-bottom:8px;
+                    background:rgba(255,255,255,0.07);border:1px solid ${hex};
+                  ">
+                    <span style="width:8px;height:8px;border-radius:50%;background:${hex};flex-shrink:0;"></span>
+                    <span style="font-size:11px;font-weight:700;color:${hex};">
+                      ${z.statusLabel} · ${(z.recovery * 100).toFixed(1)}% recovery
+                    </span>
+                  </div>
+                  <div style="font-size:10px;color:#94a3b8;">Adjust Forest Growth panel sliders to see regrowth stages</div>
+                </div>`,
+              style: { background: "none" },
+            };
+          }
 
           // Erosion zone hover — show ML risk level + description
           if ("kind" in object && object.kind === "erosion-zone") {
@@ -918,11 +1044,14 @@ export function ThreeDView({
         }}
       />
 
-      {/* ── Live count badge ── */}
+      {/* ── Live count badge — dot always visible, label expands on hover ── */}
       {liveCount > 0 && (
-        <div className="absolute top-4 left-4 z-10 pointer-events-none">
-          <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-full px-2.5 py-1 shadow text-[10px] text-green-500 font-semibold border border-gray-200/60 dark:border-gray-700/40">
-            ● {liveCount}/5 live
+        <div className="absolute top-4 left-4 z-10 group cursor-default">
+          <div className="bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm rounded-full px-2 py-1 shadow border border-gray-200/60 dark:border-gray-700/40 flex items-center overflow-hidden transition-all duration-200">
+            <span className="text-[10px] text-green-500 font-semibold leading-none">●</span>
+            <span className="text-[10px] text-green-500 font-semibold leading-none max-w-0 group-hover:max-w-[4rem] overflow-hidden whitespace-nowrap transition-all duration-200 group-hover:ml-1">
+              {liveCount}/5 live
+            </span>
           </div>
         </div>
       )}

@@ -5,8 +5,8 @@
  * monitoring station.  The popup opens automatically on first load so
  * reviewers and presenters immediately see what the marker represents.
  *
- * The "permanent" tooltip label stays visible at all zoom levels so the
- * station is always identifiable without having to click it.
+ * The tooltip label appears on hover so the station is identifiable without
+ * cluttering the map at all times.
  *
  * Note: the data values shown in the popup (pH, coordinates) are static
  * demo values — a real build would pull them from Feven's backend.
@@ -53,7 +53,7 @@ export function TelemetryStation() {
 
   return (
     <Marker ref={markerRef} position={STATION_CENTER} icon={radarPinIcon}>
-      <Tooltip permanent direction="bottom" offset={[0, 14]} className="jasper-zone-label" opacity={1}>
+      <Tooltip direction="bottom" offset={[0, 14]} className="jasper-zone-label" opacity={1}>
         <span className="font-semibold text-[11px] leading-none text-sait-sky">
           Live Sensor — SEC-B4
         </span>
