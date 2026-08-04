@@ -158,6 +158,7 @@ export const RISK_CATEGORY_COLORS: Record<number, { fill: string; label: string 
 // Returns the lowest risk category that becomes inundated at a given water level.
 // Categories at or above this threshold are highlighted as flood zones.
 function floodedFromCategory(waterLevelM: number): number {
+  if (waterLevelM >= 4.8) return 1; // catastrophic — all zones including high ridges
   if (waterLevelM >= 4.5) return 2;
   if (waterLevelM >= 3.0) return 3;
   if (waterLevelM >= 1.5) return 4;
