@@ -185,6 +185,7 @@ interface ErosionZoneDatum {
   sectorId:    string;
   label:       string;
   slopeDeg:    number;
+  rainfallMm:  number;
   riskLabel:   string;
   riskScore:   number | null;
   confidence:  number | null;
@@ -353,6 +354,10 @@ interface Props {
   contaminationLevel?: number;
   /** Scenario panel: hours to project forward (extends plume path) */
   projectionHours?:    number;
+  /** Soil erosion panel: slope angle in degrees — syncs polygon colors to panel */
+  slopeDeg?:           number;
+  /** Soil erosion panel: rainfall in mm — syncs polygon colors to panel */
+  rainfallMm?:         number;
 }
 
 /**
@@ -378,7 +383,15 @@ export function ThreeDView({
   simulationResults,
   contaminationLevel = 0.72,
   projectionHours    = 24,
+  slopeDeg           = 22,
+  rainfallMm         = 82,
 }: Props) {
+  // Same RUSLE formula as SoilErosionPanel so 3D polygon colors stay in sync with the panel
+  const erosionRate = slopeDeg > 0 && rainfallMm > 0
+    ? 2.0 * Math.pow(rainfallMm / 82, 1.2) * Math.pow(slopeDeg / 22, 1.4)
+    : 0;
+  const erosionRiskLabel: "High" | "Medium" | "Low" =
+    erosionRate >= 4.0 ? "High" : erosionRate >= 1.5 ? "Medium" : "Low";
 
   const [viewState, setViewState] = useState(INITIAL_VIEW_STATE);
 
@@ -473,26 +486,26 @@ export function ThreeDView({
       .catch(() => { /* Overpass unavailable — render without buildings */ });
   }, []);
 
-  // Build erosion zone polygons from static configs + live ML risk_label
+  // Build erosion zone polygons — color driven by RUSLE risk label for instant slider sync
   const erosionZoneData = useMemo<ErosionZoneDatum[]>(
     () => EROSION_ZONE_CONFIGS.map((cfg) => {
-      const ml         = erosionML[cfg.sectorId];
-      const riskLabel  = ml?.risk_label ?? "Unknown";
-      const colors     = EROSION_RISK_RGBA[riskLabel] ?? EROSION_RISK_RGBA.Unknown;
+      const ml     = erosionML[cfg.sectorId];
+      const colors = EROSION_RISK_RGBA[erosionRiskLabel] ?? EROSION_RISK_RGBA.Unknown;
       return {
         kind:       "erosion-zone" as const,
         sectorId:   cfg.sectorId,
         label:      cfg.label,
-        slopeDeg:   cfg.slopeDeg,
-        riskLabel,
-        riskScore:  ml?.risk_score   ?? null,
-        confidence: ml?.confidence   ?? null,
+        slopeDeg,
+        rainfallMm,
+        riskLabel:  erosionRiskLabel,
+        riskScore:  ml?.risk_score  ?? null,
+        confidence: ml?.confidence  ?? null,
         polygon:    cfg.polygon,
         fillColor:  colors.fill,
         lineColor:  colors.line,
       };
     }),
-    [erosionML]
+    [erosionRiskLabel, erosionML, slopeDeg, rainfallMm]
   );
 
   const data = useMemo<SectorDatum[]>(
@@ -665,7 +678,7 @@ export function ThreeDView({
       extruded:           true,
       pickable:           true,
       opacity:            0.80,
-      updateTriggers: { getFillColor: [erosionML] },
+      updateTriggers: { getFillColor: [erosionRiskLabel] },
       material: {
         ambient:       0.55,
         diffuse:       0.45,
@@ -791,7 +804,7 @@ export function ThreeDView({
                 ">
                   <div style="font-weight:700;margin-bottom:2px;">${z.label}</div>
                   <div style="color:#64748b;font-size:10px;margin-bottom:8px;">
-                    ${z.sectorId} · ${z.slopeDeg}° slope · 82 mm rain
+                    ${z.sectorId} · ${z.slopeDeg}° slope · ${z.rainfallMm} mm rain
                   </div>
                   <div style="
                     display:inline-flex;align-items:center;gap:6px;
