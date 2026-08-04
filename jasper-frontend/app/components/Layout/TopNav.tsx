@@ -196,7 +196,7 @@ export function TopNav({
           <img
             src="/bluepulse-logo.svg"
             alt="BluePulse AI"
-            className="h-7 w-auto shrink-0"
+            className="h-5 w-auto shrink-0"
           />
 
           {/* Tab navigation — hidden on mobile (uses sidebar drawer instead) */}
