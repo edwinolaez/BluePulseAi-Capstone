@@ -47,8 +47,8 @@ const ThreeDView = dynamic(
 // is needed — the parent calls the ref functions directly from event handlers.
 
 interface ConvexRefs {
-  addRef:    React.MutableRefObject<((data: Omit<PlacedSensor, "localId" | "convexId">) => Promise<string>) | null>;
-  removeRef: React.MutableRefObject<((id: string) => Promise<void>) | null>;
+  addRef:    React.RefObject<((data: Omit<PlacedSensor, "localId" | "convexId">) => Promise<string>) | null>;
+  removeRef: React.RefObject<((id: string) => Promise<void>) | null>;
 }
 
 function SensorConvexActions({ addRef, removeRef }: ConvexRefs) {
@@ -121,18 +121,22 @@ export function MapViewPage({
     setZoomOut(() => zo);
   }, []);
 
-  // Keyboard zoom — + zooms in, - zooms out (2D only)
+  // Keyboard zoom — + / = zooms in, - zooms out (2D only; skipped entirely in 3D mode)
+  // zoomIn / zoomOut are function refs passed up from JasperMap via onMapInit
   useEffect(() => {
-    if (is3D) return;
+    if (is3D) return; // 3D view has its own zoom buttons and ignores Leaflet zoom refs
     const onKey = (e: KeyboardEvent) => {
       const tgt = e.target as HTMLElement;
       if (
+        // Same guard as page.tsx: block shortcuts when a text input has focus, BUT allow
+        // <input type="range"> (sliders) so zoom keys still work after touching a slider.
+        // See page.tsx for the full explanation of why range inputs are excluded.
         (tgt.tagName === "INPUT" && (tgt as HTMLInputElement).type !== "range") ||
         tgt.tagName === "TEXTAREA" ||
         tgt.tagName === "SELECT" ||
         tgt.isContentEditable
       ) return;
-      if (e.key === "=" || e.key === "+") zoomIn?.();
+      if (e.key === "=" || e.key === "+") zoomIn?.();  // = and + share a key on most keyboards
       if (e.key === "-")                  zoomOut?.();
     };
     window.addEventListener("keydown", onKey);

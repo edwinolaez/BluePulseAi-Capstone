@@ -200,6 +200,12 @@ export function ContaminantLayer({
       ))}
 
       {/* River Water Quality sensor dot — cyan #00A3E0 matches 3D map colour */}
+      {/*
+        Sensor dot at WSC station 07AA001 (Miette River at Jasper).
+        The dot fill is always sky-blue (#00A3E0) regardless of contamination level
+        so the sensor location is always recognisable.  Risk severity is communicated
+        via the text label inside the tooltip, not the dot colour.
+      */}
       <CircleMarker
         center={CRITICAL_CENTER}
         radius={7}
@@ -208,7 +214,14 @@ export function ContaminantLayer({
         <Tooltip direction="top" offset={[0, -8]} opacity={1}>
           <div className="text-xs font-semibold">ATH-001-W</div>
           <div className="text-xs text-gray-500">River Water Quality Sensor</div>
-          {/* Dynamic risk level — updates as contamination slider moves */}
+
+          {/*
+            Dynamic risk level — added Aug 5 2026.
+            This line updates in real time as the Contaminant Scenario panel slider moves.
+            riverColor is derived from contaminationLevel (blue → amber → red) so the text
+            colour matches the river polyline colour the user is looking at on the map.
+            Thresholds: < 0.4 = Low (blue), 0.4–0.7 = Medium (amber), ≥ 0.7 = High (red).
+          */}
           <div className="text-xs font-semibold" style={{ color: riverColor }}>
             {contaminationLevel >= 0.7 ? "High" : contaminationLevel >= 0.4 ? "Medium" : "Low"} Risk
             &nbsp;· {(contaminationLevel * 100).toFixed(0)}% contamination

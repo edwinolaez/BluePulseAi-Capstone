@@ -907,25 +907,40 @@ export function ThreeDView({
       },
     }),
 
-    // Placed sensor coverage rings — radius in metres matches the 2D dashed circle
+    // ── Placed sensor coverage rings ─────────────────────────────────────────
+    // Renders a flat circle on the terrain surface showing each sensor's monitoring area.
+    // This is the 3D equivalent of the dashed <Circle> drawn by PlacedSensorLayer.tsx in 2D.
+    //
+    // Key decisions:
+    //   radiusUnits: "meters" — the radius value (d.radiusM) is treated as real-world metres
+    //     rather than pixels or screen units.  This is the only way to make the ring match
+    //     the 2D dashed circle at real scale on the terrain.  Without this prop, deck.gl
+    //     defaults to "pixels" and the ring would shrink/grow with zoom.
+    //
+    //   fillColor alpha 18 (≈7%) — near-transparent fill so the satellite terrain is visible
+    //     through the ring.  The border (alpha 150) provides the visible ring edge.
+    //
+    //   pickable: false — the ring is a visual reference only; the column below it is the
+    //     clickable element that shows the tooltip.  Making rings pickable would cause them
+    //     to steal hover/click events from the column.
     new ScatterplotLayer<PlacedSensorDatum>({
       id:                 "placed-sensor-rings",
       data:               placedSensorData,
       getPosition:        (d) => [d.lon, d.lat, d.elevationM],
       getFillColor:       (d): [number, number, number, number] => {
         const [r, g, b] = PLACED_COL_COLOR[d.sensorType] ?? PLACED_COL_COLOR.erosion;
-        return [r, g, b, 18];
+        return [r, g, b, 18]; // near-transparent fill — only the border ring is visible
       },
       getLineColor:       (d): [number, number, number, number] => {
         const [r, g, b] = PLACED_COL_COLOR[d.sensorType] ?? PLACED_COL_COLOR.erosion;
-        return [r, g, b, 150];
+        return [r, g, b, 150]; // solid-ish border matching the sensor type colour
       },
       getRadius:          (d) => d.radiusM,
-      radiusUnits:        "meters",
+      radiusUnits:        "meters",  // REQUIRED — otherwise radius is in pixels, not real metres
       filled:             true,
       stroked:            true,
       lineWidthMinPixels: 1.5,
-      pickable:           false,
+      pickable:           false,     // rings are decorative — columns handle click/hover
       updateTriggers:     { getRadius: [placedSensors], getFillColor: [placedSensors], getLineColor: [placedSensors] },
     }),
 
@@ -1098,11 +1113,17 @@ export function ThreeDView({
             };
           }
 
-          // Sensor dot hover — show name + coordinates + dynamic risk level
+          // Sensor dot hover — show name + coordinates + dynamic risk level.
+          // `contaminationLevel` and `waterLevelM` are accessed here from the component's
+          // closure (they are props of ThreeDView, not part of the SensorDot datum).
+          // This means the tooltip always reflects the current slider value without needing
+          // to store it inside the data array or trigger a layer rebuild.
           if ("layerType" in object) {
             const latStr = `${Math.abs(object.lat).toFixed(4)}°${object.lat >= 0 ? "N" : "S"}`;
             const lonStr = `${Math.abs(object.lon).toFixed(4)}°${object.lon >= 0 ? "E" : "W"}`;
-            // Dynamic risk line per sensor type
+            // Dynamic risk line varies by sensor type — only contaminant and burnScar have
+            // dynamic state; erosion dots defer to the column tooltip for risk details
+
             const dynamicLine = object.layerType === "contaminant"
               ? `<div style="font-size:11px;font-weight:700;color:${
                   contaminationLevel >= 0.7 ? "#ef4444" : contaminationLevel >= 0.4 ? "#f59e0b" : "#00A3E0"

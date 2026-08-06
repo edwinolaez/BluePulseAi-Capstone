@@ -1,8 +1,30 @@
+/**
+ * PlaceSensorModal.tsx — confirmation dialog shown after a user drops a sensor on the map.
+ *
+ * Triggered from MapViewPage.tsx after the user clicks the map in placement mode.
+ * The terrain (elevation + slope) has already been fetched via lookupTerrain() before
+ * this modal opens, so it appears with real values pre-populated.
+ *
+ * The modal lets the user:
+ *   1. Name the sensor
+ *   2. Choose the sensor type (Erosion / Forest / Water / Flood)
+ *   3. Adjust the coverage radius (100–2000 m) with a live slider
+ *
+ * As the slider moves, all four physics simulations re-compute in real time
+ * (no debounce needed — these are pure synchronous functions from sensorPhysics.ts).
+ * The results are shown in the "Simulation results" grid before the user confirms.
+ *
+ * On confirm, the sensor data + snapshot simulation results are passed to
+ * MapViewPage.tsx > handleModalConfirm which:
+ *   a) Adds the sensor to local React state (immediate pin appears on map)
+ *   b) Persists to Convex in the background (so it survives a page refresh)
+ *
+ * Why physics functions are imported, not inlined:
+ *   Moving the formulas to sensorPhysics.ts allows them to be unit-tested in isolation
+ *   without mounting this component.  The modal simply calls the functions and displays
+ *   the results — it does not own the physics logic.
+ */
 "use client";
-
-// Modal shown after a user clicks the map in placement mode.
-// Radius slider lets the user set the monitoring coverage area.
-// All 4 digital twin simulations re-compute live as the slider moves.
 
 import { useState } from "react";
 import type { PlacedSensor } from "../../../lib/terrainLookup";
@@ -21,7 +43,16 @@ const SENSOR_TYPE_OPTIONS: { value: PlacedSensor["sensorType"]; label: string; c
   { value: "flood",   label: "Flood Monitor",   color: "#3b82f6" },
 ];
 
-// Default monitoring radius per sensor type (metres)
+/**
+ * DEFAULT_RADIUS — suggested coverage radius per sensor type in metres.
+ *
+ * These defaults are pre-filled when the user switches sensor type so the slider
+ * starts at a physically meaningful value:
+ *   erosion: 500 m — typical field-instrument monitoring radius for RUSLE plots
+ *   forest:  800 m — forest inventory plots are typically 0.5–1 ha (radius ~400–560 m)
+ *   water:   400 m — WSC stream gauges monitor a short reach upstream/downstream
+ *   flood:   700 m — flood inundation mapping commonly uses 500–1000 m buffers
+ */
 const DEFAULT_RADIUS: Record<PlacedSensor["sensorType"], number> = {
   erosion: 500,
   forest:  800,
@@ -85,14 +116,17 @@ export function PlaceSensorModal({
 
   const handleTypeChange = (type: PlacedSensor["sensorType"]) => {
     setSensorType(type);
-    setRadiusM(DEFAULT_RADIUS[type]); // suggest the canonical radius for this type
+    setRadiusM(DEFAULT_RADIUS[type]); // reset radius to the canonical default for this type
   };
 
-  // ── Live simulation — re-computes every time radius or sliders change ───────
+  // ── Live simulation — re-computes every time radius or sliders change ────────
+  // All four functions are pure and synchronous so they run inline on every render.
+  // No debounce or useEffect is needed — React re-renders are fast enough for a slider.
   const { areaM2, areaHa }  = catchmentFrom(radiusM);
   const erosion              = computeErosion(pending.slopeDeg, rainfallMm, areaHa);
   const recovery             = computeForestRecovery(yearsSinceFire, precipMmYr);
   const floodQ               = computeFloodFlow(rainfallMm, areaM2);
+  // contam evaluates Gaussian decay from the Miette River source to this sensor's location
   const contam               = computeContaminant(pending.lat, pending.lon, contaminationLevel, radiusM);
 
   const badgeColor = (label: string) =>

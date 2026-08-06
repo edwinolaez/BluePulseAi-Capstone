@@ -111,6 +111,12 @@ export default function Home() {
     const onKey = (e: KeyboardEvent) => {
       const tgt = e.target as HTMLElement;
       if (
+        // Block shortcuts when the user is typing into a text field, select, or rich text editor.
+        // IMPORTANT: `type !== "range"` is intentional — we do NOT block shortcuts after the user
+        // interacts with a slider (<input type="range">).  Without this exclusion, moving a digital
+        // twin slider shifts browser focus to that input element, and the next keypress fires the
+        // INPUT guard instead of a shortcut.  The range exclusion was added Aug 5 2026 after
+        // users reported that shortcuts stopped working after touching any slider.
         (tgt.tagName === "INPUT" && (tgt as HTMLInputElement).type !== "range") ||
         tgt.tagName === "TEXTAREA" ||
         tgt.tagName === "SELECT" ||
