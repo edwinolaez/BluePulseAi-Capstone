@@ -151,8 +151,6 @@ export function ContaminantLayer({
 
   const directionDeg = result?.contaminant_vector.direction_deg ?? 180;
   const velocity     = result?.contaminant_vector.velocity     ?? 0.65;
-  const risk         = result?.risk_label ?? "Warning";
-  void risk;
 
   // Scale arrow count and river line weight with zoom level
   const arrowPositions = zoom >= 12 ? ARROW_POSITIONS
@@ -210,6 +208,11 @@ export function ContaminantLayer({
         <Tooltip direction="top" offset={[0, -8]} opacity={1}>
           <div className="text-xs font-semibold">ATH-001-W</div>
           <div className="text-xs text-gray-500">River Water Quality Sensor</div>
+          {/* Dynamic risk level — updates as contamination slider moves */}
+          <div className="text-xs font-semibold" style={{ color: riverColor }}>
+            {contaminationLevel >= 0.7 ? "High" : contaminationLevel >= 0.4 ? "Medium" : "Low"} Risk
+            &nbsp;· {(contaminationLevel * 100).toFixed(0)}% contamination
+          </div>
           <div className="text-xs text-gray-400">52.8639°N, 118.1069°W</div>
         </Tooltip>
       </CircleMarker>

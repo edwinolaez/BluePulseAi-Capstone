@@ -189,22 +189,25 @@ export function ElevationRiskLayer({ waterLevelM = 0 }: { waterLevelM?: number }
             }}
           >
             <Tooltip sticky direction="top" opacity={0.95}>
-              <div style={{ minWidth: 180 }}>
+              <div style={{ minWidth: 190 }}>
                 <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 2 }}>
                   {zone.label}
                 </div>
                 <div style={{ fontSize: 11, color: "#6b7280" }}>
                   {zone.sublabel}
                 </div>
-                {flooded && (
-                  <div style={{
-                    marginTop: 5, padding: "2px 6px", borderRadius: 4,
-                    background: "#dbeafe", border: "1px solid #3b82f6",
-                    fontSize: 10, fontWeight: 700, color: "#1d4ed8",
-                  }}>
-                    ⚠ Flood Inundation Zone · +{waterLevelM.toFixed(1)} m
-                  </div>
-                )}
+                {/* Dynamic flood status badge — updates as slider moves */}
+                <div style={{
+                  marginTop: 5, padding: "2px 6px", borderRadius: 4,
+                  background: flooded ? "#dbeafe" : `${zone.fill}18`,
+                  border: `1px solid ${flooded ? "#3b82f6" : zone.fill}`,
+                  fontSize: 10, fontWeight: 700,
+                  color: flooded ? "#1d4ed8" : zone.fill,
+                }}>
+                  {flooded
+                    ? `⚠ Flood Inundation Active · +${waterLevelM.toFixed(1)} m`
+                    : `✓ Not flooded at +${waterLevelM.toFixed(1)} m`}
+                </div>
                 <div style={{
                   marginTop: 6, display: "flex", alignItems: "center", gap: 6,
                   fontSize: 11, fontWeight: 600,
@@ -214,7 +217,9 @@ export function ElevationRiskLayer({ waterLevelM = 0 }: { waterLevelM?: number }
                     display: "inline-block", width: 10, height: 10,
                     borderRadius: 2, background: flooded ? "#3b82f6" : zone.fill,
                   }} />
-                  Elevation Risk Class {zone.category}
+                  {flooded
+                    ? `Risk Class ${zone.category} · ⚠ Inundated`
+                    : `Elevation Risk Class ${zone.category}`}
                 </div>
               </div>
             </Tooltip>

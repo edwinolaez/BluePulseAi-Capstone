@@ -111,7 +111,7 @@ export default function Home() {
     const onKey = (e: KeyboardEvent) => {
       const tgt = e.target as HTMLElement;
       if (
-        tgt.tagName === "INPUT" ||
+        (tgt.tagName === "INPUT" && (tgt as HTMLInputElement).type !== "range") ||
         tgt.tagName === "TEXTAREA" ||
         tgt.tagName === "SELECT" ||
         tgt.isContentEditable

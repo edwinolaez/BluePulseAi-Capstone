@@ -126,8 +126,12 @@ export function MapViewPage({
     if (is3D) return;
     const onKey = (e: KeyboardEvent) => {
       const tgt = e.target as HTMLElement;
-      if (tgt.tagName === "INPUT" || tgt.tagName === "TEXTAREA" ||
-          tgt.tagName === "SELECT" || tgt.isContentEditable) return;
+      if (
+        (tgt.tagName === "INPUT" && (tgt as HTMLInputElement).type !== "range") ||
+        tgt.tagName === "TEXTAREA" ||
+        tgt.tagName === "SELECT" ||
+        tgt.isContentEditable
+      ) return;
       if (e.key === "=" || e.key === "+") zoomIn?.();
       if (e.key === "-")                  zoomOut?.();
     };

@@ -73,7 +73,15 @@ export function BurnScarLayer({ yearsSinceFire = 2, precipMmYr = 450 }: Props) {
         <Tooltip sticky opacity={1}>
           <div className="text-xs font-semibold">ATH-001-A · Forest Regrowth Sensor</div>
           <div className="text-xs text-gray-500">2024 Jasper Wildfire Perimeter · ~35,000 ha</div>
-          <div className="text-xs" style={{ color: fillColor }}>{statusLabel} · {(recovery * 100).toFixed(1)}%</div>
+          {/* Dynamic recovery stage badge — updates as Forest Growth sliders move */}
+          <div style={{
+            marginTop: 4, display: "inline-block",
+            padding: "1px 6px", borderRadius: 4,
+            background: `${fillColor}22`, border: `1px solid ${fillColor}`,
+            fontSize: 10, fontWeight: 700, color: fillColor,
+          }}>
+            {statusLabel} · {(recovery * 100).toFixed(1)}% recovery
+          </div>
         </Tooltip>
       </Polygon>
 
@@ -86,7 +94,9 @@ export function BurnScarLayer({ yearsSinceFire = 2, precipMmYr = 450 }: Props) {
         <Tooltip direction="top" offset={[0, -8]} opacity={1}>
           <div className="text-xs font-semibold">ATH-001-A</div>
           <div className="text-xs text-gray-500">Forest Regrowth Sensor</div>
-          <div className="text-xs" style={{ color: fillColor }}>{statusLabel} · {(recovery * 100).toFixed(1)}%</div>
+          <div className="text-xs font-semibold" style={{ color: fillColor }}>
+            {statusLabel} · {(recovery * 100).toFixed(1)}% recovery
+          </div>
           <div className="text-xs text-gray-400">52.8480°N, 118.0830°W</div>
         </Tooltip>
       </CircleMarker>

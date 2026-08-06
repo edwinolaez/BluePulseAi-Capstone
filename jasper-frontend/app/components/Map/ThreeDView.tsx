@@ -1058,7 +1058,7 @@ export function ThreeDView({
             };
           }
 
-          // Elevation zone hover — show risk class + flood state
+          // Elevation zone hover — show risk class + flood state (dynamic with slider)
           if ("category" in object) {
             const zone    = object as ElevationZoneDatum;
             const flooded = zone.category >= floodCat;
@@ -1076,20 +1076,45 @@ export function ThreeDView({
                 ">
                   <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
                     <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${hex};flex-shrink:0;"></span>
-                    <div style="font-weight:700;">${zone.label}</div>
+                    <div style="font-weight:700;">${zone.label}${flooded ? " · ⚠ Flooded" : ""}</div>
                   </div>
                   <div style="color:#94a3b8;font-size:11px;">${zone.sublabel}</div>
-                  ${flooded ? `<div style="margin-top:5px;padding:2px 8px;border-radius:4px;background:#1e3a8a;border:1px solid #3b82f6;font-size:10px;font-weight:700;color:#93c5fd;">⚠ Flood Inundation Zone · +${waterLevelM.toFixed(1)} m</div>` : ""}
-                  <div style="color:#64748b;font-size:10px;margin-top:4px;">Elevation Flood Risk Class ${zone.category} · hover to identify</div>
+                  <div style="
+                    margin-top:5px;padding:2px 8px;border-radius:4px;
+                    background:${flooded ? "#1e3a8a" : "rgba(255,255,255,0.06)"};
+                    border:1px solid ${flooded ? "#3b82f6" : hex};
+                    font-size:10px;font-weight:700;
+                    color:${flooded ? "#93c5fd" : hex};
+                  ">
+                    ${flooded
+                      ? `⚠ Flood Inundation Active · +${waterLevelM.toFixed(1)} m`
+                      : `✓ Not flooded at +${waterLevelM.toFixed(1)} m`}
+                  </div>
+                  <div style="color:#64748b;font-size:10px;margin-top:4px;">
+                    ${flooded ? `⚠ Inundated · ` : ""}Elevation Risk Class ${zone.category}
+                  </div>
                 </div>`,
               style: { background: "none" },
             };
           }
 
-          // Sensor dot hover — show name + coordinates
+          // Sensor dot hover — show name + coordinates + dynamic risk level
           if ("layerType" in object) {
             const latStr = `${Math.abs(object.lat).toFixed(4)}°${object.lat >= 0 ? "N" : "S"}`;
             const lonStr = `${Math.abs(object.lon).toFixed(4)}°${object.lon >= 0 ? "E" : "W"}`;
+            // Dynamic risk line per sensor type
+            const dynamicLine = object.layerType === "contaminant"
+              ? `<div style="font-size:11px;font-weight:700;color:${
+                  contaminationLevel >= 0.7 ? "#ef4444" : contaminationLevel >= 0.4 ? "#f59e0b" : "#00A3E0"
+                };">
+                  ${contaminationLevel >= 0.7 ? "High" : contaminationLevel >= 0.4 ? "Medium" : "Low"} Risk
+                  · ${(contaminationLevel * 100).toFixed(0)}% contamination
+                </div>`
+              : object.layerType === "burnScar"
+              ? `<div style="font-size:11px;font-weight:700;color:#22c55e;">
+                  Forest recovery in progress · adjust Forest Growth panel
+                </div>`
+              : "";
             return {
               html: `
                 <div style="
@@ -1100,6 +1125,7 @@ export function ThreeDView({
                 ">
                   <div style="font-weight:700;margin-bottom:4px;">${object.label}</div>
                   <div style="color:#94a3b8;font-size:11px;margin-bottom:4px;">${SENSOR_TYPE_LABEL[object.layerType]}</div>
+                  ${dynamicLine}
                   <div>ID: <span style="color:#94a3b8">${object.id}</span></div>
                   <div>Location: <span style="color:#94a3b8">${latStr}, ${lonStr}</span></div>
                   <div style="color:#64748b;font-size:10px;margin-top:4px;">Click to select sector</div>
