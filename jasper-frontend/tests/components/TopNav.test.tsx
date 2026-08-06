@@ -27,9 +27,12 @@ it("renders without crashing", () => {
   render(<TopNav {...BASE_PROPS} />);
 });
 
-it("shows the Jasper Environmental Twin branding", () => {
+// FIX (Aug 6 2026): Old test checked for visible text "Jasper Environmental Twin".
+// TopNav now renders only the <img alt="BluePulse AI"> logo — no visible brand text.
+// Updated to check the image alt attribute instead.
+it("shows the BluePulse AI logo", () => {
   render(<TopNav {...BASE_PROPS} />);
-  expect(screen.getByText("Jasper Environmental Twin")).toBeInTheDocument();
+  expect(screen.getByAltText("BluePulse AI")).toBeInTheDocument();
 });
 
 it("highlights the active Map View tab", () => {

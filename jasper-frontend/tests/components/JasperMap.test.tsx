@@ -15,7 +15,10 @@ jest.mock("react-leaflet", () => ({
   Tooltip: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
   Polyline: () => <div />,
   Polygon:  ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
-  useMap: () => ({}),
+  // FIX (Aug 6 2026): Added getContainer() to the useMap mock. PlacedSensorLayer calls
+  // map.getContainer().style.cursor to toggle the crosshair during sensor placement mode.
+  // Without getContainer the component threw "map.getContainer is not a function".
+  useMap: () => ({ getContainer: () => ({ style: {} }), on: () => {}, off: () => {} }),
   useMapEvents: () => null,
 }));
 

@@ -20,9 +20,16 @@ jest.mock("../../lib/api", () => ({
   fetchContaminantSimulation: (...args: unknown[]) => mockFetchContaminantSimulation(...args),
 }));
 
+// FIX (Aug 6 2026): slopeDeg, rainfallMm, and contaminationLevel are required props
+// that were missing from defaultProps. Without them, AiOverviewPage.tsx crashed at
+// contaminationLevel.toFixed(2) because the value was undefined. These defaults match
+// the baseline slider values used across the digital twin panels.
 const defaultProps = {
-  onResultsUpdate:  jest.fn(),
-  onNavigateToMap:  jest.fn(),
+  onResultsUpdate:    jest.fn(),
+  onNavigateToMap:    jest.fn(),
+  slopeDeg:           38.5,
+  rainfallMm:         82,
+  contaminationLevel: 0.72,
 };
 
 beforeEach(() => {

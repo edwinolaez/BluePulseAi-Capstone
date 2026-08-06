@@ -29,9 +29,11 @@ it("renders river polylines", () => {
   expect(screen.getAllByTestId("river-polyline").length).toBeGreaterThanOrEqual(2);
 });
 
-it("renders the River Flow Warning hazard zone", () => {
+// FIX (Aug 6 2026): Old assertion checked for "River Flow Warning" which was removed
+// from the component. Updated to match the actual rendered label "River Water Quality Sensor".
+it("renders the River Water Quality Sensor label", () => {
   render(<ContaminantLayer />);
-  expect(screen.getAllByText(/River Flow Warning/i).length).toBeGreaterThan(0);
+  expect(screen.getAllByText(/River Water Quality Sensor/i).length).toBeGreaterThan(0);
 });
 
 it("renders the River Water Quality popup title", () => {

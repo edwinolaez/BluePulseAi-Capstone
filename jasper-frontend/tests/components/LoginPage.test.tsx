@@ -32,7 +32,9 @@ it("shows an error when submitting empty fields", async () => {
   });
 });
 
-it("shows the demo credentials hint section", () => {
+// FIX (Aug 6 2026): Old assertion matched "Demo credentials" — the collapsible label
+// was renamed to "Demo accounts" in the LoginPage component. Updated to match.
+it("shows the demo accounts collapsible section", () => {
   render(<LoginPage onLoginSuccess={() => {}} onSuperadminPending={() => {}} />);
-  expect(screen.getByText(/Demo credentials/i)).toBeInTheDocument();
+  expect(screen.getByText(/Demo accounts/i)).toBeInTheDocument();
 });

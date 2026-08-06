@@ -1,6 +1,12 @@
 // Tests for lib/api.ts — the module that connects the frontend to
 // Feven's backend (layer data) and Richard's ML API (burn scar, erosion, contaminant).
 // We mock fetch globally so no real HTTP calls are made.
+//
+// FIX (Aug 6 2026): URL patterns updated to match the Next.js proxy routes that replaced
+// direct Railway calls. All backend traffic now goes through /api/backend/... and
+// /api/ml/... server-side routes so the API key is never exposed in client-side JS.
+// X-API-Key header checks were removed from tests that expected it on the client
+// fetch — that header is now injected by the server-side proxy, not the browser.
 
 import {
   fetchLayerData,
@@ -53,16 +59,12 @@ describe("fetchLayerData", () => {
     (global.fetch as jest.Mock).mockResolvedValue(mockResponse(MOCK_LAYER_DATA));
     await fetchLayerData("ATH-001-A", "2024-01-01", "2024-12-31", "burn");
     const [url] = (global.fetch as jest.Mock).mock.calls[0];
-    expect(url).toContain("/api/v1/layers/ATH-001-A");
+    // Requests go through the Next.js server-side proxy (/api/backend/layers)
+    // so the API key is never exposed in client-side fetch calls.
+    expect(url).toContain("/api/backend/layers");
+    expect(url).toContain("sector_id=ATH-001-A");
     expect(url).toContain("date_from=2024-01-01");
     expect(url).toContain("layer_type=burn");
-  });
-
-  it("sends the X-API-Key header", async () => {
-    (global.fetch as jest.Mock).mockResolvedValue(mockResponse(MOCK_LAYER_DATA));
-    await fetchLayerData("ATH-001-A", "2024-01-01", "2024-12-31", "burn");
-    const [, options] = (global.fetch as jest.Mock).mock.calls[0];
-    expect(options.headers).toHaveProperty("X-API-Key");
   });
 
   it("returns the parsed JSON on success", async () => {
@@ -87,7 +89,8 @@ describe("fetchChangeDetection", () => {
     (global.fetch as jest.Mock).mockResolvedValue(mockResponse(MOCK_MODEL_OUTPUT));
     await fetchChangeDetection("ATH-001-A");
     const [url, options] = (global.fetch as jest.Mock).mock.calls[0];
-    expect(url).toContain("/predict/change-detection");
+    // Proxied through /api/ml/change-detection — API key stays server-side
+    expect(url).toContain("/api/ml/change-detection");
     expect(options.method).toBe("POST");
   });
 
@@ -98,12 +101,12 @@ describe("fetchChangeDetection", () => {
     expect(JSON.parse(options.body)).toEqual({ sector_id: "ATH-001-A" });
   });
 
-  it("sends Content-Type and X-API-Key headers", async () => {
+  it("sends Content-Type header", async () => {
     (global.fetch as jest.Mock).mockResolvedValue(mockResponse(MOCK_MODEL_OUTPUT));
     await fetchChangeDetection("ATH-001-A");
     const [, options] = (global.fetch as jest.Mock).mock.calls[0];
+    // API key is injected by the server-side proxy, not by the client fetch
     expect(options.headers["Content-Type"]).toBe("application/json");
-    expect(options.headers).toHaveProperty("X-API-Key");
   });
 
   it("returns the model output on success", async () => {
@@ -128,7 +131,8 @@ describe("fetchErosionSimulation", () => {
     (global.fetch as jest.Mock).mockResolvedValue(mockResponse(MOCK_MODEL_OUTPUT));
     await fetchErosionSimulation("ATH-001-H", 42, 95);
     const [url] = (global.fetch as jest.Mock).mock.calls[0];
-    expect(url).toContain("/simulate/erosion");
+    // Proxied through /api/ml/erosion — API key stays server-side
+    expect(url).toContain("/api/ml/erosion");
     expect(url).toContain("sector_id=ATH-001-H");
     expect(url).toContain("slope_deg=42");
     expect(url).toContain("rainfall_mm=95");
@@ -165,7 +169,8 @@ describe("fetchContaminantSimulation", () => {
     (global.fetch as jest.Mock).mockResolvedValue(mockResponse(MOCK_MODEL_OUTPUT));
     await fetchContaminantSimulation("ATH-001-W", 180, 2.1, 0.72);
     const [url] = (global.fetch as jest.Mock).mock.calls[0];
-    expect(url).toContain("/simulate/contaminant");
+    // Proxied through /api/ml/contaminant — API key stays server-side
+    expect(url).toContain("/api/ml/contaminant");
     expect(url).toContain("sector_id=ATH-001-W");
     expect(url).toContain("flow_direction_deg=180");
     expect(url).toContain("water_velocity_ms=2.1");
